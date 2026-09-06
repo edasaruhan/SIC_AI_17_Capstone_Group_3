@@ -1,0 +1,31 @@
+# Data generated locally
+data/raw/*
+data/interim/*
+data/processed/*
+!data/raw/.gitkeep
+!data/interim/.gitkeep
+!data/processed/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+
+# Generated artifacts
+artifacts/*
+!artifacts/README.md
+!artifacts/*/
+artifacts/*/*
+!artifacts/*/.gitkeep
+
+# Local configuration and editors
+.env
+.idea/
+.vscode/
+*.egg-info/
+dist/
+build/
+.ruff_cache/

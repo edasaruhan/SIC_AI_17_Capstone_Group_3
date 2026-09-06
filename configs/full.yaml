@@ -1,0 +1,28 @@
+extends: base.yaml
+
+project:
+  mode: full
+  random_seed: 42
+
+data:
+  sampling:
+    enabled: false
+    max_rows: null
+
+paths:
+  run_dir: artifacts/full
+
+# The in-memory pandas quick path is intentionally not used at full scale.
+# DuckDB externally sorts the non-chronological raw file and spills blocking
+# window operations to this run's local work directory when needed.
+full_pipeline:
+  engine: duckdb
+  # Calibrated after the first real run: 1 GB / 2 threads completed all
+  # histories but exhausted memory in the six-way feature export join.
+  # One thread reduces per-thread buffers; 2 GB remains below the measured
+  # 3.616 GiB free-RAM envelope at retry time.
+  memory_limit: 2GB
+  threads: 1
+  max_temp_directory_size: 100GB
+  parquet_compression: zstd
+  eda_sample_rows: 100000

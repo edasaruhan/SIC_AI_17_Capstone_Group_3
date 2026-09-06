@@ -1,0 +1,17 @@
+extends: base.yaml
+
+project:
+  mode: quick
+  random_seed: 42
+
+data:
+  sampling:
+    enabled: true
+    max_rows: 10000
+
+paths:
+  run_dir: artifacts/quick
+
+eda:
+  top_n: 20
+  graph_max_edges: 10000

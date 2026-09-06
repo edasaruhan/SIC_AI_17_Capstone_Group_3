@@ -1,0 +1,59 @@
+version: 1
+
+project:
+  name: "ARGUS AI"
+  mode: base
+  random_seed: 42
+
+paths:
+  raw_data: data/raw/HI-Small_Trans.csv
+  raw_accounts: data/raw/HI-Small_accounts.csv
+  interim_dir: data/interim
+  processed_dir: data/processed
+  artifacts_dir: artifacts
+  figures_dir: artifacts/figures
+  tables_dir: artifacts/tables
+  run_dir: artifacts/base
+
+data:
+  column_mapping:
+    "Timestamp": timestamp
+    "From Bank": from_bank
+    "Account": from_account
+    "To Bank": to_bank
+    "Account.1": to_account
+    "Amount Received": amount_received
+    "Receiving Currency": receiving_currency
+    "Amount Paid": amount_paid
+    "Payment Currency": payment_currency
+    "Payment Format": payment_format
+    "Is Laundering": is_laundering
+  sampling:
+    enabled: false
+    method: chronological_prefix
+    max_rows: null
+
+split:
+  strategy: chronological
+  train_fraction: 0.70
+  validation_fraction: 0.15
+  test_fraction: 0.15
+  train_end: null
+  validation_end: null
+  keep_timestamp_groups_intact: true
+
+features:
+  history_windows:
+    - 1h
+    - 24h
+    - 7d
+  graph:
+    directed: true
+    preserve_repeated_edges: true
+
+logging:
+  level: INFO
+
+eda:
+  top_n: 20
+  graph_max_edges: 50000
