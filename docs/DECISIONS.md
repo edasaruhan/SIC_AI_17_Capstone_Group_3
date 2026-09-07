@@ -4,7 +4,8 @@ Decisions are recorded before results so implementation choices cannot be rewrit
 to fit a preferred narrative. “Accepted” means the design rule is authoritative;
 it does not mean its implementation has passed tests. Runtime verification remains
 in `reports/generated/SPRINT_1_STATUS.md` and
-`reports/generated/SPRINT_2_STATUS.md`.
+`reports/generated/SPRINT_2_STATUS.md`; Sprint 3 runtime verification passed and is
+recorded in `reports/generated/SPRINT_3_STATUS.md`.
 
 ## ADR-001 — Limit the initial build to Sprint 1
 
@@ -240,8 +241,9 @@ in `reports/generated/SPRINT_1_STATUS.md` and
   recomputed validation metrics, deserialized all three models, repeated champion
   selection, and found zero test prediction artifacts. The refreshed manifest
   inventories 26 payloads excluding itself.
-- **Consequence:** Sprint 2 is complete, Random Forest is the validation-selected
-  champion, and Sprint 3 remains not started.
+- **Consequence:** Sprint 2 is complete and immutable, and Random Forest remains its
+  validation-selected champion. Later Sprint 3 evidence is recorded separately
+  under ADR-023 through ADR-026.
 
 ## ADR-020 — Fit all preprocessing state on train only
 
@@ -298,6 +300,80 @@ in `reports/generated/SPRINT_1_STATUS.md` and
   reached its configured 20-iteration limit before convergence; this warning is
   preserved rather than hidden. All outputs are uncalibrated baselines.
 - **Consequence:** Sprint 2 provides initial comparison evidence, not tuned or
-  production-ready estimators. Refinement, calibration, ablation, and graph-value
-  evaluation remain Sprint 3 work. No empirical LightGBM-over-XGBoost superiority
+  production-ready estimators. Its limitations become explicit Sprint 3 inputs and
+  are never erased by later results. No empirical LightGBM-over-XGBoost superiority
   claim is supported.
+
+## ADR-023 — Execute Sprint 3 with the final-test gate closed
+
+- **Date:** 2026-09-07
+- **Status:** Accepted and verified
+- **Decision:** Implement bounded model refinement, expanding temporal CV,
+  validation-only threshold selection, and controlled graph-feature ablation on
+  the frozen Sprint 1/Sprint 2 data snapshot. Do not load, transform, score, or
+  evaluate the final-test rows. Stop before Sprint 4/GraphSAGE.
+- **Reason:** Refinement and graph value require multiple development comparisons;
+  using final-test feedback for those choices would bias the final estimate.
+- **Evidence:** All 15 Sprint 3 acceptance gates passed. Independent artifact
+  verification, 207 tests, Ruff lint/format, and `pip check` passed; the final-test
+  policy records no test fit, transform, inference, prediction, metric, or feedback.
+- **Consequence:** Sprint 3 is complete. Test counts/prevalence are reported only
+  from existing split metadata, and Sprint 4/GraphSAGE was not started.
+
+## ADR-024 — Tune on expanding folds wholly inside outer train
+
+- **Date:** 2026-09-07
+- **Status:** Accepted and verified
+- **Decision:** Create three expanding, timestamp-group-intact folds inside outer
+  train. Fit preprocessing independently on every fold train, transform only its
+  later fold interval, and select one candidate per estimator family by mean fold
+  average precision with deterministic candidate-ID tie-breaking.
+- **Reason:** A single outer-validation search would overfit the only available
+  development holdout, while shuffled cross-validation violates temporal order.
+- **Evidence:** Three timestamp-intact expanding folds ran wholly inside outer
+  train. Mean fold AP selected `lr_newton_sqrt_weight_c001`,
+  `rf_deeper_regularized`, and `lgb_stable_unweighted` before outer-validation
+  comparison.
+- **Consequence:** Outer validation is reserved for the selected-candidate refit,
+  refined champion comparison, threshold analysis, and A/B/C experiment. No outer-
+  validation statistic may enter fold preprocessing or candidate selection.
+
+## ADR-025 — Separate raw ranking evidence from probability saturation
+
+- **Date:** 2026-09-07
+- **Status:** Accepted and verified
+- **Decision:** Preserve raw Logistic Regression and LightGBM decision margins for
+  ranking and store probabilities as diagnostics. Attribute saturation across
+  preprocessing tails, class weighting, regularization/leaf stability, raw-margin
+  ranges, and sigmoid representation. Report exact/near-boundary groups, score
+  collapse, and tie-aware Top-K expected/minimum/maximum outcomes.
+- **Reason:** Sprint 2 Logistic and LightGBM probabilities contain large exact-one
+  plateaus. A stable source-row tie-break reproduces membership but cannot prove
+  discrimination inside an equal-score group.
+- **Evidence:** Serialized-estimator reproduction passed. The immediate tie
+  mechanism was sigmoid/link conversion of extreme raw margins; Sprint 2 weak
+  regularization/class weighting drove those margins. Refined LightGBM had no exact
+  boundary probabilities, and refined Logistic Regression convergence passed.
+- **Consequence:** Top-K superiority may not be claimed when K cuts an unresolved
+  tie. Refined Logistic Regression must also pass explicit convergence evidence;
+  a larger `max_iter` setting alone is insufficient.
+
+## ADR-026 — Isolate graph value with a same-model A/B/C ablation
+
+- **Date:** 2026-09-07
+- **Status:** Accepted and verified
+- **Decision:** Compare A transaction-only, B transaction plus temporal/history,
+  and C B plus all five graph-history features using the same selected LightGBM
+  candidate, parameters, seed, outer split, preprocessing discipline, raw-score
+  representation, and metrics. Also run a declared novel-three graph sensitivity.
+- **Reason:** Changing estimator family or tuning protocol together with features
+  would confound graph value. Two required C columns are exact duplicates of B
+  history columns on the frozen data, so the all-five result needs a redundancy-
+  aware sensitivity.
+- **Evidence:** With the same selected LightGBM protocol, B validation AP was
+  0.35535042 and C AP was 0.47175420, a +0.11640378 delta. The novel-three
+  sensitivity produced the same AP. Test metrics were not used.
+- **Consequence:** The headline graph statement is the generated B-versus-C
+  validation delta. The sensitivity adds only sender prior fan-in, receiver prior
+  fan-out, and prior repeated-pair count. This tabular experiment is not GraphSAGE
+  and supports no GNN-superiority claim.

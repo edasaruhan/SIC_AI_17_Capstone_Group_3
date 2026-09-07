@@ -1,9 +1,10 @@
 # ARGUS AI Roadmap
 
-**Completed boundary:** Sprint 1 and Sprint 2
+**Completed checkpoint:** Sprint 1, Sprint 2, and Sprint 3
 **Overall Sprint 1 status:** `PASS` — 14/14 acceptance criteria  
 **Sprint 2 status:** `PASS` — three baselines and validation-only champion verified
-**Current stop boundary:** Sprint 3 and later have not started
+**Sprint 3 status:** `PASS` — 15/15 acceptance gates and 207 tests passed
+**Current stop boundary:** Sprint 3 complete; Sprint 4/GraphSAGE not started
 
 ## Sprint 1 — Repository Foundation + Data Proof
 
@@ -100,12 +101,70 @@ only selection evidence passed. The logistic baseline reached its configured
 are uncalibrated, and no threshold/hyperparameter refinement was attempted. These
 are explicit inputs to Sprint 3 rather than reasons to rewrite Sprint 2 results.
 
-## Unstarted Sprint 3 and later work
+## Sprint 3 — Model Refinement + Graph Value Experiment
 
-The master implementation prompt retains model refinement, threshold work, temporal
-cross-validation, feature-family ablation, the controlled graph-value experiment,
-GraphSAGE, case/evidence, explainability, and Streamlit phases. None has started,
-and no Sprint 3+ result is claimed.
+The configuration-driven Sprint 3 run completed from `configs/refinement.yaml`.
+It remains separate from the accepted Sprint 2 checkpoint: its evidence compares
+against Sprint 2 without rewriting the baseline models, scores, or warning.
+
+Refined LightGBM was selected on validation AP 0.35535042. The controlled,
+same-model B-versus-C experiment measured AP 0.35535042 versus 0.47175420, a
++0.11640378 graph-feature delta. Independent artifact verification and all quality
+checks passed; the final test remained untouched. See
+[`SPRINT_3_STATUS.md`](../reports/generated/SPRINT_3_STATUS.md) for the complete
+machine-generated ledger.
+
+| Gate | Executable evidence contract | Status source |
+| --- | --- | --- |
+| Frozen outer split | Original train/validation boundaries and upstream hashes | Sprint 3 manifest/verifier |
+| Expanding temporal CV | Three timestamp-intact folds wholly within outer train | `temporal_cv/folds.json` |
+| Fold-local preprocessing | Fit on each fold train; later fold transform-only | preprocessing manifests/tests |
+| Bounded tuning | Declared Logistic, Random Forest, and LightGBM grids | temporal-CV trials/summary |
+| Logistic convergence | Solver/regularization/iteration evidence; nonconverged result rejected | model metadata/acceptance gate |
+| Saturation diagnosis | Raw margins, probabilities, tie groups, label counts, weight/stability controls | `saturation/sprint2_vs_refined.json` |
+| Validation-only refit | Selected family candidates refit on outer train, scored on outer validation | refined comparison/predictions |
+| Threshold selection | Complete score groups; alert-budget and FPR/recall trade-off | `threshold/analysis.json` |
+| Same-model ablation | A transaction-only; B + temporal/history; C + graph | `ablation/feature_family_ablation.csv` |
+| Graph-value control | Same LightGBM candidate, parameters, seed, split, and evaluation for B versus C | graph-value conclusion/verifier |
+| Redundancy sensitivity | Required all-five graph arm plus novel-three graph arm | ablation artifacts |
+| Final-test gate | No transform, inference, predictions, metrics, or feedback | final-test policy/verifier |
+| Reproduction | Train, independent verify, then full quality command | run manifest/status report |
+
+Candidate selection uses mean fold average precision inside outer train. After
+selection, outer validation remains the only partition available for refined model
+comparison, champion selection, and threshold choice. PR-AUC/average precision is
+primary; ROC-AUC is secondary, and Recall@K, Precision@K, F1, FPR, and alert volume
+are operational context. Accuracy is not a primary metric.
+
+Logistic Regression and LightGBM use raw decision margins for ranking when the
+estimator exposes them. Probability scores remain diagnostic outputs. When a
+finite K cuts through an equal-score group, deterministic row ordering makes the
+output reproducible, but tie-aware expected/minimum/maximum true-positive bounds
+must be reported and that K cannot establish within-tie model superiority.
+
+The A/B/C headline experiment holds the LightGBM candidate and all non-feature
+conditions constant. C includes all five required prior graph fields. Because
+sender prior fan-out and receiver prior fan-in duplicate existing history fields
+on the frozen data, a novel-three sensitivity separately adds sender prior fan-in,
+receiver prior fan-out, and prior repeated-pair count. The generated full run found
+the same +0.11640378 AP delta for both the required all-five C arm and the
+duplicate-removed novel-three sensitivity. This is tabular validation evidence,
+not a GNN result.
+
+Reproduction commands:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/train_refined_models.py --config configs/refinement.yaml
+.\.venv\Scripts\python.exe scripts/verify_refinement.py --config configs/refinement.yaml
+.\.venv\Scripts\python.exe scripts/validate_sprint3.py --config configs/refinement.yaml
+```
+
+## Sprint 4 and later — Not started
+
+GraphSAGE/GNN modeling, case/evidence cards, explainability, Streamlit, and final-
+test opening remain outside Sprint 3. The project must stop before those phases;
+the tabular graph-feature ablation is not GraphSAGE and must not be described as a
+GNN result.
 
 ## Stop conditions
 

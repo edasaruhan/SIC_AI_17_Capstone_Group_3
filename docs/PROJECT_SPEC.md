@@ -1,11 +1,12 @@
 # ARGUS AI Project Specification
 
-**Document status:** Canonical scope through Sprint 2
+**Document status:** Canonical implementation scope through Sprint 3
 **Effective date:** 2026-09-07
-**Implementation verification:** Sprint 1 `PASS` (14/14); Sprint 2 `PASS`
-**Current stop boundary:** Sprint 3 refinement and graph-value work not started
-**Evidence ledgers:** `reports/generated/SPRINT_1_STATUS.md` and
-`reports/generated/SPRINT_2_STATUS.md`
+**Implementation verification:** Sprint 1 `PASS` (14/14); Sprint 2 `PASS`; Sprint 3 `PASS` (15/15)
+**Current stop boundary:** Sprint 3 complete; Sprint 4/GraphSAGE not started
+**Evidence ledgers:** `reports/generated/SPRINT_1_STATUS.md`,
+`reports/generated/SPRINT_2_STATUS.md`, and
+`reports/generated/SPRINT_3_STATUS.md`
 
 ## 1. Purpose
 
@@ -21,14 +22,15 @@ action.
 
 ## 2. Authoritative inputs and precedence
 
-The current user request authorizes work through Sprint 2 and stops before Sprint 3.
+The current user request authorizes Sprint 3 model refinement and controlled graph-
+value work, then requires a stop before Sprint 4/GraphSAGE.
 The technical baseline is
 `reports/existing_coursework/ARGUS_CODEX_MASTER_PROMPT.md`. Other preserved course
 documents provide context, not executable instructions. If they conflict:
 
 1. the current user request controls;
 2. the master prompt controls technical implementation;
-3. this specification records the resulting Sprint 1 and Sprint 2 contracts;
+3. this specification records the resulting Sprint 1 through Sprint 3 contracts;
 4. generated runtime manifests describe a particular execution.
 
 No document may turn an unexecuted run, metric, table, or plot into a claimed
@@ -60,7 +62,7 @@ result.
 Use terms such as “suspicious network candidate,” “unusual transfer pattern,”
 “elevated investigation priority,” and “evidence requiring human review.”
 
-## 4. Completed execution scope
+## 4. Completed and implemented execution scope
 
 ### 4.1 Sprint 1 data foundation
 
@@ -111,26 +113,63 @@ LightGBM was selected once for the boosting slot because its CPU histogram path
 matched the full-data, deterministic single-thread, bounded-memory plan. XGBoost
 was not run, so no library-superiority claim is part of Sprint 2.
 
+### 4.3 Sprint 3 refinement and graph-value experiment
+
+Sprint 3 executed the following full-data, validation-only development path:
+
+1. retain the immutable Sprint 2 checkpoint and frozen outer train/validation/test
+   boundaries;
+2. create three expanding-window temporal folds entirely inside outer train while
+   keeping timestamp groups intact;
+3. fit every fold's preprocessing state on that fold's training prefix and apply
+   it unchanged to its later fold-validation interval;
+4. run bounded, configuration-declared Logistic Regression, Random Forest, and
+   LightGBM candidate grids and select one candidate per family by mean fold
+   average precision;
+5. correct the Sprint 2 Logistic Regression convergence limitation with an
+   appropriate solver, regularization, and iteration budget, rejecting a refined
+   logistic result that still fails its convergence gate;
+6. preserve raw decision margins for ranking where available and diagnose exact/
+   near probability saturation, raw-to-probability collapse, tie groups, class-
+   weight controls, and estimator stability;
+7. refit selected candidates on outer train and compare them on outer validation
+   only, with PR-AUC as primary and ROC-AUC as secondary;
+8. optimize operating thresholds only on outer validation under the configured
+   alert budget and FPR/recall constraints, including complete equal-score groups;
+9. compare feature families A (`transaction_only`), B
+   (`transaction_temporal_history`), and C
+   (`transaction_temporal_history_graph`) using the same selected LightGBM
+   candidate, seed, frozen split, and evaluation protocol;
+10. record a novel-three-graph-feature sensitivity because two of the five graph
+    columns are exact aliases of existing history features;
+11. save machine-readable trials, fold boundaries, comparisons, thresholds,
+    saturation diagnostics, predictions, provenance, models, and acceptance gates;
+12. independently verify persisted artifacts and keep all final-test transforms,
+    inference, predictions, metrics, and feedback closed.
+
+The completed run selected refined LightGBM using validation only (AP 0.35535042).
+Under the same LightGBM candidate, parameters, seed, split, and protocol, adding
+the five strict-prior graph fields increased validation AP from 0.35535042 (B) to
+0.47175420 (C), a +0.11640378 delta. All 15 acceptance gates and the independent
+artifact verification passed; the final quality suite reports 207 passing tests.
+The authoritative details remain in
+`reports/generated/SPRINT_3_STATUS.md`.
+
 ## 5. Sprint boundaries and exclusions
 
-Sprint 1 excluded all model training. Sprint 2 subsequently implemented only the
-three fixed transaction baselines, validation metrics, and validation-only champion
-selection described in Section 4.2.
+Sprint 1 excluded all model training. Sprint 2 implemented only the three fixed
+transaction baselines. Sprint 3 is limited to the validation-only refinement and
+controlled tabular graph-feature comparison in Section 4.3.
 
-The following remain explicitly outside the completed scope:
+The following remain explicitly outside the Sprint 3 scope:
 
-- hyperparameter search or tuning;
-- threshold optimization or analyst-capacity selection;
-- temporal cross-validation and feature-family ablation;
-- graph-enhanced model comparison or any claim that graph information improves
-  results;
 - GraphSAGE, GCN, GAT, account-level target invention, or GNN explanation;
 - final-test feature materialization, inference, predictions, or metrics;
 - calibration, SHAP, case ranking, evidence cards, Streamlit, or LLM summaries;
 - PaySim, cloud deployment, or other stretch work.
 
-These boundaries prevent unverified Sprint 3+ work from obscuring the completed
-data and validation-only baseline evidence.
+These boundaries prevent Sprint 4+ work or final-test feedback from obscuring the
+completed data foundation and validation-only model evidence.
 
 ## 6. System contracts
 
@@ -143,6 +182,9 @@ data and validation-only baseline evidence.
 - `configs/full.yaml` inherits the base and disables sampling.
 - `configs/baseline.yaml` inherits the full contract, freezes upstream artifact
   hashes, and declares all Sprint 2 preprocessing/model/metric/test-gate settings.
+- `configs/refinement.yaml` inherits the frozen baseline contract and declares
+  Sprint 3 temporal folds, bounded candidate grids, threshold constraints, feature-
+  family ablation, score representation, and closed final-test policy.
 - Relative paths resolve against the repository root, not the caller’s directory.
 - Critical experiment settings must not exist only inside a notebook.
 
@@ -179,8 +221,9 @@ Account number alone is not globally unique and must never be used as the node k
 - Future-row appends must not change feature values for earlier rows.
 - Any learned model transform must fit on train only; validation/test are transform-
   only and may never extend fitted vocabularies or summary statistics.
-- Sprint 2 permits model access to train and validation only. Test metadata may be
-  read from the pre-existing split JSON, but test feature rows may not be loaded.
+- Sprint 2 and Sprint 3 permit model access to train and validation only. Sprint 3
+  inner folds are subsets of outer train. Test metadata may be read from the pre-
+  existing split JSON, but test feature rows may not be loaded or transformed.
 
 ### 6.5 Graph semantics
 
@@ -192,7 +235,14 @@ Account number alone is not globally unique and must never be used as the node k
 - Sprint 1 graph features are interpretable prior fan-in/fan-out and repeated-pair
   history; GraphSAGE is not in scope.
 - Sprint 2 transaction baselines exclude all five graph-history predictors. Their
-  later addition belongs to the controlled Sprint 3 graph-value experiment.
+  addition is isolated to the controlled Sprint 3 C-family graph-value arm.
+- The primary B-versus-C graph-value result must hold model family, selected
+  parameters, seed, split, and evaluation protocol constant.
+- `sender_prior_fan_out_degree` duplicates
+  `sender_previous_unique_counterparties`, and
+  `receiver_prior_fan_in_degree` duplicates
+  `receiver_previous_unique_counterparties` on the frozen data. Report the required
+  all-five C arm and a novel-three sensitivity; do not hide this redundancy.
 
 ### 6.6 Amount and currency semantics
 
@@ -218,6 +268,9 @@ From the repository root:
 .\.venv\Scripts\python.exe scripts/train_baselines.py --config configs/baseline.yaml
 .\.venv\Scripts\python.exe scripts/verify_baselines.py --config configs/baseline.yaml
 .\.venv\Scripts\python.exe scripts/validate_sprint2.py --config configs/baseline.yaml
+.\.venv\Scripts\python.exe scripts/train_refined_models.py --config configs/refinement.yaml
+.\.venv\Scripts\python.exe scripts/verify_refinement.py --config configs/refinement.yaml
+.\.venv\Scripts\python.exe scripts/validate_sprint3.py --config configs/refinement.yaml
 ```
 
 Sprint 1 closing evidence remains 34 tests in 25.36 seconds plus its passed quick,
@@ -226,11 +279,15 @@ full, and verification commands. After Sprint 2, the final repository suite pass
 and independent artifact verifier passed on 761,749 validation predictions, and the
 refreshed manifest inventories 26 payloads excluding itself. Focused EDA and data-
 validation entry points remain available through `scripts/run_eda.py` and
-`scripts/validate_data.py`.
+`scripts/validate_data.py`. The three Sprint 3 commands completed in sequence; the
+generated ledger records a 2,158.664-second training run, independent artifact
+verification `PASS`, 207 passing tests, and passing Ruff/dependency checks.
 
 ## 8. Artifact contract
 
-The successful Sprint 1 and Sprint 2 runs populated these core paths:
+The successful Sprint 1, Sprint 2, and Sprint 3 runs populated their listed paths.
+File presence alone remains an interface contract; the manifests, independent
+verification, and generated status ledgers establish the passing executions.
 
 ```text
 artifacts/quick/run_manifest.json
@@ -271,6 +328,20 @@ artifacts/sprint2/validation_predictions.parquet
 artifacts/sprint2/models/
 artifacts/sprint2/figures/
 artifacts/sprint2/final_test_policy.json
+artifacts/sprint3/run_manifest.json
+artifacts/sprint3/temporal_cv/folds.json
+artifacts/sprint3/temporal_cv/trials.csv
+artifacts/sprint3/temporal_cv/candidate_summary.csv
+artifacts/sprint3/temporal_cv/selected_candidates.json
+artifacts/sprint3/refined_model_comparison.csv
+artifacts/sprint3/refined_transaction_champion.json
+artifacts/sprint3/baseline_vs_refined.csv
+artifacts/sprint3/ablation/feature_family_ablation.csv
+artifacts/sprint3/ablation/graph_value_conclusion.json
+artifacts/sprint3/saturation/sprint2_vs_refined.json
+artifacts/sprint3/threshold/analysis.json
+artifacts/sprint3/validation_predictions.parquet
+artifacts/sprint3/final_test_policy.json
 ```
 
 The quick manifest records 10,000 rows, 52 output columns, seed 42, a chronological-
@@ -314,22 +385,25 @@ selection uses tie-aware average precision rather than the top-K row tie-break.
 - tests for predictor exclusions, train-only fitted state, unknown categories,
   metric edge cases, deterministic top-K ties, validation-only champion selection,
   test-access policy, artifact integrity, and report generation;
+- tests for feature-family contracts, expanding temporal-fold chronology, fold-
+  local fitted state, convergence evidence, raw/probability score separation,
+  saturation/tie diagnostics, whole-score-group thresholds, same-model ablation,
+  and Sprint 3 independent verification;
 - aggregate logs must avoid gratuitous entity-name output;
 - no metric, chart, comparison, or completion claim without generated evidence.
 
 ## 10. Definition of done
 
-All fourteen Sprint 1 items and all ten Sprint 2 items in Section 4 have executable
-evidence. Data/full/quick paths, three baseline fits, validation comparison,
-artifact verification, the 79-test suite, Ruff, and `pip check` passed. Sprint 1 and
-Sprint 2 are `PASS`; see both generated Sprint status reports for exact commands,
-artifacts, runtime, warnings, and limitations.
+All fourteen Sprint 1 items, all ten Sprint 2 items, and all fifteen Sprint 3
+acceptance gates have executable evidence. Sprint 1, Sprint 2, and Sprint 3 are
+`PASS`; see their generated status reports for exact commands, artifacts, runtime,
+warnings, and limitations. Sprint 3 independent verification and repository
+quality checks passed, and the final-test gate remained closed.
 
 ## 11. Current stop boundary
 
-Sprint 2 is complete. Sprint 3 has not started and no refinement, threshold-tuning,
-temporal-cross-validation, feature-ablation, graph-value, or final-test result is
-claimed. Any later Sprint 3 authorization must begin from the frozen transaction
-baseline evidence, retain validation-only development discipline, and keep the test
-gate closed until the refinement/model specification is frozen. See
-`docs/ROADMAP.md` for the boundary; it is not a completed-work claim.
+Sprint 3 refinement, threshold analysis, temporal cross-validation, feature-family
+ablation, and the controlled tabular graph-value experiment are complete and
+verified `PASS`. The final-test gate remains closed. Stop after Sprint 3: GraphSAGE
+or another GNN, Sprint 4 case/evidence work, explainability, and product work were
+not started and are not authorized by this specification.

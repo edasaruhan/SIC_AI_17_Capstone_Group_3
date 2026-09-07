@@ -1,0 +1,163 @@
+extends: baseline.yaml
+
+project:
+  mode: sprint3_refinement
+  random_seed: 42
+
+paths:
+  run_dir: artifacts/sprint3
+  generated_report: reports/generated/SPRINT_3_STATUS.md
+  sprint2_run_dir: artifacts/sprint2
+
+sprint3:
+  protocol_version: 1
+  full_data: true
+  sampled: false
+  selection_metric: average_precision
+  ranking_score_type: raw_margin_where_available
+  final_test_access: false
+  final_test_policy: metadata_only_no_transform_no_inference
+  top_k: [100, 500, 1000]
+  ranking_tie_break: source_row_number_ascending
+  batch_rows: 100000
+  memory_limit: 4GB
+  # Keep DuckDB aggregation single-threaded so the accepted Sprint 2 fitted
+  # preprocessing state is bit-for-bit reproducible. Estimators use the
+  # separate model_threads setting.
+  threads: 1
+  model_threads: 4
+  max_temp_directory_size: 100GB
+  parquet_compression: zstd
+  model_serialization_compression: 3
+  retain_work_matrices: false
+
+  temporal_cv:
+    strategy: expanding_window
+    cumulative_train_quantiles: [0.4, 0.6, 0.8]
+    validation_end_quantiles: [0.6, 0.8, 1.0]
+    timestamp_groups_must_remain_intact: true
+    selection_aggregation: mean_fold_average_precision
+
+  threshold_optimization:
+    partition: validation
+    score_type: raw_ranking_score
+    primary_rule: maximize_recall_subject_to_joint_constraints
+    alert_budget: 5000
+    fpr_ceiling: 0.01
+    tie_policy: include_complete_equal_score_group
+
+  tuning:
+    feature_family: transaction_temporal_history
+    candidate_tie_break: candidate_id_ascending
+    reject_nonconverged_logistic: true
+    reject_nonfinite_scores: true
+    logistic_regression:
+      # The first two trials isolate class weighting; the second and third
+      # isolate L2 strength. newton-cholesky is efficient for millions of rows
+      # with this modest transformed feature count. The fourth candidate keeps
+      # a bounded solver comparison against SAGA.
+      - candidate_id: lr_newton_unweighted_c001
+        solver: newton-cholesky
+        penalty: l2
+        C: 0.01
+        class_weight_policy: none
+        max_iter: 100
+        tol: 0.0001
+      - candidate_id: lr_newton_sqrt_weight_c001
+        solver: newton-cholesky
+        penalty: l2
+        C: 0.01
+        class_weight_policy: sqrt_train_ratio
+        max_iter: 100
+        tol: 0.0001
+      - candidate_id: lr_newton_sqrt_weight_c0001
+        solver: newton-cholesky
+        penalty: l2
+        C: 0.001
+        class_weight_policy: sqrt_train_ratio
+        max_iter: 100
+        tol: 0.0001
+      - candidate_id: lr_saga_sqrt_weight_c001
+        solver: saga
+        penalty: l2
+        C: 0.01
+        class_weight_policy: sqrt_train_ratio
+        max_iter: 250
+        tol: 0.001
+
+    random_forest:
+      - candidate_id: rf_sprint2_reference
+        n_estimators: 80
+        max_depth: 14
+        min_samples_leaf: 25
+        max_features: sqrt
+        class_weight_policy: balanced_subsample
+        bootstrap: true
+        max_samples: 0.2
+      - candidate_id: rf_deeper_regularized
+        n_estimators: 120
+        max_depth: 18
+        min_samples_leaf: 40
+        max_features: sqrt
+        class_weight_policy: balanced_subsample
+        bootstrap: true
+        max_samples: 0.25
+
+    lightgbm:
+      # The first three trials isolate class weighting. All other parameters
+      # are deliberately identical so saturation attribution is controlled.
+      - candidate_id: lgb_stable_unweighted
+        scale_pos_weight_policy: none
+        n_estimators: 300
+        learning_rate: 0.04
+        num_leaves: 31
+        max_depth: 8
+        min_child_samples: 100
+        min_child_weight: 1.0
+        reg_alpha: 1.0
+        reg_lambda: 20.0
+        max_delta_step: 1.0
+      - candidate_id: lgb_stable_sqrt_weight
+        scale_pos_weight_policy: sqrt_train_ratio
+        n_estimators: 300
+        learning_rate: 0.04
+        num_leaves: 31
+        max_depth: 8
+        min_child_samples: 100
+        min_child_weight: 1.0
+        reg_alpha: 1.0
+        reg_lambda: 20.0
+        max_delta_step: 1.0
+      - candidate_id: lgb_stable_capped100_weight
+        scale_pos_weight_policy: capped_100
+        n_estimators: 300
+        learning_rate: 0.04
+        num_leaves: 31
+        max_depth: 8
+        min_child_samples: 100
+        min_child_weight: 1.0
+        reg_alpha: 1.0
+        reg_lambda: 20.0
+        max_delta_step: 1.0
+      - candidate_id: lgb_sqrt_weight_stronger_regularization
+        scale_pos_weight_policy: sqrt_train_ratio
+        n_estimators: 400
+        learning_rate: 0.03
+        num_leaves: 15
+        max_depth: 6
+        min_child_samples: 200
+        min_child_weight: 5.0
+        reg_alpha: 2.0
+        reg_lambda: 50.0
+        max_delta_step: 1.0
+
+  ablation:
+    model_family: lightgbm
+    primary_families:
+      - transaction_only
+      - transaction_temporal_history
+      - transaction_temporal_history_graph
+    sensitivity_family: transaction_temporal_history_graph_novel3
+    duplicate_graph_pairs:
+      sender_prior_fan_out_degree: sender_previous_unique_counterparties
+      receiver_prior_fan_in_degree: receiver_previous_unique_counterparties

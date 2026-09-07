@@ -10,6 +10,7 @@ directory.
 
 from __future__ import annotations
 
+import math
 import re
 from collections.abc import Mapping, MutableMapping
 from copy import deepcopy
@@ -19,6 +20,9 @@ from typing import Any, TypeAlias
 import yaml
 
 ConfigDict: TypeAlias = dict[str, Any]
+
+_POSITIVE_SIZE_PATTERN = re.compile(r"[1-9]\d*(?:\.\d+)?(?:KB|MB|GB|TB)")
+_CANDIDATE_ID_PATTERN = re.compile(r"[a-z][a-z0-9_]*")
 
 
 class ConfigError(ValueError):
@@ -120,6 +124,50 @@ def _require_mapping(config: Mapping[str, Any], key: str) -> Mapping[str, Any]:
     return value
 
 
+def _require_exact_keys(value: Mapping[str, Any], expected: set[str], name: str) -> None:
+    """Reject omissions and misspelled/unsupported schema keys."""
+
+    actual = set(value)
+    if actual != expected:
+        missing = sorted(expected - actual)
+        unexpected = sorted(actual - expected)
+        raise ConfigError(f"{name} keys differ; missing={missing}, unexpected={unexpected}")
+
+
+def _require_positive_integer(value: object, name: str, *, minimum: int = 1) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+        raise ConfigError(f"{name} must be an integer >= {minimum}")
+    return value
+
+
+def _require_finite_number(
+    value: object,
+    name: str,
+    *,
+    minimum: float | None = None,
+    maximum: float | None = None,
+    minimum_inclusive: bool = True,
+    maximum_inclusive: bool = True,
+) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ConfigError(f"{name} must be a finite number")
+    numeric = float(value)
+    if not math.isfinite(numeric):
+        raise ConfigError(f"{name} must be a finite number")
+    if minimum is not None and (numeric < minimum if minimum_inclusive else numeric <= minimum):
+        relation = ">=" if minimum_inclusive else ">"
+        raise ConfigError(f"{name} must be {relation} {minimum}")
+    if maximum is not None and (numeric > maximum if maximum_inclusive else numeric >= maximum):
+        relation = "<=" if maximum_inclusive else "<"
+        raise ConfigError(f"{name} must be {relation} {maximum}")
+    return numeric
+
+
+def _require_positive_size(value: object, name: str) -> None:
+    if not isinstance(value, str) or _POSITIVE_SIZE_PATTERN.fullmatch(value) is None:
+        raise ConfigError(f"{name} must be a positive size such as '1GB'")
+
+
 def validate_config(config: Mapping[str, Any]) -> None:
     """Validate settings required by the Sprint 1 data pipeline."""
 
@@ -219,6 +267,10 @@ def validate_config(config: Mapping[str, Any]) -> None:
     if baseline is not None:
         _validate_baseline_config(baseline)
 
+    sprint3 = config.get("sprint3")
+    if sprint3 is not None:
+        _validate_refinement_config(sprint3, baseline=baseline)
+
 
 def _validate_baseline_config(baseline: object) -> None:
     """Validate the immutable Sprint 2 model-selection contract."""
@@ -294,6 +346,428 @@ def _validate_baseline_config(baseline: object) -> None:
         value = frozen.get(key)
         if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None:
             raise ConfigError(f"baseline.frozen_upstream.{key} must be a lowercase SHA-256")
+
+
+def _validate_refinement_config(sprint3: object, *, baseline: object) -> None:
+    """Validate the complete, predeclared Sprint 3 experiment protocol.
+
+    Sprint 3 is intentionally not a generic estimator configuration surface.  Its
+    evidence is comparable only while the full-data scope, closed-test policy,
+    expanding folds, tuning grid, and same-model feature ablation remain intact.
+    Strict keys also turn misspelled settings into load-time errors rather than
+    silently ignored experimental changes.
+    """
+
+    if not isinstance(sprint3, Mapping):
+        raise ConfigError("sprint3 must be a mapping")
+    _require_exact_keys(
+        sprint3,
+        {
+            "protocol_version",
+            "full_data",
+            "sampled",
+            "selection_metric",
+            "ranking_score_type",
+            "final_test_access",
+            "final_test_policy",
+            "top_k",
+            "ranking_tie_break",
+            "batch_rows",
+            "memory_limit",
+            "threads",
+            "model_threads",
+            "max_temp_directory_size",
+            "parquet_compression",
+            "model_serialization_compression",
+            "retain_work_matrices",
+            "temporal_cv",
+            "threshold_optimization",
+            "tuning",
+            "ablation",
+        },
+        "sprint3",
+    )
+
+    if sprint3.get("protocol_version") != 1 or isinstance(sprint3.get("protocol_version"), bool):
+        raise ConfigError("sprint3.protocol_version must be integer 1")
+    if sprint3.get("full_data") is not True or sprint3.get("sampled") is not False:
+        raise ConfigError("Sprint 3 requires sprint3.full_data=true and sprint3.sampled=false")
+    if sprint3.get("selection_metric") != "average_precision":
+        raise ConfigError("sprint3.selection_metric must be 'average_precision'")
+    if sprint3.get("ranking_score_type") != "raw_margin_where_available":
+        raise ConfigError("sprint3.ranking_score_type must be 'raw_margin_where_available'")
+    if sprint3.get("final_test_access") is not False:
+        raise ConfigError("Sprint 3 requires sprint3.final_test_access=false")
+    if sprint3.get("final_test_policy") != "metadata_only_no_transform_no_inference":
+        raise ConfigError(
+            "sprint3.final_test_policy must be 'metadata_only_no_transform_no_inference'"
+        )
+    if sprint3.get("ranking_tie_break") != "source_row_number_ascending":
+        raise ConfigError("sprint3.ranking_tie_break must be 'source_row_number_ascending'")
+
+    top_k = sprint3.get("top_k")
+    if (
+        not isinstance(top_k, list)
+        or not top_k
+        or any(
+            isinstance(value, bool) or not isinstance(value, int) or value <= 0 for value in top_k
+        )
+        or top_k != sorted(set(top_k))
+    ):
+        raise ConfigError("sprint3.top_k must be strictly increasing unique positive integers")
+    if not isinstance(baseline, Mapping):
+        raise ConfigError("Sprint 3 requires the inherited baseline contract")
+    if top_k != baseline.get("top_k"):
+        raise ConfigError("sprint3.top_k must match baseline.top_k for comparable evaluation")
+    if sprint3.get("ranking_tie_break") != baseline.get("ranking_tie_break"):
+        raise ConfigError("sprint3.ranking_tie_break must match baseline.ranking_tie_break")
+
+    _require_positive_integer(sprint3.get("batch_rows"), "sprint3.batch_rows")
+    _require_positive_integer(sprint3.get("threads"), "sprint3.threads")
+    _require_positive_integer(sprint3.get("model_threads"), "sprint3.model_threads")
+    _require_positive_size(sprint3.get("memory_limit"), "sprint3.memory_limit")
+    _require_positive_size(
+        sprint3.get("max_temp_directory_size"), "sprint3.max_temp_directory_size"
+    )
+    if sprint3.get("parquet_compression") not in {"snappy", "zstd"}:
+        raise ConfigError("sprint3.parquet_compression must be 'snappy' or 'zstd'")
+    compression = sprint3.get("model_serialization_compression")
+    if (
+        isinstance(compression, bool)
+        or not isinstance(compression, int)
+        or not 0 <= compression <= 9
+    ):
+        raise ConfigError("sprint3.model_serialization_compression must be an integer in [0, 9]")
+    if not isinstance(sprint3.get("retain_work_matrices"), bool):
+        raise ConfigError("sprint3.retain_work_matrices must be boolean")
+
+    _validate_refinement_temporal_cv(sprint3.get("temporal_cv"))
+    _validate_refinement_threshold(sprint3.get("threshold_optimization"))
+    _validate_refinement_tuning(sprint3.get("tuning"))
+    _validate_refinement_ablation(sprint3.get("ablation"))
+
+
+def _validated_refinement_quantiles(value: object, name: str) -> list[float]:
+    if not isinstance(value, list) or len(value) < 3:
+        raise ConfigError(f"{name} must contain at least three numeric quantiles")
+    quantiles = [
+        _require_finite_number(
+            item,
+            f"{name}[{index}]",
+            minimum=0.0,
+            maximum=1.0,
+            minimum_inclusive=False,
+        )
+        for index, item in enumerate(value)
+    ]
+    if quantiles != sorted(set(quantiles)):
+        raise ConfigError(f"{name} must be strictly increasing")
+    return quantiles
+
+
+def _validate_refinement_temporal_cv(value: object) -> None:
+    if not isinstance(value, Mapping):
+        raise ConfigError("sprint3.temporal_cv must be a mapping")
+    _require_exact_keys(
+        value,
+        {
+            "strategy",
+            "cumulative_train_quantiles",
+            "validation_end_quantiles",
+            "timestamp_groups_must_remain_intact",
+            "selection_aggregation",
+        },
+        "sprint3.temporal_cv",
+    )
+    if value.get("strategy") != "expanding_window":
+        raise ConfigError("sprint3.temporal_cv.strategy must be 'expanding_window'")
+    if value.get("selection_aggregation") != "mean_fold_average_precision":
+        raise ConfigError(
+            "sprint3.temporal_cv.selection_aggregation must be 'mean_fold_average_precision'"
+        )
+    if value.get("timestamp_groups_must_remain_intact") is not True:
+        raise ConfigError("sprint3.temporal_cv.timestamp_groups_must_remain_intact must be true")
+    train = _validated_refinement_quantiles(
+        value.get("cumulative_train_quantiles"),
+        "sprint3.temporal_cv.cumulative_train_quantiles",
+    )
+    validation = _validated_refinement_quantiles(
+        value.get("validation_end_quantiles"),
+        "sprint3.temporal_cv.validation_end_quantiles",
+    )
+    if len(train) != len(validation):
+        raise ConfigError("Sprint 3 temporal-CV quantile lists must have equal length")
+    if any(
+        train_end >= validation_end
+        for train_end, validation_end in zip(train, validation, strict=True)
+    ):
+        raise ConfigError("Each Sprint 3 train quantile must precede its validation end")
+    if any(
+        not math.isclose(validation[index], train[index + 1], abs_tol=1e-12)
+        for index in range(len(train) - 1)
+    ):
+        raise ConfigError(
+            "Adjacent Sprint 3 folds must join at validation_end[i] == train_end[i+1]"
+        )
+    if not math.isclose(validation[-1], 1.0, abs_tol=1e-12):
+        raise ConfigError("The final Sprint 3 temporal-CV validation quantile must be 1.0")
+
+
+def _validate_refinement_threshold(value: object) -> None:
+    if not isinstance(value, Mapping):
+        raise ConfigError("sprint3.threshold_optimization must be a mapping")
+    _require_exact_keys(
+        value,
+        {
+            "partition",
+            "score_type",
+            "primary_rule",
+            "alert_budget",
+            "fpr_ceiling",
+            "tie_policy",
+        },
+        "sprint3.threshold_optimization",
+    )
+    expected_strings = {
+        "partition": "validation",
+        "score_type": "raw_ranking_score",
+        "primary_rule": "maximize_recall_subject_to_joint_constraints",
+        "tie_policy": "include_complete_equal_score_group",
+    }
+    for key, expected in expected_strings.items():
+        if value.get(key) != expected:
+            raise ConfigError(f"sprint3.threshold_optimization.{key} must be {expected!r}")
+    _require_positive_integer(
+        value.get("alert_budget"), "sprint3.threshold_optimization.alert_budget"
+    )
+    _require_finite_number(
+        value.get("fpr_ceiling"),
+        "sprint3.threshold_optimization.fpr_ceiling",
+        minimum=0.0,
+        maximum=1.0,
+        minimum_inclusive=False,
+        maximum_inclusive=False,
+    )
+
+
+def _validate_refinement_tuning(value: object) -> None:
+    if not isinstance(value, Mapping):
+        raise ConfigError("sprint3.tuning must be a mapping")
+    model_families = {"logistic_regression", "random_forest", "lightgbm"}
+    _require_exact_keys(
+        value,
+        {
+            "feature_family",
+            "candidate_tie_break",
+            "reject_nonconverged_logistic",
+            "reject_nonfinite_scores",
+            *model_families,
+        },
+        "sprint3.tuning",
+    )
+    if value.get("feature_family") != "transaction_temporal_history":
+        raise ConfigError("sprint3.tuning.feature_family must be 'transaction_temporal_history'")
+    if value.get("candidate_tie_break") != "candidate_id_ascending":
+        raise ConfigError("sprint3.tuning.candidate_tie_break must be 'candidate_id_ascending'")
+    for key in ("reject_nonconverged_logistic", "reject_nonfinite_scores"):
+        if value.get(key) is not True:
+            raise ConfigError(f"sprint3.tuning.{key} must be true")
+
+    expected_counts = {"logistic_regression": 4, "random_forest": 2, "lightgbm": 4}
+    candidate_ids: list[str] = []
+    policies: dict[str, set[str]] = {}
+    solvers: set[str] = set()
+    for family in sorted(model_families):
+        candidates = value.get(family)
+        expected_count = expected_counts[family]
+        if not isinstance(candidates, list) or len(candidates) != expected_count:
+            raise ConfigError(
+                f"sprint3.tuning.{family} must contain exactly {expected_count} candidates"
+            )
+        family_policies: set[str] = set()
+        for index, candidate in enumerate(candidates):
+            name = f"sprint3.tuning.{family}[{index}]"
+            if not isinstance(candidate, Mapping):
+                raise ConfigError(f"{name} must be a mapping")
+            _validate_refinement_candidate(family, candidate, name)
+            candidate_id = candidate.get("candidate_id")
+            assert isinstance(candidate_id, str)
+            candidate_ids.append(candidate_id)
+            policy_key = (
+                "scale_pos_weight_policy" if family == "lightgbm" else "class_weight_policy"
+            )
+            family_policies.add(str(candidate[policy_key]))
+            if family == "logistic_regression":
+                solvers.add(str(candidate["solver"]))
+        policies[family] = family_policies
+    if len(candidate_ids) != len(set(candidate_ids)):
+        raise ConfigError("Sprint 3 candidate_id values must be globally unique")
+    if solvers != {"newton-cholesky", "saga"}:
+        raise ConfigError("Sprint 3 Logistic Regression grid must cover newton-cholesky and saga")
+    if policies["logistic_regression"] != {"none", "sqrt_train_ratio"}:
+        raise ConfigError(
+            "Sprint 3 Logistic Regression grid must cover none and sqrt_train_ratio weighting"
+        )
+    if policies["random_forest"] != {"balanced_subsample"}:
+        raise ConfigError("Sprint 3 Random Forest grid requires balanced_subsample weighting")
+    if policies["lightgbm"] != {"none", "sqrt_train_ratio", "capped_100"}:
+        raise ConfigError(
+            "Sprint 3 LightGBM grid must cover none, sqrt_train_ratio, and capped_100 weighting"
+        )
+
+
+def _validate_refinement_candidate(family: str, candidate: Mapping[str, Any], name: str) -> None:
+    schemas = {
+        "logistic_regression": {
+            "candidate_id",
+            "solver",
+            "penalty",
+            "C",
+            "class_weight_policy",
+            "max_iter",
+            "tol",
+        },
+        "random_forest": {
+            "candidate_id",
+            "n_estimators",
+            "max_depth",
+            "min_samples_leaf",
+            "max_features",
+            "class_weight_policy",
+            "bootstrap",
+            "max_samples",
+        },
+        "lightgbm": {
+            "candidate_id",
+            "scale_pos_weight_policy",
+            "n_estimators",
+            "learning_rate",
+            "num_leaves",
+            "max_depth",
+            "min_child_samples",
+            "min_child_weight",
+            "reg_alpha",
+            "reg_lambda",
+            "max_delta_step",
+        },
+    }
+    _require_exact_keys(candidate, schemas[family], name)
+    candidate_id = candidate.get("candidate_id")
+    if not isinstance(candidate_id, str) or _CANDIDATE_ID_PATTERN.fullmatch(candidate_id) is None:
+        raise ConfigError(f"{name}.candidate_id must be a lowercase snake-case identifier")
+
+    if family == "logistic_regression":
+        if candidate.get("solver") not in {"newton-cholesky", "saga"}:
+            raise ConfigError(f"{name}.solver is unsupported")
+        if candidate.get("penalty") != "l2":
+            raise ConfigError(f"{name}.penalty must be 'l2'")
+        if candidate.get("class_weight_policy") not in {"none", "sqrt_train_ratio"}:
+            raise ConfigError(f"{name}.class_weight_policy is unsupported")
+        _require_finite_number(
+            candidate.get("C"), f"{name}.C", minimum=0.0, minimum_inclusive=False
+        )
+        _require_positive_integer(candidate.get("max_iter"), f"{name}.max_iter", minimum=100)
+        _require_finite_number(
+            candidate.get("tol"),
+            f"{name}.tol",
+            minimum=0.0,
+            maximum=1.0,
+            minimum_inclusive=False,
+            maximum_inclusive=False,
+        )
+        return
+
+    if family == "random_forest":
+        for key in ("n_estimators", "max_depth", "min_samples_leaf"):
+            _require_positive_integer(candidate.get(key), f"{name}.{key}")
+        if candidate.get("max_features") != "sqrt":
+            raise ConfigError(f"{name}.max_features must be 'sqrt'")
+        if candidate.get("class_weight_policy") != "balanced_subsample":
+            raise ConfigError(f"{name}.class_weight_policy must be 'balanced_subsample'")
+        if candidate.get("bootstrap") is not True:
+            raise ConfigError(f"{name}.bootstrap must be true")
+        _require_finite_number(
+            candidate.get("max_samples"),
+            f"{name}.max_samples",
+            minimum=0.0,
+            maximum=1.0,
+            minimum_inclusive=False,
+        )
+        return
+
+    if candidate.get("scale_pos_weight_policy") not in {
+        "none",
+        "sqrt_train_ratio",
+        "capped_100",
+    }:
+        raise ConfigError(f"{name}.scale_pos_weight_policy is unsupported")
+    for key in ("n_estimators", "max_depth", "min_child_samples"):
+        _require_positive_integer(candidate.get(key), f"{name}.{key}")
+    _require_positive_integer(candidate.get("num_leaves"), f"{name}.num_leaves", minimum=2)
+    _require_finite_number(
+        candidate.get("learning_rate"),
+        f"{name}.learning_rate",
+        minimum=0.0,
+        maximum=1.0,
+        minimum_inclusive=False,
+    )
+    _require_finite_number(
+        candidate.get("min_child_weight"), f"{name}.min_child_weight", minimum=0.0
+    )
+    _require_finite_number(candidate.get("reg_alpha"), f"{name}.reg_alpha", minimum=0.0)
+    _require_finite_number(
+        candidate.get("reg_lambda"),
+        f"{name}.reg_lambda",
+        minimum=0.0,
+        minimum_inclusive=False,
+    )
+    _require_finite_number(
+        candidate.get("max_delta_step"),
+        f"{name}.max_delta_step",
+        minimum=0.0,
+        minimum_inclusive=False,
+    )
+
+
+def _validate_refinement_ablation(value: object) -> None:
+    if not isinstance(value, Mapping):
+        raise ConfigError("sprint3.ablation must be a mapping")
+    _require_exact_keys(
+        value,
+        {
+            "model_family",
+            "primary_families",
+            "sensitivity_family",
+            "duplicate_graph_pairs",
+        },
+        "sprint3.ablation",
+    )
+    if value.get("model_family") != "lightgbm":
+        raise ConfigError("sprint3.ablation.model_family must be 'lightgbm'")
+    expected_primary = [
+        "transaction_only",
+        "transaction_temporal_history",
+        "transaction_temporal_history_graph",
+    ]
+    if value.get("primary_families") != expected_primary:
+        raise ConfigError(
+            "sprint3.ablation.primary_families must be ordered transaction-only -> "
+            "temporal/history -> graph"
+        )
+    if value.get("sensitivity_family") != "transaction_temporal_history_graph_novel3":
+        raise ConfigError(
+            "sprint3.ablation.sensitivity_family must be "
+            "'transaction_temporal_history_graph_novel3'"
+        )
+    expected_duplicates = {
+        "sender_prior_fan_out_degree": "sender_previous_unique_counterparties",
+        "receiver_prior_fan_in_degree": "receiver_previous_unique_counterparties",
+    }
+    duplicate_pairs = value.get("duplicate_graph_pairs")
+    if not isinstance(duplicate_pairs, Mapping) or dict(duplicate_pairs) != expected_duplicates:
+        raise ConfigError(
+            "sprint3.ablation.duplicate_graph_pairs must declare the two reviewed exact pairs"
+        )
 
 
 def load_config(

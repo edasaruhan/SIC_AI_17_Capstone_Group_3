@@ -15,6 +15,7 @@ import json
 import math
 from dataclasses import dataclass
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any
 
 import numpy as np
@@ -25,20 +26,29 @@ class PreprocessingError(ValueError):
     """Raised when a baseline feature contract or transform is unsafe."""
 
 
-TRANSACTION_AND_TIME_NUMERIC_FEATURES = (
-    "amount_received",
+CURRENT_TRANSACTION_NUMERIC_FEATURES = (
     "amount_paid",
+    "amount_received",
     "log_amount_paid",
     "log_amount_received",
     "same_bank",
     "currency_match",
     "amount_difference_same_currency",
     "amount_ratio_same_currency",
+)
+
+TEMPORAL_NUMERIC_FEATURES = (
     "hour",
     "day_of_week",
     "is_weekend",
     "sender_seconds_since_previous",
     "receiver_seconds_since_previous",
+)
+
+# Retained as a public compatibility alias for Sprint 2 callers and artifacts.
+TRANSACTION_AND_TIME_NUMERIC_FEATURES = (
+    *CURRENT_TRANSACTION_NUMERIC_FEATURES,
+    *TEMPORAL_NUMERIC_FEATURES,
 )
 
 HISTORY_NUMERIC_FEATURES = (
@@ -63,18 +73,26 @@ HISTORY_NUMERIC_FEATURES = (
 )
 
 LOW_CARDINALITY_CATEGORICAL_FEATURES = (
-    "receiving_currency",
     "payment_currency",
+    "receiving_currency",
     "payment_format",
 )
 
 BANK_FREQUENCY_FEATURES = ("from_bank", "to_bank")
 
-NULLABLE_NUMERIC_FEATURES = (
+TRANSACTION_NULLABLE_NUMERIC_FEATURES = (
     "amount_difference_same_currency",
     "amount_ratio_same_currency",
+)
+
+TEMPORAL_NULLABLE_NUMERIC_FEATURES = (
     "sender_seconds_since_previous",
     "receiver_seconds_since_previous",
+)
+
+NULLABLE_NUMERIC_FEATURES = (
+    *TRANSACTION_NULLABLE_NUMERIC_FEATURES,
+    *TEMPORAL_NULLABLE_NUMERIC_FEATURES,
 )
 
 GRAPH_HISTORY_FEATURES = (
@@ -85,7 +103,7 @@ GRAPH_HISTORY_FEATURES = (
     "pair_previous_transfer_count",
 )
 
-FORBIDDEN_PREDICTORS = (
+ALWAYS_FORBIDDEN_PREDICTORS = (
     "is_laundering",
     "partition",
     "transaction_id",
@@ -98,8 +116,19 @@ FORBIDDEN_PREDICTORS = (
     "to_account",
     "from_node_id",
     "to_node_id",
+)
+
+# Sprint 2's transaction baseline excluded graph history.  Keep this combined
+# name for compatibility, while the always-forbidden safety boundary remains
+# separate so Sprint 3 can deliberately include the reviewed graph family.
+FORBIDDEN_PREDICTORS = (
+    *ALWAYS_FORBIDDEN_PREDICTORS,
     *GRAPH_HISTORY_FEATURES,
 )
+
+TRANSACTION_ONLY_FAMILY = "transaction_only"
+TRANSACTION_TEMPORAL_HISTORY_FAMILY = "transaction_temporal_history"
+TRANSACTION_TEMPORAL_HISTORY_GRAPH_FAMILY = "transaction_temporal_history_graph"
 
 _MISSING_CATEGORY = "__ARGUS_MISSING__"
 _STATE_VERSION = 1
@@ -108,7 +137,7 @@ _DUCKDB_VECTOR_SIZE = 2048
 
 @dataclass(frozen=True)
 class FeatureContract:
-    """Immutable allow-list for the Sprint 2 transaction baseline family."""
+    """Immutable allow-list with an invariant identity/target safety boundary."""
 
     numeric_features: tuple[str, ...] = (
         *TRANSACTION_AND_TIME_NUMERIC_FEATURES,
@@ -121,7 +150,7 @@ class FeatureContract:
 
     def __post_init__(self) -> None:
         missing_safety_guards = sorted(
-            set(FORBIDDEN_PREDICTORS).difference(self.forbidden_predictors)
+            set(ALWAYS_FORBIDDEN_PREDICTORS).difference(self.forbidden_predictors)
         )
         if missing_safety_guards:
             raise PreprocessingError(
@@ -203,6 +232,41 @@ class FeatureContract:
                 f"actual={sorted(values)}"
             )
         return cls(**{key: tuple(values[key]) for key in required})
+
+
+FEATURE_FAMILY_CONTRACTS = MappingProxyType(
+    {
+        TRANSACTION_ONLY_FAMILY: FeatureContract(
+            numeric_features=CURRENT_TRANSACTION_NUMERIC_FEATURES,
+            missing_indicator_features=TRANSACTION_NULLABLE_NUMERIC_FEATURES,
+            forbidden_predictors=FORBIDDEN_PREDICTORS,
+        ),
+        TRANSACTION_TEMPORAL_HISTORY_FAMILY: FeatureContract.default(),
+        TRANSACTION_TEMPORAL_HISTORY_GRAPH_FAMILY: FeatureContract(
+            numeric_features=(
+                *TRANSACTION_AND_TIME_NUMERIC_FEATURES,
+                *HISTORY_NUMERIC_FEATURES,
+                *GRAPH_HISTORY_FEATURES,
+            ),
+            missing_indicator_features=NULLABLE_NUMERIC_FEATURES,
+            forbidden_predictors=ALWAYS_FORBIDDEN_PREDICTORS,
+        ),
+    }
+)
+
+
+def feature_contract_for_family(family: str) -> FeatureContract:
+    """Return one of the three reviewed, strictly nested Sprint 3 contracts."""
+
+    if not isinstance(family, str) or not family.strip():
+        raise PreprocessingError("Feature family must be a non-empty string")
+    key = family.strip().lower()
+    try:
+        return FEATURE_FAMILY_CONTRACTS[key]
+    except KeyError as exc:
+        raise PreprocessingError(
+            f"Unknown feature family {family!r}; expected one of {sorted(FEATURE_FAMILY_CONTRACTS)}"
+        ) from exc
 
 
 def _normalise_category(values: pd.Series) -> pd.Series:

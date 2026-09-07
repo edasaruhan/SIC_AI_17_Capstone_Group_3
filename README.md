@@ -13,10 +13,11 @@ score means elevated investigation priority, not a legal conclusion.
 
 ## Current status
 
-This checkout has completed **Sprint 1: Repository Foundation + Data Proof** and
-**Sprint 2: Baseline + Model Exploration**. Sprint 3 model refinement and graph-
-value experiments, final-test inference, GraphSAGE, and the Streamlit product have
-not started.
+This checkout has completed **Sprint 1: Repository Foundation + Data Proof**,
+**Sprint 2: Baseline + Model Exploration**, and **Sprint 3: Model Refinement +
+Graph Value Experiment**. The executed Sprint 3 run, independent artifact
+verification, and repository quality suite all passed. Final-test inference remains
+closed, and Sprint 4/GraphSAGE and the Streamlit product have not started.
 
 | Item | Status | Evidence |
 | --- | --- | --- |
@@ -36,11 +37,15 @@ not started.
 | Saved Sprint 2 verification | PASS | 761,749 validation predictions and validation-only reselection verified |
 | Sprint 2 final quality suite | PASS | 81 passed in 19.87 seconds; Ruff lint/format and `pip check` passed |
 | Final-test model access | **NOT USED** | No test feature matrix, prediction, inference, or test metric exists |
-| Sprint 3 refinement / graph-value experiment | NOT STARTED | Graph-history predictors remain excluded from baselines |
+| Sprint 3 refinement / graph-value experiment | **PASS** | All 15 acceptance gates passed |
+| Refined Transaction Baseline Champion | **LightGBM** | Validation AP 0.35535042; selected using validation only |
+| Same-model graph-value experiment | **PASS** | LightGBM B AP 0.35535042; C AP 0.47175420; delta +0.11640378 |
+| Sprint 3 final quality suite | **PASS** | 207 passed in 30.74 seconds; artifact verification, Ruff lint/format, and `pip check` passed |
 
-The evidence ledgers are
-[`reports/generated/SPRINT_1_STATUS.md`](reports/generated/SPRINT_1_STATUS.md) and
-[`reports/generated/SPRINT_2_STATUS.md`](reports/generated/SPRINT_2_STATUS.md).
+The completed-run evidence ledgers are
+[`SPRINT_1_STATUS.md`](reports/generated/SPRINT_1_STATUS.md),
+[`SPRINT_2_STATUS.md`](reports/generated/SPRINT_2_STATUS.md), and
+[`SPRINT_3_STATUS.md`](reports/generated/SPRINT_3_STATUS.md).
 
 ## Research question
 
@@ -50,11 +55,13 @@ The final project is intended to answer, with executable evidence:
 > transactions compared with the strongest transaction-only baseline under severe
 > class imbalance and limited analyst capacity?
 
-Sprint 2 establishes the strongest transaction-only baseline among the three
-executed fixed configurations. It does not answer whether graph information adds
-value; that controlled experiment belongs to Sprint 3 and has not started.
+Sprint 2 established the fixed transaction-only reference. In Sprint 3, the
+same-family LightGBM comparison measured validation AP 0.35535042 for B
+(transaction + temporal/history) and 0.47175420 for C (B + graph), an absolute
+delta of +0.11640378. This is validation evidence for tabular strict-prior graph
+features, not a GraphSAGE/GNN result or a production-performance claim.
 
-## Executed architecture through Sprint 2
+## Implemented architecture through Sprint 3
 
 ```mermaid
 flowchart LR
@@ -71,14 +78,18 @@ flowchart LR
     Q --> P[Train-only preprocessing]
     P --> M[Three transaction baselines]
     M --> C[Validation-only champion]
-    C -. Sprint 3 only .-> X[Graph-value experiment]
+    C --> R[Expanding temporal CV\nand bounded refinement]
+    R --> X[Same-model A / B / C\ngraph-value experiment]
+    X --> O[Validation-only\noperating threshold]
 ```
 
 Every historical or graph-history feature for an event at time `t` may use only
 events at times strictly earlier than `t`. Events sharing the same timestamp see
 the same prior state. Sprint 2 uses transaction, time, and strictly-prior account-
-history signals; it deliberately withholds the five graph-history columns for the
-future graph-value experiment.
+history signals; it deliberately withholds the five graph-history columns from
+the Sprint 2 baselines. Sprint 3 adds them only in the controlled C-family arm,
+with identical model family, selected parameters, frozen outer split, and
+evaluation protocol used for the B-versus-C comparison.
 
 ## Verified source-data facts
 
@@ -272,7 +283,7 @@ prediction artifacts, and returned `PASS`.
 ## Repository map
 
 ```text
-configs/                    versioned quick/full/baseline experiment settings
+configs/                    versioned quick/full/baseline/refinement settings
 data/README.md              source placement, provenance, and raw schema
 data/raw/                   local IBM files; ignored by Git
 docs/                       scope, dictionary, protocol, roadmap, decisions
@@ -284,6 +295,7 @@ tests/                      automated data, leakage, feature, metric, and protoc
 artifacts/quick/             deterministic quick-run outputs; ignored by Git
 artifacts/full/              full-data outputs; ignored by Git
 artifacts/sprint2/           baseline outputs; ignored by Git except `.gitkeep`
+artifacts/sprint3/           refinement/ablation outputs; ignored by Git except `.gitkeep`
 ```
 
 Raw/interim/processed data and generated artifacts are deliberately excluded by
@@ -291,8 +303,8 @@ Raw/interim/processed data and generated artifacts are deliberately excluded by
 
 ## Quick start
 
-The commands below reproduce the verified Sprint 1 data path and Sprint 2 baseline
-experiment.
+The commands below reproduce the verified Sprint 1 data path, Sprint 2 baseline,
+and executable Sprint 3 refinement experiment.
 
 ### 1. Open the repository
 
@@ -335,6 +347,9 @@ py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe scripts/train_baselines.py --config configs/baseline.yaml
 .\.venv\Scripts\python.exe scripts/verify_baselines.py --config configs/baseline.yaml
 .\.venv\Scripts\python.exe scripts/validate_sprint2.py --config configs/baseline.yaml
+.\.venv\Scripts\python.exe scripts/train_refined_models.py --config configs/refinement.yaml
+.\.venv\Scripts\python.exe scripts/verify_refinement.py --config configs/refinement.yaml
+.\.venv\Scripts\python.exe scripts/validate_sprint3.py --config configs/refinement.yaml
 ```
 
 Equivalent Make targets are:
@@ -355,12 +370,15 @@ make quick
 `quick.yaml` uses seed `42` and at most 10,000 source rows for fast development.
 `full.yaml` disables preprocessing and feature sampling and is the full HI-Small
 data contract. `baseline.yaml` inherits that contract, freezes upstream hashes,
-and declares the train/validation-only model protocol. The full EDA manifest
+and declares the train/validation-only model protocol. `refinement.yaml` inherits
+the frozen baseline contract and declares bounded candidate grids, three expanding-
+window temporal folds inside outer train, validation-only operating-point rules,
+and the same-model feature-family ablation. The full EDA manifest
 separately labels exact all-row tables and the deterministic sampled plot/NetworkX
 scope. A quick or sampled artifact must never be described as a full-population
 result.
 
-## Generated Sprint 1 and Sprint 2 outputs
+## Generated experiment outputs
 
 The verified quick and full runs generated these core paths:
 
@@ -403,6 +421,20 @@ artifacts/sprint2/preprocessing/manifest.json
 artifacts/sprint2/models/
 artifacts/sprint2/figures/
 artifacts/sprint2/final_test_policy.json
+artifacts/sprint3/run_manifest.json
+artifacts/sprint3/temporal_cv/folds.json
+artifacts/sprint3/temporal_cv/trials.csv
+artifacts/sprint3/temporal_cv/candidate_summary.csv
+artifacts/sprint3/temporal_cv/selected_candidates.json
+artifacts/sprint3/refined_model_comparison.csv
+artifacts/sprint3/refined_transaction_champion.json
+artifacts/sprint3/baseline_vs_refined.csv
+artifacts/sprint3/ablation/feature_family_ablation.csv
+artifacts/sprint3/ablation/graph_value_conclusion.json
+artifacts/sprint3/saturation/sprint2_vs_refined.json
+artifacts/sprint3/threshold/analysis.json
+artifacts/sprint3/validation_predictions.parquet
+artifacts/sprint3/final_test_policy.json
 ```
 
 `run_manifest.json` inventories and hashes 38 payloads; together with the manifest,
@@ -429,6 +461,14 @@ metrics still use all 761,749 validation rows.
 The final repository suite passed 81 tests in 19.87 seconds; Ruff lint/format and
 `pip check` also passed.
 
+Sprint 3 artifacts are generated, not hand-authored. The completed training run
+used bounded tuning on three expanding chronological folds contained entirely
+within outer train, refit selected Logistic Regression, Random Forest, and LightGBM
+candidates on outer train, evaluated only outer validation, and ran the
+feature-family ablation. Independent verification passed, as did 207 tests, Ruff
+lint/format, and `pip check`. The complete runtime and metric ledger is
+[`SPRINT_3_STATUS.md`](reports/generated/SPRINT_3_STATUS.md).
+
 ## Experiment rules
 
 - Split chronologically; do not use a shuffled row split as the primary protocol.
@@ -436,8 +476,17 @@ The final repository suite passed 81 tests in 19.87 seconds; Ruff lint/format an
   strictly ordered.
 - Fit learned transformations on training data only. Sprint 2 records this fitted
   state separately and applies it unchanged to validation.
-- Select models on validation only; keep test features and labels untouched until
-  refinement is frozen. Sprint 2 used a fixed threshold rather than optimizing it.
+- Select refinement candidates with expanding temporal folds contained within
+  outer train; use outer validation for the final comparison and operating point.
+  Keep final-test features and labels untouched throughout Sprint 3.
+- Rank Logistic Regression and LightGBM by raw decision margin where available.
+  Probability outputs remain diagnostics: finite-K results that cut through a tied
+  score group must report tie-aware bounds and cannot establish within-tie model
+  superiority.
+- Choose thresholds on validation only using complete equal-score groups and the
+  configured alert-budget/FPR-recall rule; never use test feedback.
+- Measure graph value with the same selected LightGBM configuration across
+  transaction-only (A), transaction + temporal/history (B), and B + graph (C).
 - Use composite `normalized_bank_id::account_id` node identities.
 - Preserve edge direction and repeated transfers.
 - Treat PR-AUC, Recall@K, Precision@K, F1, FPR, and alert volume as core metrics;
@@ -464,23 +513,29 @@ Sprint 1 executed the full 5,078,345-row preprocessing, split, and exact feature
 pipeline. Sprint 2 executed three uncalibrated, fixed-configuration transaction
 baselines and selected Random Forest on validation AP only. Their validation
 scores are evidence for this synthetic snapshot, not production performance or a
-causal conclusion. The Logistic Regression implementation did not converge within
-its configured 20 iterations; later refinement must not erase that limitation.
+causal conclusion. The Sprint 2 Logistic Regression convergence failure and the
+Logistic/LightGBM probability-score saturation remain immutable baseline evidence;
+Sprint 3 resolved refined Logistic convergence and attributed the probability ties
+to sigmoid/link conversion of extreme margins, with weak regularization/class
+weighting as upstream causes in the Sprint 2 estimators.
 
 Full-population NetworkX component/local-subgraph materialization remains
 intentionally excluded for bounded memory: those visual analyses use the clearly
 labeled deterministic sample above. No sampled graph statistic is a full-population
-estimate. No final-test or graph-value result is claimed.
+estimate. No final-test result is claimed. The Sprint 3 graph-value conclusion
+applies only to the controlled tabular feature ablation; Sprint 4/GraphSAGE remains
+outside the implemented scope and was not started.
 
 ## Documentation
 
 - [`PROJECT_SPEC.md`](docs/PROJECT_SPEC.md): canonical scope and system contract
 - [`DATA_DICTIONARY.md`](docs/DATA_DICTIONARY.md): raw, canonical, and engineered fields
 - [`EXPERIMENT_PROTOCOL.md`](docs/EXPERIMENT_PROTOCOL.md): leakage-safe evaluation rules
-- [`ROADMAP.md`](docs/ROADMAP.md): completed Sprint 1/2 gates and later boundaries
+- [`ROADMAP.md`](docs/ROADMAP.md): completed Sprint 1/2/3 gates and later boundaries
 - [`DECISIONS.md`](docs/DECISIONS.md): architecture decision log
 - [`SPRINT_1_STATUS.md`](reports/generated/SPRINT_1_STATUS.md): evidence-backed status
 - [`SPRINT_2_STATUS.md`](reports/generated/SPRINT_2_STATUS.md): generated baseline evidence
+- [`SPRINT_3_STATUS.md`](reports/generated/SPRINT_3_STATUS.md): generated Sprint 3 evidence and acceptance ledger
 
 The original proposal, presentation, reports, templates, and master prompt are
 preserved unchanged in `reports/existing_coursework/`.

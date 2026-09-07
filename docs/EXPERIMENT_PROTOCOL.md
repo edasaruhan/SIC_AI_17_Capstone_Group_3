@@ -1,13 +1,15 @@
 # ARGUS AI Experiment Protocol
 
-**Protocol version:** 2.0
-**Completed execution scope:** Sprint 1 data proof and Sprint 2 transaction baselines
-**Current stop boundary:** Sprint 3 refinement and graph-value experiment not started
-**Pipeline/test results:** `PASS` for data, baseline, artifact-verification, and quality paths
+**Protocol version:** 3.0
+**Completed execution scope:** Sprint 1 data proof, Sprint 2 transaction baselines, and Sprint 3 refinement/graph value
+**Sprint 3 status:** `PASS` — 15/15 acceptance gates and 207 tests passed
+**Current stop boundary:** Sprint 3 complete; Sprint 4/GraphSAGE not started
+**Pipeline/test results:** generated artifacts control each sprint's empirical status
 
 This document defines how ARGUS experiments become comparable and scientifically
-defensible. Observed values are included only where they are read from the generated
-Sprint 1 or Sprint 2 manifests; future work is explicitly labeled.
+defensible. Observed values are included only where they are read from generated
+manifests and status reports. The completed Sprint 3 evidence ledger is
+[`SPRINT_3_STATUS.md`](../reports/generated/SPRINT_3_STATUS.md).
 
 ## 1. Reproducibility unit
 
@@ -23,9 +25,10 @@ The reproducibility unit is one run with:
 - an inventory of generated artifacts;
 - a terminal status and error details if incomplete.
 
-The quick, full, and baseline runs write inventories to
+The quick, full, baseline, and refinement runs write inventories to
 `artifacts/quick/run_manifest.json`, `artifacts/full/run_manifest.json`, and
-`artifacts/sprint2/run_manifest.json`. Generated artifacts and local datasets are
+`artifacts/sprint2/run_manifest.json`, and `artifacts/sprint3/run_manifest.json`.
+Generated artifacts and local datasets are
 Git-ignored, so manifests and commands must make them reproducible rather than
 implying they are committed.
 
@@ -350,7 +353,7 @@ low-cardinality vocabularies, and bank-frequency maps are fit on train only.
 Unknown validation categories use declared zero encodings. The target, identifiers,
 timestamp/provenance, account/node IDs, and all five prior fan-in/fan-out/pair graph
 features are forbidden predictors. Withholding graph history preserves a valid
-transaction-only reference for the unstarted Sprint 3 graph-value experiment.
+  transaction-only reference for the controlled Sprint 3 graph-value experiment.
 
 ### Executed models
 
@@ -441,7 +444,143 @@ The reproducible command sequence after frozen Sprint 1 artifacts exist is:
 .\.venv\Scripts\python.exe scripts/validate_sprint2.py --config configs/baseline.yaml
 ```
 
-## 11. Human review
+## 11. Sprint 3 refinement protocol
+
+Sprint 3 was executed from `configs/refinement.yaml`. Its completion status,
+selected candidates, metrics, runtimes, and graph-value conclusion are recorded in
+`artifacts/sprint3/run_manifest.json` and
+[`SPRINT_3_STATUS.md`](../reports/generated/SPRINT_3_STATUS.md). The rules below
+were fixed before those results were interpreted.
+
+The completed run selected refined LightGBM at validation AP 0.35535042. With the
+same LightGBM candidate, parameters, seed, frozen split, and protocol, the C graph
+arm reached AP 0.47175420 versus 0.35535042 for B, a +0.11640378 delta. Training
+runtime was 2,158.664 seconds; independent artifact verification, 207 tests, Ruff
+lint/format, and `pip check` passed. The final test remained untouched.
+
+### Outer split and expanding temporal cross-validation
+
+The Sprint 1 outer train/validation/test boundaries remain unchanged. Candidate
+tuning uses three expanding-window folds derived only from outer train at the
+configured cumulative timestamp quantiles. Every fold satisfies:
+
+```text
+fold train ⊂ outer train
+fold validation ⊂ outer train
+max(fold train timestamp) < min(fold validation timestamp)
+```
+
+Equal timestamps may not cross a fold boundary. Each fold gets a newly fitted
+preprocessor using only its training prefix; its later interval is transform-only.
+No outer-validation or final-test category, median, scale, frequency, label, or
+model statistic may enter fold fitting. One candidate per estimator family is
+selected by mean fold average precision, with the configured candidate-ID tie-
+break and complete-fold eligibility requirement.
+
+The bounded candidate grids compare Logistic Regression solver/L2/class-weight
+choices, two Random Forest configurations, and regularized LightGBM class-weight
+controls. A refined Logistic Regression is eligible only if convergence evidence
+shows `n_iter < max_iter`; increasing the configured iteration budget must not be
+misreported as proof of convergence by itself. Non-finite score outputs are
+ineligible.
+
+### Outer validation and metrics
+
+After inner-fold selection, each chosen estimator is refit on all outer-train rows
+with a newly train-fitted transform and evaluated once on outer validation. The
+refined Transaction Baseline Champion is selected by outer-validation average
+precision. PR-AUC/average precision is primary, ROC-AUC is secondary, and
+Recall@K, Precision@K, F1, FPR, alert count, and alert rate are operational
+evidence. Accuracy is not a primary measure.
+
+Threshold optimization is confined to outer validation and uses the raw ranking
+score. Candidate operating points are exact whole score groups, so an equal-score
+plateau is never split merely to hit a budget. The configured primary rule
+maximizes recall subject to both an alert budget of 5,000 and FPR ceiling of 0.01;
+the artifact also records maximum-F1 and individual budget/FPR alternatives. These
+are research operating points, not a deployed bank policy.
+
+### Saturation and tie policy
+
+Sprint 2 probability outputs remain immutable evidence. Sprint 3 reproduces their
+diagnostics and separates two layers:
+
+1. upstream estimator behavior, including preprocessing tails, learned raw-margin
+   range, class weighting, regularization, and LightGBM leaf-score stability;
+2. downstream sigmoid/probability representation, including exact and near-zero/
+   one counts, unique-score counts, raw-to-probability collapse, and label makeup
+   of saturated groups.
+
+Logistic Regression and LightGBM are ranked by raw decision margin where available;
+probabilities are retained as diagnostic outputs. Random Forest uses its positive-
+class probability because it has no separate margin interface in this protocol.
+Top-K output is deterministically ordered by score descending and
+`source_row_number` ascending, but each K also records tie-aware expected, minimum,
+and maximum true positives. If K intersects a tied score group, its deterministic
+membership cannot establish within-tie superiority.
+
+### Same-model feature-family ablation
+
+The primary graph-value comparison uses one selected LightGBM candidate with the
+same parameters, seed, outer train/validation rows, preprocessing discipline,
+score representation, and metric protocol for all arms:
+
+```text
+A  transaction-only
+B  transaction + temporal/history
+C  transaction + temporal/history + all five graph-history fields
+```
+
+The five graph fields remain strictly prior and target-free. On the frozen feature
+table, `sender_prior_fan_out_degree` is an exact duplicate of
+`sender_previous_unique_counterparties`, and `receiver_prior_fan_in_degree` is an
+exact duplicate of `receiver_previous_unique_counterparties`. Therefore the
+required all-five C arm is accompanied by a declared novel-three sensitivity using
+sender prior fan-in, receiver prior fan-out, and repeated-pair count. Only the
+machine-generated B-versus-C validation delta may support a graph-value statement;
+the experiment is tabular feature ablation, not GraphSAGE.
+
+### Final-test gate and executable evidence
+
+Sprint 3 did not materialize a final-test feature matrix, transform final-test rows,
+run inference, write test predictions, calculate a test metric, choose a candidate
+or threshold using test information, or revise a decision after test feedback.
+Reported test counts and prevalence came only from frozen Sprint 1 metadata.
+
+Run, independently verify, and close quality checks with:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/train_refined_models.py --config configs/refinement.yaml
+.\.venv\Scripts\python.exe scripts/verify_refinement.py --config configs/refinement.yaml
+.\.venv\Scripts\python.exe scripts/validate_sprint3.py --config configs/refinement.yaml
+```
+
+The executable evidence contract includes:
+
+```text
+artifacts/sprint3/run_manifest.json
+artifacts/sprint3/temporal_cv/folds.json
+artifacts/sprint3/temporal_cv/trials.csv
+artifacts/sprint3/temporal_cv/candidate_summary.csv
+artifacts/sprint3/temporal_cv/selected_candidates.json
+artifacts/sprint3/refined_model_comparison.csv
+artifacts/sprint3/refined_transaction_champion.json
+artifacts/sprint3/baseline_vs_refined.csv
+artifacts/sprint3/ablation/feature_family_ablation.csv
+artifacts/sprint3/ablation/graph_value_conclusion.json
+artifacts/sprint3/saturation/sprint2_vs_refined.json
+artifacts/sprint3/threshold/analysis.json
+artifacts/sprint3/validation_predictions.parquet
+artifacts/sprint3/final_test_policy.json
+artifacts/sprint3/verification_report.json
+artifacts/sprint3/quality_report.json
+reports/generated/SPRINT_3_STATUS.md
+```
+
+Stop after these gates. Sprint 4/GraphSAGE, case/evidence, explainability, and
+product work are not part of this protocol version and were not started.
+
+## 12. Human review
 
 Metrics measure ranking/classification behavior on synthetic labels. They do not
 establish guilt or justify adverse action. Any later alert or case must show

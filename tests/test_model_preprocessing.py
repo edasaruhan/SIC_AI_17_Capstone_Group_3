@@ -47,8 +47,8 @@ def test_default_contract_is_an_explicit_transaction_only_allowlist() -> None:
 
     assert len(contract.numeric_features) == 31
     assert contract.low_cardinality_categories == (
-        "receiving_currency",
         "payment_currency",
+        "receiving_currency",
         "payment_format",
     )
     assert contract.bank_frequency_categories == ("from_bank", "to_bank")
