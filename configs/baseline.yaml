@@ -1,0 +1,148 @@
+extends: full.yaml
+
+project:
+  mode: sprint2_baseline
+  random_seed: 42
+
+paths:
+  feature_table: artifacts/full/tables/transaction_features.parquet
+  split_table: artifacts/full/tables/split_manifest.parquet
+  split_metadata: artifacts/full/metadata/split_metadata.json
+  upstream_manifest: artifacts/full/run_manifest.json
+  run_dir: artifacts/sprint2
+  generated_report: reports/generated/SPRINT_2_STATUS.md
+
+baseline:
+  protocol_version: 1
+  feature_scope: transaction_level_without_graph_history
+  target_column: is_laundering
+  selection_partition: validation
+  selection_metric: average_precision
+  metric_display_name: PR-AUC (average precision)
+  final_test_access: false
+  final_test_policy: metadata_only_no_model_inference
+  decision_threshold: 0.5
+  threshold_basis: fixed_from_config_not_optimized
+  top_k:
+    - 100
+    - 500
+    - 1000
+  ranking_tie_break: source_row_number_ascending
+  positive_label: 1
+  batch_rows: 100000
+  memory_limit: 2GB
+  threads: 1
+  max_temp_directory_size: 100GB
+  parquet_compression: zstd
+  model_serialization_compression: 3
+  retain_work_matrices: false
+
+  frozen_upstream:
+    expected_rows: 5078345
+    feature_table_sha256: 931aa48c43dd9648ac52023795d0603d377821c5d1241480a1376a89a0d55b6e
+    split_table_sha256: b7294d56545c4135c890e69dda29a326b6b4134777ad606ef246b46250fdd872
+    split_metadata_sha256: 188ad59d15019e88928546934dbd1fcdae6d07c4d8406617ba2de1415ea77b78
+
+  features:
+    numeric:
+      - amount_paid
+      - amount_received
+      - log_amount_paid
+      - log_amount_received
+      - same_bank
+      - currency_match
+      - amount_difference_same_currency
+      - amount_ratio_same_currency
+      - hour
+      - day_of_week
+      - is_weekend
+      - sender_seconds_since_previous
+      - receiver_seconds_since_previous
+      - sender_previous_transaction_count
+      - sender_previous_outgoing_amount
+      - sender_previous_unique_counterparties
+      - sender_burst_count_1h
+      - sender_rolling_outgoing_amount_1h
+      - sender_burst_count_24h
+      - sender_rolling_outgoing_amount_24h
+      - sender_burst_count_7d
+      - sender_rolling_outgoing_amount_7d
+      - receiver_previous_transaction_count
+      - receiver_previous_incoming_amount
+      - receiver_previous_unique_counterparties
+      - receiver_burst_count_1h
+      - receiver_rolling_incoming_amount_1h
+      - receiver_burst_count_24h
+      - receiver_rolling_incoming_amount_24h
+      - receiver_burst_count_7d
+      - receiver_rolling_incoming_amount_7d
+    one_hot_categorical:
+      - payment_currency
+      - receiving_currency
+      - payment_format
+    frequency_categorical:
+      - from_bank
+      - to_bank
+    missing_indicators:
+      - amount_difference_same_currency
+      - amount_ratio_same_currency
+      - sender_seconds_since_previous
+      - receiver_seconds_since_previous
+    forbidden_graph_history:
+      - sender_prior_fan_out_degree
+      - sender_prior_fan_in_degree
+      - receiver_prior_fan_out_degree
+      - receiver_prior_fan_in_degree
+      - pair_previous_transfer_count
+    forbidden_identity_or_target:
+      - partition
+      - transaction_id
+      - source_file
+      - source_row_number
+      - timestamp
+      - from_account
+      - to_account
+      - from_bank_raw
+      - to_bank_raw
+      - from_node_id
+      - to_node_id
+      - is_laundering
+
+  models:
+    logistic_regression:
+      implementation: sklearn.linear_model.SGDClassifier
+      loss: log_loss
+      penalty: l2
+      alpha: 0.0001
+      max_iter: 20
+      tol: 0.001
+      average: true
+      class_weight: balanced
+      early_stopping: false
+      n_jobs: 1
+    random_forest:
+      implementation: sklearn.ensemble.RandomForestClassifier
+      n_estimators: 80
+      max_depth: 14
+      min_samples_leaf: 25
+      max_features: sqrt
+      class_weight: balanced_subsample
+      bootstrap: true
+      max_samples: 0.2
+      n_jobs: 1
+    lightgbm:
+      implementation: lightgbm.LGBMClassifier
+      boosting_type: gbdt
+      n_estimators: 250
+      learning_rate: 0.05
+      num_leaves: 31
+      max_depth: -1
+      min_child_samples: 20
+      subsample: 1.0
+      colsample_bytree: 1.0
+      reg_lambda: 0.0
+      max_bin: 255
+      deterministic: true
+      force_col_wise: true
+      n_jobs: 1
+      verbosity: -1

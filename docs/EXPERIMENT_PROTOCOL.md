@@ -1,12 +1,13 @@
 # ARGUS AI Experiment Protocol
 
-**Protocol version:** 1.0  
-**Active execution scope:** Sprint 1 data proof  
-**Pipeline/test results:** `PASS` for quick, full out-of-core, and full raw-audit paths
+**Protocol version:** 2.0
+**Completed execution scope:** Sprint 1 data proof and Sprint 2 transaction baselines
+**Current stop boundary:** Sprint 3 refinement and graph-value experiment not started
+**Pipeline/test results:** `PASS` for data, baseline, artifact-verification, and quality paths
 
 This document defines how ARGUS experiments become comparable and scientifically
-defensible. It is a protocol, not a results report. No metric in this document is
-an observed model result.
+defensible. Observed values are included only where they are read from the generated
+Sprint 1 or Sprint 2 manifests; future work is explicitly labeled.
 
 ## 1. Reproducibility unit
 
@@ -22,8 +23,9 @@ The reproducibility unit is one run with:
 - an inventory of generated artifacts;
 - a terminal status and error details if incomplete.
 
-The quick and full runs write inventories to `artifacts/quick/run_manifest.json`
-and `artifacts/full/run_manifest.json`. Generated artifacts and local datasets are
+The quick, full, and baseline runs write inventories to
+`artifacts/quick/run_manifest.json`, `artifacts/full/run_manifest.json`, and
+`artifacts/sprint2/run_manifest.json`. Generated artifacts and local datasets are
 Git-ignored, so manifests and commands must make them reproducible rather than
 implying they are committed.
 
@@ -314,62 +316,130 @@ The canonical test command is:
 .\.venv\Scripts\pytest.exe -q
 ```
 
-The fresh final run passed 34 tests in 25.36 seconds under CPython 3.12.10.
-Ruff lint, Ruff format verification, and `pip check` also pass; exact commands and
-resolved intermediate failures are preserved in the final Sprint status report.
+The Sprint 1 closing run passed 34 tests in 25.36 seconds under CPython 3.12.10.
+After Sprint 2 implementation and artifact verification, the final repository run
+passed 81 tests in 19.87 seconds. Ruff lint, Ruff format verification, and
+`pip check` also passed. Exact commands and resolved limitations are preserved in
+the generated Sprint status reports.
 
-## 10. Recommended Sprint 2 model protocol
+## 10. Executed Sprint 2 baseline protocol
 
-This section is a recommendation only. No Sprint 2 implementation or result is
-claimed.
+Sprint 2 ran once on the full, frozen Sprint 1 feature/split snapshot configured in
+`configs/baseline.yaml`. It did not change boundaries, resample rows, or create a
+test feature matrix.
 
-### Models
+### Frozen partitions and temporal prevalence
 
-Train three transaction-level baselines on identical partitions and feature scope:
+| Partition | Rows | Positives | Positive rate | Modeling access |
+| --- | ---: | ---: | ---: | --- |
+| Train | 3,554,957 | 2,856 | 0.0008033852448848186 | Preprocessing and model fit |
+| Validation | 761,749 | 760 | 0.0009977039681049794 | Transform, comparison, selection |
+| Test | 761,639 | 1,561 | 0.0020495274007764834 | Pre-existing metadata only |
 
-1. Logistic Regression;
-2. Random Forest;
-3. LightGBM or XGBoost, chosen once with dependency/runtime justification.
+The validation/train positive-rate ratio is 1.2418748968286322. The
+test/validation ratio is 2.0542440105448496. Because precision and fixed-threshold
+alert volume are prevalence-sensitive, validation operating values cannot be
+assumed to transfer unchanged to the later test period. The split was deliberately
+left frozen rather than rebalanced.
 
-Any encoding, imputation, scaling, feature selection, or class weighting with
-learned state must be fit on training data only. Do not oversample before splitting.
+### Train-only transform
 
-### Selection and test discipline
+The explicit allow-list produces 74 float32 columns from transaction, calendar,
+and strictly-prior account-history features. Numeric median imputation and scaling,
+low-cardinality vocabularies, and bank-frequency maps are fit on train only.
+Unknown validation categories use declared zero encodings. The target, identifiers,
+timestamp/provenance, account/node IDs, and all five prior fan-in/fan-out/pair graph
+features are forbidden predictors. Withholding graph history preserves a valid
+transaction-only reference for the unstarted Sprint 3 graph-value experiment.
 
-- Train on `train`.
-- Compare/tune on `validation`.
-- Name a Transaction Baseline Champion using validation evidence only.
-- Optimize an operational threshold using validation only.
-- Freeze preprocessing, features, model, and threshold before final test use.
-- Do not repeatedly inspect test results or retune after seeing them.
+### Executed models
 
-Final untouched-test evaluation belongs to the later final-test phase, not Sprint 2
-selection.
+The fixed candidate configurations were:
 
-### Recommended metrics
+1. Logistic Regression implemented by
+   `sklearn.linear_model.SGDClassifier(loss="log_loss")`, balanced class weight;
+2. `sklearn.ensemble.RandomForestClassifier`, balanced subsample weight;
+3. `lightgbm.LGBMClassifier`, using the train-only class ratio as
+   `scale_pos_weight`.
 
-Accuracy is not a primary metric because the audited positive rate is only
-0.101942660453%. Save, at minimum:
+LightGBM was chosen once for the boosting slot because its CPU histogram path fit
+the intended full-data, deterministic single-thread, bounded-memory execution.
+XGBoost was not run; this dependency/runtime decision is not a comparative model-
+quality result.
 
-- PR-AUC, with implementation explicitly identified (for example average
-  precision rather than an ambiguous label);
-- ROC-AUC as secondary context;
-- precision, recall, F1, and false-positive rate at the selected threshold;
-- alert count/volume;
-- Recall@K and Precision@K for configured values such as 100, 500, and 1,000;
-- confusion matrix;
-- runtime and model/config metadata.
+The SGD implementation enabled bounded training at 3,554,957 rows. It reached the
+configured 20-iteration maximum before convergence; the warning is retained. The
+models are uncalibrated, were not hyperparameter-tuned, and used no oversampling.
 
-Top-K ranking must use descending score with a deterministic tie-breaker. If `K`
-exceeds partition size, the behavior must be explicit. Threshold and K metrics must
-be computed on the same frozen predictions, not mixed across runs.
+### Metrics, threshold, and deterministic ranking
 
-### Comparison artifacts
+The primary metric is non-interpolated average precision, recorded as PR-AUC.
+ROC-AUC is secondary. Precision, recall, F1, FPR, confusion counts, alert count,
+and alert rate are computed at the fixed configuration threshold `0.5`; this
+threshold was not optimized in Sprint 2. Accuracy is not primary. Recall@K and
+Precision@K use `K = 100, 500, 1000`, score descending, then
+`source_row_number` ascending for deterministic ties.
 
-Sprint 2 should generate machine-readable JSON/CSV and plots from code. It should
-not populate Markdown with hand-copied numbers. The comparison table must identify
-dataset hash, split metadata, feature family, model version, threshold basis, and
-whether results are validation or test.
+Tie diagnostics are part of interpretation: Logistic Regression has 60,119
+validation rows at exact score `1.0`, including 427 positives; LightGBM has
+108,347, including 663 positives. All configured K cutoffs lie inside those score
+plateaus, so their top-K membership materially depends on the deterministic source-
+row tie-break and does not establish within-tie discrimination. Random Forest has
+no exact score-1 rows. Average precision groups score ties and remains independent
+of arbitrary row order for champion selection.
+
+Only the raster precision-recall visualization is scaled: it deterministically
+keeps endpoints and at most 10,000 evenly indexed curve points per model. Numerical
+AP, ROC-AUC, threshold, and Top-K metrics use every one of the 761,749 validation
+rows; the sampling is not part of evaluation or selection.
+
+### Observed validation comparison
+
+| Model | PR-AUC (AP) | ROC-AUC | Precision | Recall | F1 | FPR | Alerts |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Random Forest | 0.08859105087174989 | 0.97497346510507 | 0.03127670483678004 | 0.7223684210526315 | 0.05995740730628515 | 0.022344606820860747 | 17,553 |
+| Logistic Regression | 0.006634242622201133 | 0.9180836419863874 | 0.004914120533763571 | 0.9618421052631579 | 0.00977828311540648 | 0.1945152952276577 | 148,755 |
+| LightGBM | 0.0054755570960638884 | 0.851071813334877 | 0.005075210957563899 | 0.8736842105263158 | 0.01009179889354976 | 0.17105109272275945 | 130,832 |
+
+Random Forest is the Transaction Baseline Champion under the predeclared rule:
+maximum validation average precision, with model-name ascending only as an exact-
+score tie-break. No test metric entered selection.
+
+### Test gate and artifacts
+
+Final-test inference was not performed. Test rows were not used for preprocessing,
+training, tuning, selection, threshold work, prediction, or evaluation. Only their
+pre-existing Sprint 1 metadata is reported. No test prediction artifact exists.
+
+The full run took 389.0078022000016 seconds. Executable outputs include:
+
+```text
+artifacts/sprint2/run_manifest.json
+artifacts/sprint2/verification_report.json
+artifacts/sprint2/quality_report.json
+artifacts/sprint2/preprocessing/manifest.json
+artifacts/sprint2/model_comparison.json
+artifacts/sprint2/model_comparison.csv
+artifacts/sprint2/transaction_baseline_champion.json
+artifacts/sprint2/validation_predictions.parquet
+artifacts/sprint2/models/
+artifacts/sprint2/figures/
+artifacts/sprint2/final_test_policy.json
+```
+
+The independent verifier recomputed AP/ROC-AUC from 761,749 saved validation rows,
+deserialized all three estimators, repeated validation-only champion selection,
+and confirmed the closed test gate. The refreshed manifest inventories 26 payloads
+excluding itself. Sprint 2 closed with 81 tests passing in 19.87 seconds, Ruff
+lint/format passing, and `pip check` passing.
+
+The reproducible command sequence after frozen Sprint 1 artifacts exist is:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/train_baselines.py --config configs/baseline.yaml
+.\.venv\Scripts\python.exe scripts/verify_baselines.py --config configs/baseline.yaml
+.\.venv\Scripts\python.exe scripts/validate_sprint2.py --config configs/baseline.yaml
+```
 
 ## 11. Human review
 

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from argus.config import load_config
+import pytest
+
+from argus.config import ConfigError, load_config, validate_config
 
 
 def test_quick_config_inherits_base_and_resolves_project_paths() -> None:
@@ -40,3 +42,23 @@ def test_full_config_declares_bounded_out_of_core_engine() -> None:
         "parquet_compression": "zstd",
         "eda_sample_rows": 100000,
     }
+
+
+def test_baseline_config_freezes_validation_only_selection() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    config = load_config(project_root / "configs" / "baseline.yaml")
+
+    assert config["project"]["mode"] == "sprint2_baseline"
+    assert config["baseline"]["selection_partition"] == "validation"
+    assert config["baseline"]["selection_metric"] == "average_precision"
+    assert config["baseline"]["final_test_access"] is False
+    assert Path(config["paths"]["feature_table"]).is_absolute()
+
+
+def test_baseline_config_rejects_test_access() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    config = load_config(project_root / "configs" / "baseline.yaml")
+    config["baseline"]["final_test_access"] = True
+
+    with pytest.raises(ConfigError, match="final_test_access=false"):
+        validate_config(config)

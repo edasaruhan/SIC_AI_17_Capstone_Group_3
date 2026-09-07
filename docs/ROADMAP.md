@@ -1,8 +1,9 @@
 # ARGUS AI Roadmap
 
-**Completed boundary:** Sprint 1 only  
+**Completed boundary:** Sprint 1 and Sprint 2
 **Overall Sprint 1 status:** `PASS` — 14/14 acceptance criteria  
-**Later work in this document:** recommendations, not authorization or results
+**Sprint 2 status:** `PASS` — three baselines and validation-only champion verified
+**Current stop boundary:** Sprint 3 and later have not started
 
 ## Sprint 1 — Repository Foundation + Data Proof
 
@@ -50,50 +51,61 @@ across all four primary Parquet outputs. See
 If a gate fails, fix and rerun that gate before widening scope. Do not begin model
 work to compensate for an incomplete data foundation.
 
-## Recommended Sprint 2 — Baseline + Model Exploration
+## Completed Sprint 2 — Baseline + Model Exploration
 
-Sprint 2 should start only after Sprint 1 is marked PASS. Recommended scope:
+Sprint 2 entered only after Sprint 1 passed and then executed the full-data,
+transaction-only protocol in `configs/baseline.yaml`.
 
-- implement Logistic Regression and Random Forest;
-- choose and implement either LightGBM or XGBoost with a documented dependency
-  decision;
-- use the identical frozen chronological partitions for all models;
-- build training-only preprocessing/encoding pipelines;
-- address imbalance through justified training-time methods without contaminating
-  validation/test;
-- generate PR-AUC, Recall@K, Precision@K, F1, FPR, alert count, confusion matrix,
-  and secondary ROC-AUC from code;
-- compare multiple operational K values, configured rather than hard-coded;
-- select the Transaction Baseline Champion on validation evidence only;
-- save model/config/runtime/prediction provenance and machine-readable comparison
-  artifacts;
-- leave final-test labels untouched during selection and threshold work.
+| Gate | Executed evidence | Status |
+| --- | --- | --- |
+| Frozen inputs | Sprint 1 feature/split hashes checked before model access | PASS |
+| Train-only transform | 3,554,957 train rows fit 74 predictors; validation transform-only | PASS |
+| Logistic Regression | `SGDClassifier(loss="log_loss")`, balanced weight | PASS with convergence warning retained |
+| Random Forest | 80 trees, balanced subsample, bounded configuration | PASS |
+| LightGBM | 250 trees, train-only `scale_pos_weight` | PASS |
+| Imbalance-aware metrics | AP/PR-AUC primary; ROC-AUC, F1, FPR, alerts, top-K saved | PASS |
+| Deterministic ranking | K 100/500/1000; source-row tie-break | PASS |
+| Validation-only champion | Random Forest, validation AP 0.08859105087174989 | PASS |
+| Final-test gate | No test matrix, inference, prediction, metric, or selection input | PASS |
+| Graph-history exclusion | Five prior fan-in/fan-out/pair fields withheld | PASS |
+| Machine-readable evidence | JSON, CSV, Parquet, model files, plots, manifest | PASS |
+| Independent verification | 761,749 saved validation rows and model artifacts checked | PASS |
+| Final quality | 81 tests in 19.87 seconds; Ruff and `pip check` PASS | PASS |
 
-### Recommended Sprint 2 entry criteria
+Validation AP ranked Random Forest first (0.08859105087174989), Logistic Regression
+second (0.006634242622201133), and LightGBM third (0.0054755570960638884). The
+decision threshold remained the fixed, unoptimized configuration value `0.5`.
+The full run took 389.0078022000016 seconds, and the refreshed manifest inventories
+26 payloads excluding itself.
 
-- Sprint 1 status is PASS;
-- quick run is repeatable with the same manifest-relevant counts;
-- the verified full-data split and feature schema are frozen for model comparison;
-- split metadata is frozen and versioned;
-- feature columns and forbidden leakage fields are reviewed;
-- no unresolved schema, identity, or referential-integrity failure remains.
+LightGBM filled the boosting slot because its CPU histogram path matched the full-
+data, deterministic single-thread, bounded-memory plan. XGBoost was not executed,
+so the roadmap records no empirical superiority claim between those libraries.
 
-### Recommended Sprint 2 exit criteria
+The frozen positive rates are 0.080338524% for train, 0.099770397% for validation,
+and 0.204952740% for test metadata. This temporal prevalence shift is preserved,
+not equalized; later precision and alert-volume comparisons must account for it.
 
-- all three baseline families run under one protocol;
-- validation comparison is generated, not manually typed;
-- champion selection and threshold basis are recorded;
-- top-K tie behavior is deterministic;
-- tests cover metric edge cases and training-only transformations;
-- no final-test-driven selection occurred;
-- claims are limited to the executed dataset/run scope.
+Top-K evidence also retains its tie limitation. Logistic Regression has 60,119
+validation rows at score `1.0` (427 positives), and LightGBM has 108,347 (663
+positives); K 100/500/1,000 cuts through those ties, so deterministic source-row
+ordering materially determines membership. Random Forest has no exact score-1
+rows, and the validation-AP champion rule is tie-aware.
 
-## Beyond the current planning horizon
+### Sprint 2 exit status
 
-The master implementation prompt retains later refinement, graph-value, GraphSAGE,
-case/evidence, explainability, and Streamlit phases. They are intentionally not
-expanded here so they cannot be mistaken for current work. No Sprint 3+ status or
-result is claimed.
+All planned baseline families, metrics, provenance, leakage guards, and validation-
+only selection evidence passed. The logistic baseline reached its configured
+20-iteration limit before convergence, its scores and all other candidate scores
+are uncalibrated, and no threshold/hyperparameter refinement was attempted. These
+are explicit inputs to Sprint 3 rather than reasons to rewrite Sprint 2 results.
+
+## Unstarted Sprint 3 and later work
+
+The master implementation prompt retains model refinement, threshold work, temporal
+cross-validation, feature-family ablation, the controlled graph-value experiment,
+GraphSAGE, case/evidence, explainability, and Streamlit phases. None has started,
+and no Sprint 3+ result is claimed.
 
 ## Stop conditions
 

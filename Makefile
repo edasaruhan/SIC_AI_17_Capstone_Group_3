@@ -1,4 +1,4 @@
-.PHONY: setup test lint quick full eda validate audit
+.PHONY: setup test lint quick full baseline verify-baseline validate-sprint2 eda validate audit
 
 setup:
 	python -m pip install -e ".[dev]"
@@ -15,6 +15,15 @@ quick:
 full:
 	python scripts/run_full_pipeline.py
 
+baseline:
+	python scripts/train_baselines.py --config configs/baseline.yaml
+
+verify-baseline:
+	python scripts/verify_baselines.py --config configs/baseline.yaml
+
+validate-sprint2:
+	python scripts/validate_sprint2.py --config configs/baseline.yaml
+
 eda:
 	python scripts/run_eda.py --config configs/quick.yaml
 
@@ -23,4 +32,3 @@ validate:
 
 audit:
 	python scripts/audit_raw_data.py
-

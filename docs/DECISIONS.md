@@ -3,18 +3,19 @@
 Decisions are recorded before results so implementation choices cannot be rewritten
 to fit a preferred narrative. “Accepted” means the design rule is authoritative;
 it does not mean its implementation has passed tests. Runtime verification remains
-in `reports/generated/SPRINT_1_STATUS.md`.
+in `reports/generated/SPRINT_1_STATUS.md` and
+`reports/generated/SPRINT_2_STATUS.md`.
 
-## ADR-001 — Limit the active build to Sprint 1
+## ADR-001 — Limit the initial build to Sprint 1
 
 - **Date:** 2026-09-06
-- **Status:** Accepted
+- **Status:** Superseded for active execution by ADR-019; retained as Sprint 1 history
 - **Decision:** Implement and validate repository/data/EDA/leakage-safe feature
   foundations only. Treat transaction models and later layers as deferred.
 - **Reason:** The user explicitly prohibited moving to Sprint 2 before Sprint 1 is
   complete.
-- **Consequence:** No model metric or graph-value conclusion belongs in current
-  documentation.
+- **Consequence:** No model metric belonged in the Sprint 1 closing evidence. Sprint
+  2 results are recorded separately; no graph-value conclusion exists.
 
 ## ADR-002 — Preserve coursework as immutable source context
 
@@ -175,17 +176,22 @@ in `reports/generated/SPRINT_1_STATUS.md`.
 - **Consequence:** Later case output must separate observed evidence from model
   evidence, state uncertainty, and require trained analyst review.
 
-## ADR-016 — Recommend validation-first model selection for Sprint 2
+## ADR-016 — Require validation-first model selection for Sprint 2
 
 - **Date:** 2026-09-06
-- **Status:** Proposed for Sprint 2; not implemented
-- **Decision:** Compare Logistic Regression, Random Forest, and one boosting family
-  on identical chronological partitions; select using validation PR-AUC and
-  operational top-K/FPR evidence.
+- **Status:** Accepted and verified
+- **Decision:** Compare Logistic Regression, Random Forest, and LightGBM on identical
+  frozen chronological partitions. Select the Transaction Baseline Champion solely
+  by maximum validation average precision; report top-K/FPR evidence as operating
+  context, not as test-driven selection input.
 - **Reason:** Accuracy is misleading at a 0.101942660453% positive rate, and test-
   driven selection would bias final evaluation.
-- **Consequence:** Sprint 1 now passes, but model and threshold work remains a
-  separately authorized Sprint 2 task. No model result is presently claimed.
+- **Evidence:** Random Forest validation AP is 0.08859105087174989, Logistic
+  Regression AP is 0.006634242622201133, and LightGBM AP is
+  0.0054755570960638884. Independent reselection names Random Forest champion.
+- **Consequence:** Random Forest is the current Transaction Baseline Champion for
+  this snapshot. Final-test inference remains closed and Sprint 3 refinement may
+  not rewrite the Sprint 2 validation evidence.
 
 ## ADR-017 — Isolate ARGUS from the unrelated DATATON repository
 
@@ -218,4 +224,80 @@ in `reports/generated/SPRINT_1_STATUS.md`.
   hash-ranked edges and a 50,000-edge NetworkX cap.
 - **Consequence:** Sprint 1 is PASS with actual full feature execution. Sampled
   graph component/local-subgraph values remain descriptive and must not be called
-  population estimates. Sprint 2 has not started.
+  population estimates. This frozen output became the verified input to Sprint 2.
+
+## ADR-019 — Execute Sprint 2 as a transaction-only validation experiment
+
+- **Date:** 2026-09-07
+- **Status:** Accepted and verified
+- **Decision:** Fit Logistic Regression, Random Forest, and LightGBM on the same
+  unsampled 3,554,957-row training matrix; evaluate all three on the same 761,749
+  validation rows. Exclude target/identity/provenance fields and all five graph-
+  history fields. Do not materialize or score the final test partition.
+- **Reason:** A clean transaction-only champion and a closed test gate are required
+  before model refinement or the controlled graph-value experiment.
+- **Evidence:** The run finished in 389.0078022000016 seconds. Its verifier
+  recomputed validation metrics, deserialized all three models, repeated champion
+  selection, and found zero test prediction artifacts. The refreshed manifest
+  inventories 26 payloads excluding itself.
+- **Consequence:** Sprint 2 is complete, Random Forest is the validation-selected
+  champion, and Sprint 3 remains not started.
+
+## ADR-020 — Fit all preprocessing state on train only
+
+- **Date:** 2026-09-07
+- **Status:** Accepted and verified
+- **Decision:** Use an explicit predictor allow-list. Fit numeric medians/scales,
+  low-cardinality vocabularies, and bank-frequency mappings only on train; transform
+  validation with frozen state and safe unknown-category fallbacks.
+- **Reason:** Allow-list selection prevents newly introduced identity, target, or
+  graph columns from silently becoming predictors, while train-only state prevents
+  validation distribution leakage.
+- **Evidence:** The fitted state records 3,554,957 train rows and 74 transformed
+  features. Tests exercise unknown categories, state integrity, forbidden fields,
+  and DuckDB/pandas parity.
+- **Consequence:** Validation is transform-only. Test was neither transformed nor
+  used for preprocessing fit.
+
+## ADR-021 — Keep threshold fixed and final test closed in Sprint 2
+
+- **Date:** 2026-09-07
+- **Status:** Accepted and verified
+- **Decision:** Report threshold metrics at the configured `0.5` without optimizing
+  it. Use non-interpolated average precision as the primary selection metric and
+  ROC-AUC as secondary. Report K 100/500/1000 with deterministic source-row tie-
+  breaking. Defer threshold tuning and final-test inference until refinement is
+  frozen.
+- **Reason:** Tuning belongs to Sprint 3, and repeated test inspection would bias
+  the final estimate. Accuracy is not informative under the observed imbalance.
+- **Evidence:** `final_test_policy.json` records no test fit, training, selection,
+  inference, or predictions. Validation/train prevalence ratio is
+  1.2418748968286322 and test/validation metadata ratio is 2.0542440105448496.
+  Logistic Regression has 60,119 validation rows at exact score `1.0` (427
+  positives); LightGBM has 108,347 (663 positives). Random Forest has no exact
+  score-1 rows.
+- **Consequence:** Fixed-threshold precision and alert volume are exploratory and
+  prevalence-sensitive. They must not be projected unchanged to the untouched test
+  period. Logistic/LightGBM top-K membership cuts through large tied plateaus and
+  therefore depends materially on the deterministic source-row tie-break; average-
+  precision champion selection remains tie-aware.
+
+## ADR-022 — Use bounded baseline implementations on the full training partition
+
+- **Date:** 2026-09-07
+- **Status:** Accepted and verified
+- **Decision:** Implement Logistic Regression as
+  `SGDClassifier(loss="log_loss")`, Random Forest with bounded depth/tree count and
+  balanced subsampling, and single-thread deterministic LightGBM with a train-only
+  class ratio.
+- **Reason:** The full 3,554,957-row by 74-column matrix must fit the available
+  Windows hardware without substituting a sampled training claim. LightGBM was
+  selected once for its CPU histogram/full-data fit under the deterministic,
+  single-thread, bounded-memory plan; XGBoost was not executed.
+- **Evidence:** All three models ran on the full training matrix. The logistic model
+  reached its configured 20-iteration limit before convergence; this warning is
+  preserved rather than hidden. All outputs are uncalibrated baselines.
+- **Consequence:** Sprint 2 provides initial comparison evidence, not tuned or
+  production-ready estimators. Refinement, calibration, ablation, and graph-value
+  evaluation remain Sprint 3 work. No empirical LightGBM-over-XGBoost superiority
+  claim is supported.

@@ -215,6 +215,86 @@ def validate_config(config: Mapping[str, Any]) -> None:
         if not isinstance(sample_rows, int) or isinstance(sample_rows, bool) or sample_rows <= 0:
             raise ConfigError("full_pipeline.eda_sample_rows must be a positive integer")
 
+    baseline = config.get("baseline")
+    if baseline is not None:
+        _validate_baseline_config(baseline)
+
+
+def _validate_baseline_config(baseline: object) -> None:
+    """Validate the immutable Sprint 2 model-selection contract."""
+
+    if not isinstance(baseline, Mapping):
+        raise ConfigError("baseline must be a mapping")
+    if baseline.get("selection_partition") != "validation":
+        raise ConfigError("baseline.selection_partition must be 'validation'")
+    if baseline.get("selection_metric") != "average_precision":
+        raise ConfigError("baseline.selection_metric must be 'average_precision'")
+    if baseline.get("final_test_access") is not False:
+        raise ConfigError("Sprint 2 requires baseline.final_test_access=false")
+    if baseline.get("final_test_policy") != "metadata_only_no_model_inference":
+        raise ConfigError("baseline.final_test_policy must be 'metadata_only_no_model_inference'")
+
+    threshold = baseline.get("decision_threshold")
+    if (
+        not isinstance(threshold, (int, float))
+        or isinstance(threshold, bool)
+        or not 0.0 <= float(threshold) <= 1.0
+    ):
+        raise ConfigError("baseline.decision_threshold must be numeric in [0, 1]")
+    top_k = baseline.get("top_k")
+    if (
+        not isinstance(top_k, list)
+        or not top_k
+        or any(
+            isinstance(value, bool) or not isinstance(value, int) or value <= 0 for value in top_k
+        )
+        or len(set(top_k)) != len(top_k)
+    ):
+        raise ConfigError("baseline.top_k must contain unique positive integers")
+
+    features = baseline.get("features")
+    if not isinstance(features, Mapping):
+        raise ConfigError("baseline.features must be a mapping")
+    selected_groups = ("numeric", "one_hot_categorical", "frequency_categorical")
+    selected: list[str] = []
+    for key in selected_groups:
+        values = features.get(key)
+        if (
+            not isinstance(values, list)
+            or not values
+            or not all(isinstance(value, str) and value for value in values)
+        ):
+            raise ConfigError(f"baseline.features.{key} must be a non-empty string list")
+        selected.extend(values)
+    if len(selected) != len(set(selected)):
+        raise ConfigError("A baseline input feature may appear in only one encoding group")
+    forbidden: list[str] = []
+    for key in ("forbidden_graph_history", "forbidden_identity_or_target"):
+        values = features.get(key)
+        if not isinstance(values, list) or not all(isinstance(value, str) for value in values):
+            raise ConfigError(f"baseline.features.{key} must be a string list")
+        forbidden.extend(values)
+    overlap = sorted(set(selected) & set(forbidden))
+    if overlap:
+        raise ConfigError("Forbidden fields selected as model features: " + ", ".join(overlap))
+
+    models = baseline.get("models")
+    expected_models = {"logistic_regression", "random_forest", "lightgbm"}
+    if not isinstance(models, Mapping) or set(models) != expected_models:
+        raise ConfigError(
+            "baseline.models must define exactly logistic_regression, random_forest, lightgbm"
+        )
+    if any(not isinstance(models[name], Mapping) for name in expected_models):
+        raise ConfigError("Each baseline model configuration must be a mapping")
+
+    frozen = baseline.get("frozen_upstream")
+    if not isinstance(frozen, Mapping):
+        raise ConfigError("baseline.frozen_upstream must be a mapping")
+    for key in ("feature_table_sha256", "split_table_sha256", "split_metadata_sha256"):
+        value = frozen.get(key)
+        if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None:
+            raise ConfigError(f"baseline.frozen_upstream.{key} must be a lowercase SHA-256")
+
 
 def load_config(
     path: str | Path,
