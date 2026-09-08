@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from argus.final_evaluation.reporting import render_final_comparison_markdown
+from argus.final_evaluation.reporting import (
+    render_final_comparison_markdown,
+    render_final_readme_summary_markdown,
+)
 
 
 def _comparison() -> list[dict[str, object]]:
@@ -87,3 +90,28 @@ def test_final_comparison_report_rejects_incomplete_model_set() -> None:
         assert "three frozen models" in str(exc)
     else:
         raise AssertionError("Incomplete final comparison was accepted")
+
+
+def test_readme_summary_is_turkish_concise_and_artifact_driven() -> None:
+    rendered = render_final_readme_summary_markdown(
+        _comparison(),
+        _top_k(),
+        {
+            "validation": {"rows": 10, "positives": 1, "positive_rate": 0.1},
+            "test": {"rows": 10, "positives": 2, "positive_rate": 0.2},
+            "test_to_validation_positive_rate_ratio": 2.0,
+            "interpretation": "Synthetic fixture shift.",
+        },
+        quality={
+            "status": "PASS",
+            "pytest_passed": 123,
+            "artifact_verification_status": "PASS",
+        },
+    )
+    assert rendered.startswith("### Final bilimsel değerlendirme")
+    assert "Donmuş final model | Graf özellikli LightGBM | **0,400000**" in rendered
+    assert "| 1.000 | 0,100000 | 0,200000 | 1 |" in rendered
+    assert "`2,00×` prevalans artışı" in rendered
+    assert "`%10,000000`" in rendered
+    assert "123 test" in rendered
+    assert "final_test_predictions.parquet" not in rendered

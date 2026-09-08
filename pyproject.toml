@@ -5,12 +5,13 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "argus-ai"
 version = "0.1.0"
-description = "Leakage-safe data and graph foundations for financial-crime investigation research."
+description = "Finansal suç incelemeleri için veri sızıntısını önleyen işlem ve hesap ağı araştırma prototipi."
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
 license = {text = "MIT"}
 authors = [
-  {name = "ARGUS AI Capstone Team"},
+  {name = "Gizem Özcan"},
+  {name = "Ayşe Ulaşlı"},
 ]
 dependencies = [
   "duckdb>=1.5,<2",
