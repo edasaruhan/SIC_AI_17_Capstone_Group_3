@@ -480,7 +480,8 @@ def _render_top_k(top_k: pd.DataFrame, *, partition_label: str = "Validation") -
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
     )
-    st.plotly_chart(figure, width="stretch", key="model-top-k")
+    chart_key = f"model-top-k-{partition_label.casefold().replace(' ', '-')}"
+    st.plotly_chart(figure, width="stretch", key=chart_key)
 
 
 def _render_ablation(ablation: pd.DataFrame) -> None:
@@ -601,14 +602,22 @@ def _render_final_evaluation(artifacts: DashboardArtifacts) -> None:
         "The final test has been consumed exactly once. These artifacts are immutable evaluation "
         "evidence; no post-test tuning or champion reselection is permitted."
     )
+    with st.expander("Final-test artifact provenance"):
+        st.caption("Every displayed final value is loaded from these saved artifact paths.")
+        for label, path in sorted(final.provenance.items()):
+            st.markdown(f"**{label.replace('_', ' ').title()}**")
+            st.code(path, language=None)
 
 
 def render_model_comparison(artifacts: DashboardArtifacts) -> None:
     _page_heading(
-        "VALIDATION-ONLY SCIENCE",
+        "FROZEN VALIDATION + FINAL EVIDENCE",
         "Model Comparison",
-        "Frozen transaction, graph-enhanced, and GraphSAGE evidence under the recorded protocol.",
+        "Pre-test model selection and one-shot final evidence remain visibly separated.",
     )
+    _render_final_evaluation(artifacts)
+    st.divider()
+    st.subheader("Frozen validation reference")
     comparison = artifacts.model_comparison
     preferred = [
         "version",
@@ -660,7 +669,6 @@ def render_model_comparison(artifacts: DashboardArtifacts) -> None:
             and do not establish that any person or account committed wrongdoing.
             """
         )
-    _render_final_evaluation(artifacts)
 
 
 def main() -> None:
@@ -676,7 +684,7 @@ def main() -> None:
     artifact_root = configured_artifact_root()
     st.sidebar.divider()
     st.sidebar.caption("Artifact source")
-    st.sidebar.code(str(artifact_root), language=None)
+    st.sidebar.caption(str(artifact_root))
     st.sidebar.caption("No model training or inference on page load")
 
     try:

@@ -2,6 +2,63 @@
 
 ## Current state
 
+<!-- ARGUS_FINAL_MODEL_CARD_START -->
+## One-shot final-test evidence
+
+| Role | Frozen model | PR-AUC (AP) | ROC-AUC | Precision | Recall | F1 | FPR | Alerts |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Frozen champion | Graph-enhanced LightGBM | 0.69005906 | 0.99127213 | 0.17816018 | 0.88212684 | 0.29644779 | 0.00835704 | 7,729 |
+| Comparator | GraphSAGE edge classifier | 0.01341710 | 0.82662724 | 0.00600590 | 0.11338885 | 0.01140758 | 0.03854078 | 29,471 |
+| Comparator | Refined transaction LightGBM | 0.53079643 | 0.98731443 | 0.16072332 | 0.81422165 | 0.26845496 | 0.00873200 | 7,908 |
+
+## Operational Top-K metrics
+
+| Model | K | Precision@K | Recall@K | True positives |
+| --- | ---: | ---: | ---: | ---: |
+| Graph-enhanced LightGBM | 100 | 0.98000000 | 0.06278027 | 98 |
+| Graph-enhanced LightGBM | 500 | 0.96800000 | 0.31005766 | 484 |
+| Graph-enhanced LightGBM | 1,000 | 0.83900000 | 0.53747598 | 839 |
+| GraphSAGE edge classifier | 100 | 0.18000000 | 0.01153107 | 18 |
+| GraphSAGE edge classifier | 500 | 0.08200000 | 0.02626521 | 41 |
+| GraphSAGE edge classifier | 1,000 | 0.06000000 | 0.03843690 | 60 |
+| Refined transaction LightGBM | 100 | 0.92000000 | 0.05893658 | 92 |
+| Refined transaction LightGBM | 500 | 0.86200000 | 0.27610506 | 431 |
+| Refined transaction LightGBM | 1,000 | 0.66600000 | 0.42664958 | 666 |
+
+## Prevalence shift
+
+- Validation: 760 / 761,749 (0.00099770).
+- Final test: 1,561 / 761,639 (0.00204953).
+- Test/validation positive-rate ratio: 2.05424401.
+- Interpretation: Precision and fixed-threshold alert volume are prevalence-sensitive; the observed chronological shift was reported without resampling or threshold changes.
+
+## Frozen protocol statement
+
+`graph_enhanced_lightgbm` was selected by validation PR-AUC and frozen before final-test access. Test results did not change the model, feature family, hyperparameters, or validation-selected threshold. No post-test tuning or retraining was performed.
+
+## Machine-readable evidence
+
+- [Final metrics](../artifacts/sprint5/final_metrics.json)
+- [Final comparison](../artifacts/sprint5/final_model_comparison.json)
+- [Final Top-K metrics](../artifacts/sprint5/final_top_k_metrics.json)
+- [Saved final predictions](../artifacts/sprint5/final_test_predictions.parquet)
+- [Prevalence analysis](../artifacts/sprint5/prevalence_shift.json)
+- [Test identity/leakage audit](../artifacts/sprint5/test_identity_audit.json)
+- [Immutable run manifest](../artifacts/sprint5/run_manifest.json)
+- [Read-only verification](../artifacts/sprint5/verification_report.json)
+- [Quality report](../artifacts/sprint5/quality_report.json)
+- [Streamlit: Executive Dashboard](../artifacts/sprint5/screenshots/executive_dashboard.png)
+- [Streamlit: Investigation Queue](../artifacts/sprint5/screenshots/investigation_queue.png)
+- [Streamlit: Case Investigator](../artifacts/sprint5/screenshots/case_investigator.png)
+- [Streamlit: Model Comparison](../artifacts/sprint5/screenshots/model_comparison.png)
+
+## Final quality
+
+- Status: **PASS**
+- Pytest: 377 passed
+- Saved-artifact verification: PASS
+<!-- ARGUS_FINAL_MODEL_CARD_END -->
+
 Sprint 2 trained three transaction-level baselines on the frozen Sprint 1
 chronological protocol. Random Forest remains the **Transaction Baseline Champion**
 for that immutable snapshot. Sprint 3 completed temporal refinement and selected
@@ -14,7 +71,10 @@ reference.
 
 All 19 Sprint 4 acceptance gates, artifact verification, and 289 tests passed.
 These are experiment results on synthetic data, not production model approval.
-Final-test inference remains closed.
+Sprint 5 subsequently consumed the frozen final test exactly once. The
+graph-enhanced LightGBM specification had already been selected on validation and
+remained unchanged; saved predictions were independently re-evaluated and no
+post-test tuning or retraining occurred.
 
 ## Intended use
 
@@ -232,9 +292,12 @@ positive weighting.
 
 Final-test inference was **not performed** in Sprint 2, Sprint 3, or Sprint 4. No
 sprint used test rows for preprocessing fit, training, graph construction, model
-selection, threshold work, prediction, or evaluation. Test counts above come only
-from pre-existing Sprint 1 split metadata. Any later test evaluation may not revise
-the frozen selected specification.
+selection, or threshold work. Sprint 5 then performed the separately authorized
+single confirmatory evaluation on all 761,639 exact frozen test rows. The access
+receipt was created before the first test query; the champion, feature family,
+hyperparameters, train-fitted preprocessors, and validation-selected raw-score
+thresholds were fixed before access. Test results did not revise the specification,
+and no additional final-test inference run is permitted.
 
 ## Limitations
 
@@ -246,7 +309,7 @@ the frozen selected specification.
   linear model retained a convergence warning and its `0.5` threshold was not
   optimized.
 - Sprint 3 results are validation evidence after repeated development comparisons;
-  they are not a final-test estimate.
+  the separate Sprint 5 block above is the one-shot final-test estimate.
 - Sprint 4 GraphSAGE training uses explicitly disclosed deterministic graph and
   supervised samples, not all eligible training edges; only validation scoring is
   full-partition.
@@ -258,3 +321,5 @@ the frozen selected specification.
   not independently verified real-world intelligence.
 - Validation metrics measure synthetic-label ranking/classification behavior and
   are not causal explanations or evidence of wrongdoing.
+- Final metrics come from one synthetic chronological holdout and are not external,
+  prospective, fairness, calibration, or production validation.

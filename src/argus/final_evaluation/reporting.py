@@ -137,6 +137,13 @@ def render_final_comparison_markdown(
             f"- [Immutable run manifest]({artifact_prefix}/run_manifest.json)",
             f"- [Read-only verification]({artifact_prefix}/verification_report.json)",
             f"- [Quality report]({artifact_prefix}/quality_report.json)",
+            "- [Streamlit: Executive Dashboard]"
+            f"({artifact_prefix}/screenshots/executive_dashboard.png)",
+            "- [Streamlit: Investigation Queue]"
+            f"({artifact_prefix}/screenshots/investigation_queue.png)",
+            "- [Streamlit: Case Investigator]"
+            f"({artifact_prefix}/screenshots/case_investigator.png)",
+            f"- [Streamlit: Model Comparison]({artifact_prefix}/screenshots/model_comparison.png)",
         ]
     )
     if quality:

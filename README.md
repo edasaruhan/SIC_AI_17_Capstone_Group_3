@@ -13,12 +13,71 @@ score means elevated investigation priority, not a legal conclusion.
 
 ## Current status
 
+<!-- ARGUS_FINAL_EVALUATION_START -->
+## Sprint 5 one-shot final evaluation
+
+| Role | Frozen model | PR-AUC (AP) | ROC-AUC | Precision | Recall | F1 | FPR | Alerts |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Frozen champion | Graph-enhanced LightGBM | 0.69005906 | 0.99127213 | 0.17816018 | 0.88212684 | 0.29644779 | 0.00835704 | 7,729 |
+| Comparator | GraphSAGE edge classifier | 0.01341710 | 0.82662724 | 0.00600590 | 0.11338885 | 0.01140758 | 0.03854078 | 29,471 |
+| Comparator | Refined transaction LightGBM | 0.53079643 | 0.98731443 | 0.16072332 | 0.81422165 | 0.26845496 | 0.00873200 | 7,908 |
+
+## Operational Top-K metrics
+
+| Model | K | Precision@K | Recall@K | True positives |
+| --- | ---: | ---: | ---: | ---: |
+| Graph-enhanced LightGBM | 100 | 0.98000000 | 0.06278027 | 98 |
+| Graph-enhanced LightGBM | 500 | 0.96800000 | 0.31005766 | 484 |
+| Graph-enhanced LightGBM | 1,000 | 0.83900000 | 0.53747598 | 839 |
+| GraphSAGE edge classifier | 100 | 0.18000000 | 0.01153107 | 18 |
+| GraphSAGE edge classifier | 500 | 0.08200000 | 0.02626521 | 41 |
+| GraphSAGE edge classifier | 1,000 | 0.06000000 | 0.03843690 | 60 |
+| Refined transaction LightGBM | 100 | 0.92000000 | 0.05893658 | 92 |
+| Refined transaction LightGBM | 500 | 0.86200000 | 0.27610506 | 431 |
+| Refined transaction LightGBM | 1,000 | 0.66600000 | 0.42664958 | 666 |
+
+## Prevalence shift
+
+- Validation: 760 / 761,749 (0.00099770).
+- Final test: 1,561 / 761,639 (0.00204953).
+- Test/validation positive-rate ratio: 2.05424401.
+- Interpretation: Precision and fixed-threshold alert volume are prevalence-sensitive; the observed chronological shift was reported without resampling or threshold changes.
+
+## Frozen protocol statement
+
+`graph_enhanced_lightgbm` was selected by validation PR-AUC and frozen before final-test access. Test results did not change the model, feature family, hyperparameters, or validation-selected threshold. No post-test tuning or retraining was performed.
+
+## Machine-readable evidence
+
+- [Final metrics](artifacts/sprint5/final_metrics.json)
+- [Final comparison](artifacts/sprint5/final_model_comparison.json)
+- [Final Top-K metrics](artifacts/sprint5/final_top_k_metrics.json)
+- [Saved final predictions](artifacts/sprint5/final_test_predictions.parquet)
+- [Prevalence analysis](artifacts/sprint5/prevalence_shift.json)
+- [Test identity/leakage audit](artifacts/sprint5/test_identity_audit.json)
+- [Immutable run manifest](artifacts/sprint5/run_manifest.json)
+- [Read-only verification](artifacts/sprint5/verification_report.json)
+- [Quality report](artifacts/sprint5/quality_report.json)
+- [Streamlit: Executive Dashboard](artifacts/sprint5/screenshots/executive_dashboard.png)
+- [Streamlit: Investigation Queue](artifacts/sprint5/screenshots/investigation_queue.png)
+- [Streamlit: Case Investigator](artifacts/sprint5/screenshots/case_investigator.png)
+- [Streamlit: Model Comparison](artifacts/sprint5/screenshots/model_comparison.png)
+
+## Final quality
+
+- Status: **PASS**
+- Pytest: 377 passed
+- Saved-artifact verification: PASS
+<!-- ARGUS_FINAL_EVALUATION_END -->
+
 This checkout has completed **Sprint 1: Repository Foundation + Data Proof**,
 **Sprint 2: Baseline + Model Exploration**, **Sprint 3: Model Refinement + Graph
-Value Experiment**, and **Sprint 4: GraphSAGE + Product Layer**. The executed
-Sprint 4 run, independent artifact verification, and repository quality suite all
-passed. The final-test period remains sealed: it was not fitted, transformed,
-included in a graph, scored, tuned against, or evaluated.
+Value Experiment**, **Sprint 4: GraphSAGE + Product Layer**, and **Sprint 5:
+Final Evaluation**. Sprint 5 opened the frozen chronological test partition once,
+scored the three already-fitted models, and retained graph-enhanced LightGBM as
+the pre-frozen champion. Independent saved-artifact verification and the final
+quality suite passed; no test-driven selection, tuning, feature change, threshold
+change, preprocessing fit, or retraining occurred.
 
 | Item | Status | Evidence |
 | --- | --- | --- |
@@ -37,7 +96,9 @@ included in a graph, scored, tuned against, or evaluated.
 | Transaction Baseline Champion | **Random Forest** | Validation average precision 0.08859105087174989 |
 | Saved Sprint 2 verification | PASS | 761,749 validation predictions and validation-only reselection verified |
 | Sprint 2 final quality suite | PASS | 81 passed in 19.87 seconds; Ruff lint/format and `pip check` passed |
-| Final-test model access | **NOT USED** | No test feature matrix, prediction, inference, or test metric exists |
+| Sprint 5 one-shot final-test access | **PASS — consumed once** | 761,639 exact test rows scored in one authorized run; immutable access/completion receipts saved |
+| Frozen final champion | **Graph-enhanced LightGBM** | Selected on validation before test access; test AP 0.69005906 is confirmatory only |
+| Sprint 5 final quality suite | **PASS** | 377 passed; saved-artifact metric recomputation, four-screen Streamlit smoke, Ruff, and `pip check` passed |
 | Sprint 3 refinement / graph-value experiment | **PASS** | All 15 acceptance gates passed |
 | Refined Transaction Baseline Champion | **LightGBM** | Validation AP 0.35535042; selected using validation only |
 | Same-model graph-value experiment | **PASS** | LightGBM B AP 0.35535042; C AP 0.47175420; delta +0.11640378 |
@@ -51,8 +112,9 @@ included in a graph, scored, tuned against, or evaluated.
 The completed-run evidence ledgers are
 [`SPRINT_1_STATUS.md`](reports/generated/SPRINT_1_STATUS.md),
 [`SPRINT_2_STATUS.md`](reports/generated/SPRINT_2_STATUS.md),
-[`SPRINT_3_STATUS.md`](reports/generated/SPRINT_3_STATUS.md), and
-[`SPRINT_4_STATUS.md`](reports/generated/SPRINT_4_STATUS.md).
+[`SPRINT_3_STATUS.md`](reports/generated/SPRINT_3_STATUS.md),
+[`SPRINT_4_STATUS.md`](reports/generated/SPRINT_4_STATUS.md), and the final
+[`model comparison`](reports/generated/FINAL_MODEL_COMPARISON.md).
 
 ## Research question
 
@@ -364,7 +426,9 @@ end-to-end Sprint 4 pipeline completed in 49.928 seconds; independent artifact
 verification passed, and the quality suite passed 289 tests in 34.21 seconds plus
 a four-screen saved-artifact Streamlit smoke test, Ruff lint/format, and `pip
 check`. Final-test features, labels, graph construction, predictions, and metrics
-remain unopened.
+remained unopened throughout Sprint 4. Sprint 5 later attached the separate,
+one-shot final-test artifact set without modifying the Sprint 4 cases or
+validation comparison.
 
 ## Repository map
 
@@ -442,8 +506,17 @@ py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe scripts/verify_sprint4.py --config configs/sprint4.yaml
 .\.venv\Scripts\python.exe scripts/validate_sprint4.py --config configs/sprint4.yaml
 .\.venv\Scripts\python.exe scripts/smoke_streamlit_sprint4.py --artifact-root artifacts/sprint4/product
+.\.venv\Scripts\python.exe scripts/verify_final_evaluation.py --config configs/final_evaluation.yaml
+.\.venv\Scripts\python.exe scripts/validate_final_evaluation.py --config configs/final_evaluation.yaml
+.\.venv\Scripts\python.exe scripts/smoke_streamlit_final.py --artifact-root artifacts/sprint5
+$env:ARGUS_ARTIFACT_DIR = (Resolve-Path artifacts/sprint5)
 .\.venv\Scripts\streamlit.exe run app.py
 ```
+
+The one-shot `scripts/run_final_evaluation.py` command is intentionally omitted
+from repeatable commands because `artifacts/sprint5/FINAL_TEST_OPENED.json` records
+that the sole authorized run has already been consumed. Verification, quality,
+documentation, screenshot, and Streamlit commands use saved artifacts only.
 
 Equivalent Make targets are:
 
@@ -668,20 +741,23 @@ The case builder prioritizes review; it does not establish guilt. TreeSHAP value
 describe the fitted LightGBM score locally, and GraphSAGE gradient-times-input
 sensitivity describes local model response. Neither is causal evidence. The
 deterministic narrative fallback summarizes only saved evidence and should be
-reviewed against source transactions by a trained analyst. No final-test result is
-claimed, and Sprint 4 stopped before final evaluation as required.
+reviewed against source transactions by a trained analyst. Sprint 4 stopped before
+final evaluation as required; Sprint 5 subsequently performed the separately
+authorized one-shot test evaluation without revising the frozen specification.
 
 ## Documentation
 
 - [`PROJECT_SPEC.md`](docs/PROJECT_SPEC.md): canonical scope and system contract
 - [`DATA_DICTIONARY.md`](docs/DATA_DICTIONARY.md): raw, canonical, and engineered fields
 - [`EXPERIMENT_PROTOCOL.md`](docs/EXPERIMENT_PROTOCOL.md): leakage-safe evaluation rules
-- [`ROADMAP.md`](docs/ROADMAP.md): completed Sprint 1/2/3/4 gates and later boundaries
+- [`ROADMAP.md`](docs/ROADMAP.md): Sprint gates and final-evaluation boundary
 - [`DECISIONS.md`](docs/DECISIONS.md): architecture decision log
 - [`SPRINT_1_STATUS.md`](reports/generated/SPRINT_1_STATUS.md): evidence-backed status
 - [`SPRINT_2_STATUS.md`](reports/generated/SPRINT_2_STATUS.md): generated baseline evidence
 - [`SPRINT_3_STATUS.md`](reports/generated/SPRINT_3_STATUS.md): generated Sprint 3 evidence and acceptance ledger
 - [`SPRINT_4_STATUS.md`](reports/generated/SPRINT_4_STATUS.md): generated GraphSAGE/product evidence and acceptance ledger
+- [`FINAL_EVALUATION_STATUS.md`](reports/generated/FINAL_EVALUATION_STATUS.md): one-shot final-test status
+- [`FINAL_MODEL_COMPARISON.md`](reports/generated/FINAL_MODEL_COMPARISON.md): artifact-generated final metrics, Top-K, prevalence, and quality evidence
 
 The original proposal, presentation, reports, templates, and master prompt are
 preserved unchanged in `reports/existing_coursework/`.
