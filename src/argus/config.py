@@ -276,6 +276,10 @@ def validate_config(config: Mapping[str, Any]) -> None:
     if sprint4 is not None:
         _validate_sprint4_config(sprint4, sprint3=sprint3)
 
+    sprint5 = config.get("sprint5")
+    if sprint5 is not None:
+        _validate_sprint5_config(sprint5, sprint4=sprint4)
+
 
 def _validate_baseline_config(baseline: object) -> None:
     """Validate the immutable Sprint 2 model-selection contract."""
@@ -1255,6 +1259,483 @@ def _validate_sprint4_application(value: object) -> None:
         raise ConfigError("Sprint 4 application required screens differ from the contract")
     if value.get("optional_screen") != ["Executive Dashboard"]:
         raise ConfigError("Sprint 4 optional screen must be Executive Dashboard")
+
+
+def _require_exact_value(value: Mapping[str, Any], key: str, expected: object, name: str) -> None:
+    if value.get(key) != expected:
+        raise ConfigError(f"{name}.{key} must be {expected!r}")
+
+
+def _require_sha256(value: object, name: str) -> str:
+    if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None:
+        raise ConfigError(f"{name} must be a lowercase SHA-256 digest")
+    return value
+
+
+def _validate_frozen_file_reference(
+    value: object,
+    *,
+    name: str,
+    expected_path: str,
+    expected_sha256: str,
+) -> None:
+    if not isinstance(value, Mapping):
+        raise ConfigError(f"{name} must be a mapping")
+    _require_exact_keys(value, {"path", "sha256"}, name)
+    _require_exact_value(value, "path", expected_path, name)
+    digest = _require_sha256(value.get("sha256"), f"{name}.sha256")
+    if digest != expected_sha256:
+        raise ConfigError(f"{name}.sha256 differs from the frozen artifact")
+
+
+def _validate_sprint5_config(sprint5: object, *, sprint4: object) -> None:
+    """Validate the immutable, one-shot Sprint 5 final-evaluation contract."""
+
+    if not isinstance(sprint5, Mapping):
+        raise ConfigError("sprint5 must be a mapping")
+    _require_exact_keys(
+        sprint5,
+        {
+            "protocol_version",
+            "experiment_scope",
+            "authorization",
+            "final_test_access",
+            "final_test_policy",
+            "selection_partition",
+            "evaluation_partition",
+            "selection_metric",
+            "ranking_score_type",
+            "ranking_tie_break",
+            "top_k",
+            "batch_rows",
+            "memory_limit",
+            "max_temp_directory_size",
+            "threads",
+            "torch_threads",
+            "parquet_compression",
+            "one_shot_gate",
+            "frozen_references",
+            "models",
+            "graphsage_inference",
+            "prohibitions",
+            "outputs",
+        },
+        "sprint5",
+    )
+    expected_scalars = {
+        "protocol_version": 1,
+        "experiment_scope": "one_shot_full_test_frozen_models_no_post_test_tuning",
+        "final_test_access": True,
+        "final_test_policy": "single_authorized_confirmatory_run_no_retry",
+        "selection_partition": "validation",
+        "evaluation_partition": "test",
+        "selection_metric": "average_precision",
+        "ranking_score_type": "raw_model_score",
+        "ranking_tie_break": "source_row_number_ascending",
+        "top_k": [100, 500, 1000],
+        "parquet_compression": "zstd",
+    }
+    for key, expected in expected_scalars.items():
+        _require_exact_value(sprint5, key, expected, "sprint5")
+    if isinstance(sprint5.get("protocol_version"), bool):
+        raise ConfigError("sprint5.protocol_version must be integer 1")
+    _require_boolean(sprint5.get("final_test_access"), "sprint5.final_test_access", expected=True)
+    for key in ("batch_rows", "threads", "torch_threads"):
+        _require_positive_integer(sprint5.get(key), f"sprint5.{key}")
+    _require_positive_size(sprint5.get("memory_limit"), "sprint5.memory_limit")
+    _require_positive_size(
+        sprint5.get("max_temp_directory_size"), "sprint5.max_temp_directory_size"
+    )
+    if not isinstance(sprint4, Mapping):
+        raise ConfigError("Sprint 5 requires the inherited Sprint 4 contract")
+    if sprint5.get("top_k") != sprint4.get("top_k"):
+        raise ConfigError("sprint5.top_k must match the frozen Sprint 4 top_k")
+    if sprint5.get("ranking_tie_break") != sprint4.get("ranking_tie_break"):
+        raise ConfigError("sprint5.ranking_tie_break must match the frozen Sprint 4 rule")
+
+    _validate_sprint5_authorization(sprint5.get("authorization"))
+    _validate_sprint5_one_shot_gate(sprint5.get("one_shot_gate"))
+    _validate_sprint5_frozen_references(sprint5.get("frozen_references"))
+    _validate_sprint5_models(sprint5.get("models"))
+    _validate_sprint5_graphsage_inference(sprint5.get("graphsage_inference"))
+    _validate_sprint5_prohibitions(sprint5.get("prohibitions"))
+    _validate_sprint5_outputs(sprint5.get("outputs"))
+
+
+def _validate_sprint5_authorization(value: object) -> None:
+    if not isinstance(value, Mapping):
+        raise ConfigError("sprint5.authorization must be a mapping")
+    _require_exact_keys(
+        value, {"explicit_user_authorization", "authorized_stage"}, "sprint5.authorization"
+    )
+    _require_boolean(
+        value.get("explicit_user_authorization"),
+        "sprint5.authorization.explicit_user_authorization",
+        expected=True,
+    )
+    _require_exact_value(value, "authorized_stage", "final_evaluation", "sprint5.authorization")
+
+
+def _validate_sprint5_one_shot_gate(value: object) -> None:
+    if not isinstance(value, Mapping):
+        raise ConfigError("sprint5.one_shot_gate must be a mapping")
+    _require_exact_keys(
+        value,
+        {
+            "mode",
+            "freeze_contract_path",
+            "receipt_path",
+            "require_frozen_hash_verification_before_receipt",
+            "create_receipt_before_test_read",
+            "refuse_if_receipt_exists",
+            "refuse_retry_after_failure",
+        },
+        "sprint5.one_shot_gate",
+    )
+    expected = {
+        "mode": "one_shot",
+        "freeze_contract_path": "freeze_contract.json",
+        "receipt_path": "FINAL_TEST_OPENED.json",
+    }
+    for key, item in expected.items():
+        _require_exact_value(value, key, item, "sprint5.one_shot_gate")
+    for key in (
+        "require_frozen_hash_verification_before_receipt",
+        "create_receipt_before_test_read",
+        "refuse_if_receipt_exists",
+        "refuse_retry_after_failure",
+    ):
+        _require_boolean(value.get(key), f"sprint5.one_shot_gate.{key}", expected=True)
+
+
+_SPRINT5_FILE_REFERENCES = {
+    "sprint3_manifest": (
+        "artifacts/sprint3/run_manifest.json",
+        "895f1352558cb024e157918c489214226f0901bdf440210f2d9ddf46934ace0e",
+    ),
+    "sprint4_manifest": (
+        "artifacts/sprint4/run_manifest.json",
+        "5b7ee46a876b650165a4b43f3bd5584315921fdcbc58955399a6490471af6937",
+    ),
+    "full_manifest": (
+        "artifacts/full/run_manifest.json",
+        "a3be9950c7906910457bb5d92ad3a8363794150a605675985d1fc9147c4af098",
+    ),
+    "split_manifest": (
+        "artifacts/full/tables/split_manifest.parquet",
+        "b7294d56545c4135c890e69dda29a326b6b4134777ad606ef246b46250fdd872",
+    ),
+    "feature_store": (
+        "artifacts/full/tables/transaction_features.parquet",
+        "931aa48c43dd9648ac52023795d0603d377821c5d1241480a1376a89a0d55b6e",
+    ),
+    "sprint4_thresholds": (
+        "artifacts/sprint4/thresholds.json",
+        "67aa10d6ccd1715674f4c3ab3a9fa6806d42e6b8642b27d7ec3529fdde675d5a",
+    ),
+    "sprint4_model_comparison": (
+        "artifacts/sprint4/model_comparison.json",
+        "5d692ad7216dfa36ac62ac9d0f010ac6b52d69db611fb19be242d37a83f09061",
+    ),
+}
+
+
+def _validate_sprint5_frozen_references(value: object) -> None:
+    if not isinstance(value, Mapping):
+        raise ConfigError("sprint5.frozen_references must be a mapping")
+    _require_exact_keys(
+        value,
+        {
+            "sprint4_checkpoint",
+            *_SPRINT5_FILE_REFERENCES,
+            "validation_partition",
+            "test_partition",
+        },
+        "sprint5.frozen_references",
+    )
+    checkpoint = value.get("sprint4_checkpoint")
+    if checkpoint != "01f67ac222aeb3ddf86ddd570566641e5e690d98":
+        raise ConfigError("sprint5.frozen_references.sprint4_checkpoint differs from checkpoint")
+    for key, (path, digest) in _SPRINT5_FILE_REFERENCES.items():
+        _validate_frozen_file_reference(
+            value.get(key),
+            name=f"sprint5.frozen_references.{key}",
+            expected_path=path,
+            expected_sha256=digest,
+        )
+    _validate_sprint5_partition_reference(
+        value.get("validation_partition"),
+        name="sprint5.frozen_references.validation_partition",
+        expected={
+            "rows": 761749,
+            "positives": 760,
+            "negatives": 760989,
+            "positive_rate": 0.0009977039681049794,
+            "minimum_timestamp": "2022-09-07T14:56:00",
+            "maximum_timestamp": "2022-09-09T03:16:00",
+        },
+    )
+    _validate_sprint5_partition_reference(
+        value.get("test_partition"),
+        name="sprint5.frozen_references.test_partition",
+        expected={
+            "rows": 761639,
+            "positives": 1561,
+            "negatives": 760078,
+            "positive_rate": 0.0020495274007764834,
+            "minimum_timestamp": "2022-09-09T03:17:00",
+            "maximum_timestamp": "2022-09-18T16:18:00",
+        },
+    )
+
+
+def _validate_sprint5_partition_reference(
+    value: object, *, name: str, expected: Mapping[str, object]
+) -> None:
+    if not isinstance(value, Mapping):
+        raise ConfigError(f"{name} must be a mapping")
+    _require_exact_keys(value, set(expected), name)
+    for key, item in expected.items():
+        _require_exact_value(value, key, item, name)
+    rows = _require_positive_integer(value.get("rows"), f"{name}.rows")
+    positives = _require_positive_integer(value.get("positives"), f"{name}.positives")
+    negatives = _require_positive_integer(value.get("negatives"), f"{name}.negatives")
+    if positives + negatives != rows:
+        raise ConfigError(f"{name} label counts must sum to rows")
+    rate = _require_finite_number(
+        value.get("positive_rate"), f"{name}.positive_rate", minimum=0.0, maximum=1.0
+    )
+    if not math.isclose(rate, positives / rows, rel_tol=0.0, abs_tol=1e-15):
+        raise ConfigError(f"{name}.positive_rate must equal positives / rows")
+    minimum = datetime.fromisoformat(str(value.get("minimum_timestamp")))
+    maximum = datetime.fromisoformat(str(value.get("maximum_timestamp")))
+    if minimum > maximum:
+        raise ConfigError(f"{name} timestamps must be chronological")
+
+
+_SPRINT5_MODEL_REFERENCES: dict[str, dict[str, object]] = {
+    "graph_enhanced_lightgbm": {
+        "role": "frozen_champion",
+        "feature_family": "transaction_temporal_history_graph",
+        "model_path": (
+            "artifacts/sprint3/models/ablation_transaction_temporal_history_graph/model.joblib"
+        ),
+        "model_sha256": ("20328963bfa8e3b93762c7c429254bb1eaa98be3d12aad0e959461967151ea51"),
+        "preprocessor_state_path": (
+            "artifacts/sprint3/preprocessing/outer_train/"
+            "transaction_temporal_history_graph/fitted_state.json"
+        ),
+        "preprocessor_state_sha256": (
+            "985af136d7c0d1804a86a9987a9d408478173021209e0c114b89790e56ee0aba"
+        ),
+        "preprocessor_manifest_path": (
+            "artifacts/sprint3/preprocessing/outer_train/"
+            "transaction_temporal_history_graph/manifest.json"
+        ),
+        "preprocessor_manifest_sha256": (
+            "a57009c2570d1fd7ad79e82308c194150ffb6884981757ce76631762452d7e2b"
+        ),
+        "threshold": -4.3019702136515985,
+        "threshold_source_path": (
+            "artifacts/sprint3/models/ablation_transaction_temporal_history_graph/thresholds.json"
+        ),
+        "threshold_source_sha256": (
+            "bb790ad5cdf511c244712d6fac947d69fbb9f3961fe21acc3e43e4bbaabc644f"
+        ),
+        "validation_average_precision": 0.47175419936926843,
+    },
+    "refined_transaction_lightgbm": {
+        "role": "comparator",
+        "feature_family": "transaction_temporal_history",
+        "model_path": "artifacts/sprint3/models/lightgbm/model.joblib",
+        "model_sha256": ("bbf39ac7e6ca2bce91393da5d23fcf1a0b110413bbddc1f698bf9b181e06df9d"),
+        "preprocessor_state_path": (
+            "artifacts/sprint3/preprocessing/outer_train/"
+            "transaction_temporal_history/fitted_state.json"
+        ),
+        "preprocessor_state_sha256": (
+            "865ee980006df90fff9bbb55e7cf2d885fee0a22986de257828fe058f29652ef"
+        ),
+        "preprocessor_manifest_path": (
+            "artifacts/sprint3/preprocessing/outer_train/transaction_temporal_history/manifest.json"
+        ),
+        "preprocessor_manifest_sha256": (
+            "c92ce9ea0807753f66836848a9aec8c7cdd4089902c3bc4918d466c0760d90fe"
+        ),
+        "threshold": -3.949463822202272,
+        "threshold_source_path": "artifacts/sprint3/models/lightgbm/thresholds.json",
+        "threshold_source_sha256": (
+            "aa2d17ab8ab77e97c903f1145861e15407a8b87622b23ebe5c65552b2d0c439c"
+        ),
+        "validation_average_precision": 0.35535042120390775,
+    },
+    "graphsage_edge_classifier": {
+        "role": "comparator",
+        "feature_family": "transaction_temporal_history_plus_sender_receiver_graphsage_embeddings",
+        "model_path": "artifacts/sprint4/model/graphsage.pt",
+        "model_sha256": ("7b2f6f6bbc597a07a531c66611c7c3d0de647db7b904734d1e01ead3f2976f29"),
+        "preprocessor_state_path": (
+            "artifacts/sprint3/preprocessing/outer_train/"
+            "transaction_temporal_history/fitted_state.json"
+        ),
+        "preprocessor_state_sha256": (
+            "865ee980006df90fff9bbb55e7cf2d885fee0a22986de257828fe058f29652ef"
+        ),
+        "preprocessor_manifest_path": (
+            "artifacts/sprint3/preprocessing/outer_train/transaction_temporal_history/manifest.json"
+        ),
+        "preprocessor_manifest_sha256": (
+            "c92ce9ea0807753f66836848a9aec8c7cdd4089902c3bc4918d466c0760d90fe"
+        ),
+        "threshold": 1.3003511428833008,
+        "threshold_source_path": "artifacts/sprint4/thresholds.json",
+        "threshold_source_sha256": (
+            "67aa10d6ccd1715674f4c3ab3a9fa6806d42e6b8642b27d7ec3529fdde675d5a"
+        ),
+        "validation_average_precision": 0.009438762279751283,
+    },
+}
+
+
+def _validate_sprint5_models(value: object) -> None:
+    if not isinstance(value, Mapping):
+        raise ConfigError("sprint5.models must be a mapping")
+    _require_exact_keys(value, set(_SPRINT5_MODEL_REFERENCES), "sprint5.models")
+    model_keys = {
+        "role",
+        "evaluate_on_final_test",
+        "feature_family",
+        "model_path",
+        "model_sha256",
+        "preprocessor_state_path",
+        "preprocessor_state_sha256",
+        "preprocessor_manifest_path",
+        "preprocessor_manifest_sha256",
+        "threshold",
+        "threshold_source_path",
+        "threshold_source_sha256",
+        "validation_average_precision",
+    }
+    champions = 0
+    for model_name, expected in _SPRINT5_MODEL_REFERENCES.items():
+        model = value.get(model_name)
+        name = f"sprint5.models.{model_name}"
+        if not isinstance(model, Mapping):
+            raise ConfigError(f"{name} must be a mapping")
+        _require_exact_keys(model, model_keys, name)
+        _require_boolean(
+            model.get("evaluate_on_final_test"),
+            f"{name}.evaluate_on_final_test",
+            expected=True,
+        )
+        for key, item in expected.items():
+            _require_exact_value(model, key, item, name)
+        for key in (
+            "model_sha256",
+            "preprocessor_state_sha256",
+            "preprocessor_manifest_sha256",
+            "threshold_source_sha256",
+        ):
+            _require_sha256(model.get(key), f"{name}.{key}")
+        _require_finite_number(model.get("threshold"), f"{name}.threshold")
+        _require_finite_number(
+            model.get("validation_average_precision"),
+            f"{name}.validation_average_precision",
+            minimum=0.0,
+            maximum=1.0,
+        )
+        champions += int(model.get("role") == "frozen_champion")
+    if champions != 1:
+        raise ConfigError("Sprint 5 requires exactly one final champion")
+
+
+def _validate_sprint5_graphsage_inference(value: object) -> None:
+    if not isinstance(value, Mapping):
+        raise ConfigError("sprint5.graphsage_inference must be a mapping")
+    expected = {
+        "message_context_partitions": ["train"],
+        "context_sampling_method": "md5_order_without_replacement",
+        "context_max_edges": 300000,
+        "context_source_path": "artifacts/sprint4/sampling/inference_context_edges.parquet",
+        "context_source_sha256": "f5a4369aa0033653e2de40df111c6bb16c069e156ce31c34764df769f9b4d389",
+        "inference_manifest_path": "artifacts/sprint4/model/inference_graph_manifest.json",
+        "inference_manifest_sha256": (
+            "cc079c47ea17f96b7ef6d2027981c515f87f5c5b62617475a99dfea7e0139c66"
+        ),
+        "training_graph_manifest_path": "artifacts/sprint4/model/training_graph_manifest.json",
+        "training_graph_manifest_sha256": (
+            "892e9472446dcb9a39563e61d4bcbd852aadc29e49f07e0b92066ba6c48b8099"
+        ),
+        "append_test_endpoint_identities": True,
+        "test_endpoint_identity_features_only": True,
+        "validation_edges_used_for_message_passing": False,
+        "test_edges_used_for_message_passing": False,
+        "test_labels_used_for_graph_construction": False,
+        "normalization_fit_scope": "reuse_sprint4_sampled_training_context_normalizer",
+    }
+    _require_exact_keys(value, set(expected), "sprint5.graphsage_inference")
+    for key, item in expected.items():
+        _require_exact_value(value, key, item, "sprint5.graphsage_inference")
+    _require_positive_integer(
+        value.get("context_max_edges"), "sprint5.graphsage_inference.context_max_edges"
+    )
+    for key in (
+        "context_source_sha256",
+        "inference_manifest_sha256",
+        "training_graph_manifest_sha256",
+    ):
+        _require_sha256(value.get(key), f"sprint5.graphsage_inference.{key}")
+    for key in ("append_test_endpoint_identities", "test_endpoint_identity_features_only"):
+        _require_boolean(value.get(key), f"sprint5.graphsage_inference.{key}", expected=True)
+    for key in (
+        "validation_edges_used_for_message_passing",
+        "test_edges_used_for_message_passing",
+        "test_labels_used_for_graph_construction",
+    ):
+        _require_boolean(value.get(key), f"sprint5.graphsage_inference.{key}", expected=False)
+
+
+def _validate_sprint5_prohibitions(value: object) -> None:
+    expected_keys = {
+        "test_informed_model_selection",
+        "test_informed_hyperparameter_tuning",
+        "test_informed_feature_selection",
+        "test_informed_threshold_selection",
+        "model_retraining_during_or_after_final_evaluation",
+        "test_prevalence_rebalancing",
+        "unsupported_account_level_label_creation",
+    }
+    if not isinstance(value, Mapping):
+        raise ConfigError("sprint5.prohibitions must be a mapping")
+    _require_exact_keys(value, expected_keys, "sprint5.prohibitions")
+    for key in expected_keys:
+        _require_boolean(value.get(key), f"sprint5.prohibitions.{key}", expected=False)
+
+
+def _validate_sprint5_outputs(value: object) -> None:
+    expected = {
+        "validation_reference_json": "validation_reference.json",
+        "prevalence_comparison_json": "prevalence_comparison.json",
+        "prevalence_comparison_csv": "prevalence_comparison.csv",
+        "final_metrics_json": "final_metrics.json",
+        "final_metrics_csv": "final_metrics.csv",
+        "final_model_comparison_json": "final_model_comparison.json",
+        "final_model_comparison_csv": "final_model_comparison.csv",
+        "final_pr_curves_csv": "final_pr_curves.csv",
+        "final_top_k_metrics_json": "final_top_k_metrics.json",
+        "final_top_k_metrics_csv": "final_top_k_metrics.csv",
+        "final_test_summary_json": "final_test_summary.json",
+        "final_test_predictions_parquet": "final_test_predictions.parquet",
+        "run_manifest_json": "run_manifest.json",
+        "verification_report_json": "verification_report.json",
+        "quality_report_json": "quality_report.json",
+        "failure_marker_json": "FINAL_EVALUATION_FAILED.json",
+    }
+    if not isinstance(value, Mapping):
+        raise ConfigError("sprint5.outputs must be a mapping")
+    _require_exact_keys(value, set(expected), "sprint5.outputs")
+    for key, item in expected.items():
+        _require_exact_value(value, key, item, "sprint5.outputs")
 
 
 def load_config(

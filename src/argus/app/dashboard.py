@@ -38,8 +38,14 @@ def _project_root() -> Path:
 def configured_artifact_root() -> Path:
     """Return an explicit artifact override or the repository-local default."""
 
-    configured = os.environ.get("ARGUS_SPRINT4_ARTIFACT_DIR")
-    return Path(configured) if configured else _project_root() / "artifacts" / "sprint4"
+    configured = os.environ.get("ARGUS_ARTIFACT_DIR") or os.environ.get(
+        "ARGUS_SPRINT4_ARTIFACT_DIR"
+    )
+    if configured:
+        return Path(configured)
+    sprint5_root = _project_root() / "artifacts" / "sprint5"
+    final_summary = sprint5_root / "product" / "final_test_summary.json"
+    return sprint5_root if final_summary.is_file() else _project_root() / "artifacts" / "sprint4"
 
 
 @st.cache_data(show_spinner=False)
@@ -76,6 +82,8 @@ def _format_money(value: Any, currency: str | None = None) -> str:
 
 
 def _comparison_focus(artifacts: DashboardArtifacts) -> pd.Series:
+    """Select only from the validation comparison; final-test rows are held separately."""
+
     comparison = artifacts.model_comparison
     if "is_champion" in comparison:
         selected = comparison[
@@ -183,9 +191,23 @@ def render_executive_dashboard(artifacts: DashboardArtifacts) -> None:
     )
     st.info(
         "This dashboard supports investigation prioritization. It does not establish wrongdoing, "
-        "authorize an automatic action, or replace human review. The final test set remains "
-        "unopened."
+        "authorize an automatic action, or replace human review."
     )
+    if artifacts.final_evaluation is None:
+        st.caption("Final test remains unopened in this Sprint 4 artifact set.")
+    else:
+        final = artifacts.final_evaluation
+        champion = final.model_comparison.loc[final.model_comparison["is_frozen_champion"]].iloc[0]
+        st.subheader("Frozen one-shot final test")
+        st.caption(
+            "The graph_enhanced_lightgbm champion was frozen from validation before test access. "
+            "These test metrics are reporting-only and never drive model selection."
+        )
+        final_metrics = st.columns(4)
+        final_metrics[0].metric("Final-test PR-AUC", _format_metric(champion["pr_auc"]))
+        final_metrics[1].metric("Final-test ROC-AUC", _format_metric(champion["roc_auc"]))
+        final_metrics[2].metric("Final-test F1", _format_metric(champion["f1"]))
+        final_metrics[3].metric("Final-test alerts", _format_count(champion["alerts"]))
 
 
 def _filter_queue(queue: pd.DataFrame) -> pd.DataFrame:
@@ -423,7 +445,7 @@ def render_case_investigator(artifacts: DashboardArtifacts) -> None:
         st.dataframe(pd.DataFrame(transactions), width="stretch", hide_index=True)
 
 
-def _render_top_k(top_k: pd.DataFrame) -> None:
+def _render_top_k(top_k: pd.DataFrame, *, partition_label: str = "Validation") -> None:
     if top_k.empty:
         st.info(
             "No saved Top-K curve artifact is available; aggregate values above are not "
@@ -451,7 +473,7 @@ def _render_top_k(top_k: pd.DataFrame) -> None:
             )
         )
     figure.update_layout(
-        title="Saved validation Recall@K and Precision@K",
+        title=f"Saved {partition_label.lower()} Recall@K and Precision@K",
         xaxis_title="Alert budget K",
         yaxis_title="Metric value",
         height=430,
@@ -483,6 +505,102 @@ def _render_ablation(ablation: pd.DataFrame) -> None:
     )
     st.plotly_chart(figure, width="stretch", key="model-ablation")
     st.dataframe(ablation, width="stretch", hide_index=True)
+
+
+def _final_summary_value(summary: dict[str, Any], key: str) -> Any:
+    if key in summary:
+        return summary[key]
+    for container_name in ("protocol", "final_test", "test", "freeze_contract"):
+        container = summary.get(container_name)
+        if isinstance(container, dict) and key in container:
+            return container[key]
+    return None
+
+
+def _render_final_evaluation(artifacts: DashboardArtifacts) -> None:
+    final = artifacts.final_evaluation
+    if final is None:
+        st.divider()
+        st.info(
+            "No Sprint 5 final-test payload is attached. The validation comparison, queue, and "
+            "cases above remain fully usable from the Sprint 4 artifact set."
+        )
+        return
+
+    st.divider()
+    st.markdown(
+        '<div class="argus-eyebrow">FROZEN ONE-SHOT FINAL TEST</div>',
+        unsafe_allow_html=True,
+    )
+    st.header("Final evaluation — reporting only")
+    st.success(
+        "Pre-frozen champion: graph_enhanced_lightgbm. It was selected on validation before "
+        "the single test access; test metrics did not select or tune the model."
+    )
+
+    summary = final.summary
+    validation_rate = float(_final_summary_value(summary, "validation_positive_rate"))
+    test_rate_value = _final_summary_value(summary, "test_positive_rate")
+    if test_rate_value is None:
+        test_rate_value = _final_summary_value(summary, "positive_rate")
+    test_rate = float(test_rate_value)
+    prevalence = st.columns(3)
+    prevalence[0].metric("Validation positive rate", f"{validation_rate:.6%}")
+    prevalence[1].metric("Final-test positive rate", f"{test_rate:.6%}")
+    ratio = f"{test_rate / validation_rate:.3f}×" if validation_rate > 0.0 else "N/A"
+    prevalence[2].metric("Prevalence ratio", ratio)
+    direction = "higher" if test_rate > validation_rate else "lower"
+    st.caption(
+        f"Final-test prevalence is {direction} than validation prevalence. Precision and the "
+        "number/composition of alerts at the frozen threshold must be interpreted under this "
+        "base-rate shift; the shift was not corrected by changing the model or threshold."
+    )
+
+    comparison = final.model_comparison.copy()
+    comparison.insert(
+        0,
+        "frozen_status",
+        comparison["is_frozen_champion"].map(
+            lambda selected: "PRE-FROZEN CHAMPION" if selected else "comparator only"
+        ),
+    )
+    preferred = [
+        "frozen_status",
+        "model",
+        "version",
+        "pr_auc",
+        "roc_auc",
+        "precision",
+        "recall",
+        "f1",
+        "fpr",
+        "recall_at_k",
+        "precision_at_k",
+        "alerts",
+        "row_count",
+        "positive_count",
+        "evaluation_partition",
+    ]
+    columns = [column for column in preferred if column in comparison]
+    st.dataframe(comparison[columns], width="stretch", hide_index=True)
+    st.plotly_chart(
+        build_model_metric_figure(final.model_comparison, partition_label="Final test"),
+        width="stretch",
+        key="final-model-comparison-bars",
+    )
+    left, right = st.columns(2)
+    with left:
+        st.plotly_chart(
+            build_pr_curve_figure(final.pr_curves, partition_label="Final test"),
+            width="stretch",
+            key="final-model-pr-curves",
+        )
+    with right:
+        _render_top_k(final.top_k, partition_label="Final test")
+    st.warning(
+        "The final test has been consumed exactly once. These artifacts are immutable evaluation "
+        "evidence; no post-test tuning or champion reselection is permitted."
+    )
 
 
 def render_model_comparison(artifacts: DashboardArtifacts) -> None:
@@ -542,6 +660,7 @@ def render_model_comparison(artifacts: DashboardArtifacts) -> None:
             and do not establish that any person or account committed wrongdoing.
             """
         )
+    _render_final_evaluation(artifacts)
 
 
 def main() -> None:
@@ -550,13 +669,15 @@ def main() -> None:
     st.set_page_config(page_title="ARGUS Network Investigator", page_icon="◈", layout="wide")
     _inject_style()
     st.sidebar.markdown("## ARGUS")
-    st.sidebar.caption("Network Investigator · Sprint 4")
-    page = st.sidebar.radio("Workspace", _PAGES)
+    st.sidebar.caption("Network Investigator · Saved artifacts only")
+    requested_page = st.query_params.get("page")
+    page_index = _PAGES.index(requested_page) if requested_page in _PAGES else 0
+    page = st.sidebar.radio("Workspace", _PAGES, index=page_index)
     artifact_root = configured_artifact_root()
     st.sidebar.divider()
     st.sidebar.caption("Artifact source")
     st.sidebar.code(str(artifact_root), language=None)
-    st.sidebar.caption("Validation-only · Final test unopened")
+    st.sidebar.caption("No model training or inference on page load")
 
     try:
         artifacts = _cached_load(str(artifact_root))
@@ -569,6 +690,12 @@ def main() -> None:
         )
         st.stop()
         return
+
+    if artifacts.final_evaluation is None:
+        st.sidebar.caption("Sprint 4 validation · Final test unopened")
+    else:
+        st.sidebar.caption("Sprint 5 · Frozen one-shot final test")
+        st.sidebar.caption("Pre-frozen champion: graph_enhanced_lightgbm")
 
     renderers = {
         "Executive Dashboard": render_executive_dashboard,

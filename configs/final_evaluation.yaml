@@ -1,0 +1,167 @@
+extends: sprint4.yaml
+
+project:
+  mode: sprint5_final_evaluation
+  random_seed: 42
+
+paths:
+  run_dir: artifacts/sprint5
+  generated_report: reports/generated/FINAL_EVALUATION_STATUS.md
+  sprint3_run_dir: artifacts/sprint3
+  sprint4_run_dir: artifacts/sprint4
+
+sprint5:
+  protocol_version: 1
+  experiment_scope: one_shot_full_test_frozen_models_no_post_test_tuning
+  authorization:
+    explicit_user_authorization: true
+    authorized_stage: final_evaluation
+  final_test_access: true
+  final_test_policy: single_authorized_confirmatory_run_no_retry
+  selection_partition: validation
+  evaluation_partition: test
+  selection_metric: average_precision
+  ranking_score_type: raw_model_score
+  ranking_tie_break: source_row_number_ascending
+  top_k: [100, 500, 1000]
+  batch_rows: 100000
+  memory_limit: 4GB
+  max_temp_directory_size: 100GB
+  threads: 1
+  torch_threads: 4
+  parquet_compression: zstd
+
+  one_shot_gate:
+    mode: one_shot
+    freeze_contract_path: freeze_contract.json
+    receipt_path: FINAL_TEST_OPENED.json
+    require_frozen_hash_verification_before_receipt: true
+    create_receipt_before_test_read: true
+    refuse_if_receipt_exists: true
+    refuse_retry_after_failure: true
+
+  frozen_references:
+    sprint4_checkpoint: 01f67ac222aeb3ddf86ddd570566641e5e690d98
+    sprint3_manifest:
+      path: artifacts/sprint3/run_manifest.json
+      sha256: 895f1352558cb024e157918c489214226f0901bdf440210f2d9ddf46934ace0e
+    sprint4_manifest:
+      path: artifacts/sprint4/run_manifest.json
+      sha256: 5b7ee46a876b650165a4b43f3bd5584315921fdcbc58955399a6490471af6937
+    full_manifest:
+      path: artifacts/full/run_manifest.json
+      sha256: a3be9950c7906910457bb5d92ad3a8363794150a605675985d1fc9147c4af098
+    split_manifest:
+      path: artifacts/full/tables/split_manifest.parquet
+      sha256: b7294d56545c4135c890e69dda29a326b6b4134777ad606ef246b46250fdd872
+    feature_store:
+      path: artifacts/full/tables/transaction_features.parquet
+      sha256: 931aa48c43dd9648ac52023795d0603d377821c5d1241480a1376a89a0d55b6e
+    sprint4_thresholds:
+      path: artifacts/sprint4/thresholds.json
+      sha256: 67aa10d6ccd1715674f4c3ab3a9fa6806d42e6b8642b27d7ec3529fdde675d5a
+    sprint4_model_comparison:
+      path: artifacts/sprint4/model_comparison.json
+      sha256: 5d692ad7216dfa36ac62ac9d0f010ac6b52d69db611fb19be242d37a83f09061
+    validation_partition:
+      rows: 761749
+      positives: 760
+      negatives: 760989
+      positive_rate: 0.0009977039681049794
+      minimum_timestamp: "2022-09-07T14:56:00"
+      maximum_timestamp: "2022-09-09T03:16:00"
+    test_partition:
+      rows: 761639
+      positives: 1561
+      negatives: 760078
+      positive_rate: 0.0020495274007764834
+      minimum_timestamp: "2022-09-09T03:17:00"
+      maximum_timestamp: "2022-09-18T16:18:00"
+
+  models:
+    graph_enhanced_lightgbm:
+      role: frozen_champion
+      evaluate_on_final_test: true
+      feature_family: transaction_temporal_history_graph
+      model_path: artifacts/sprint3/models/ablation_transaction_temporal_history_graph/model.joblib
+      model_sha256: 20328963bfa8e3b93762c7c429254bb1eaa98be3d12aad0e959461967151ea51
+      preprocessor_state_path: artifacts/sprint3/preprocessing/outer_train/transaction_temporal_history_graph/fitted_state.json
+      preprocessor_state_sha256: 985af136d7c0d1804a86a9987a9d408478173021209e0c114b89790e56ee0aba
+      preprocessor_manifest_path: artifacts/sprint3/preprocessing/outer_train/transaction_temporal_history_graph/manifest.json
+      preprocessor_manifest_sha256: a57009c2570d1fd7ad79e82308c194150ffb6884981757ce76631762452d7e2b
+      threshold: -4.3019702136515985
+      threshold_source_path: artifacts/sprint3/models/ablation_transaction_temporal_history_graph/thresholds.json
+      threshold_source_sha256: bb790ad5cdf511c244712d6fac947d69fbb9f3961fe21acc3e43e4bbaabc644f
+      validation_average_precision: 0.47175419936926843
+    refined_transaction_lightgbm:
+      role: comparator
+      evaluate_on_final_test: true
+      feature_family: transaction_temporal_history
+      model_path: artifacts/sprint3/models/lightgbm/model.joblib
+      model_sha256: bbf39ac7e6ca2bce91393da5d23fcf1a0b110413bbddc1f698bf9b181e06df9d
+      preprocessor_state_path: artifacts/sprint3/preprocessing/outer_train/transaction_temporal_history/fitted_state.json
+      preprocessor_state_sha256: 865ee980006df90fff9bbb55e7cf2d885fee0a22986de257828fe058f29652ef
+      preprocessor_manifest_path: artifacts/sprint3/preprocessing/outer_train/transaction_temporal_history/manifest.json
+      preprocessor_manifest_sha256: c92ce9ea0807753f66836848a9aec8c7cdd4089902c3bc4918d466c0760d90fe
+      threshold: -3.949463822202272
+      threshold_source_path: artifacts/sprint3/models/lightgbm/thresholds.json
+      threshold_source_sha256: aa2d17ab8ab77e97c903f1145861e15407a8b87622b23ebe5c65552b2d0c439c
+      validation_average_precision: 0.35535042120390775
+    graphsage_edge_classifier:
+      role: comparator
+      evaluate_on_final_test: true
+      feature_family: transaction_temporal_history_plus_sender_receiver_graphsage_embeddings
+      model_path: artifacts/sprint4/model/graphsage.pt
+      model_sha256: 7b2f6f6bbc597a07a531c66611c7c3d0de647db7b904734d1e01ead3f2976f29
+      preprocessor_state_path: artifacts/sprint3/preprocessing/outer_train/transaction_temporal_history/fitted_state.json
+      preprocessor_state_sha256: 865ee980006df90fff9bbb55e7cf2d885fee0a22986de257828fe058f29652ef
+      preprocessor_manifest_path: artifacts/sprint3/preprocessing/outer_train/transaction_temporal_history/manifest.json
+      preprocessor_manifest_sha256: c92ce9ea0807753f66836848a9aec8c7cdd4089902c3bc4918d466c0760d90fe
+      threshold: 1.3003511428833008
+      threshold_source_path: artifacts/sprint4/thresholds.json
+      threshold_source_sha256: 67aa10d6ccd1715674f4c3ab3a9fa6806d42e6b8642b27d7ec3529fdde675d5a
+      validation_average_precision: 0.009438762279751283
+
+  graphsage_inference:
+    message_context_partitions: [train]
+    context_sampling_method: md5_order_without_replacement
+    context_max_edges: 300000
+    context_source_path: artifacts/sprint4/sampling/inference_context_edges.parquet
+    context_source_sha256: f5a4369aa0033653e2de40df111c6bb16c069e156ce31c34764df769f9b4d389
+    inference_manifest_path: artifacts/sprint4/model/inference_graph_manifest.json
+    inference_manifest_sha256: cc079c47ea17f96b7ef6d2027981c515f87f5c5b62617475a99dfea7e0139c66
+    training_graph_manifest_path: artifacts/sprint4/model/training_graph_manifest.json
+    training_graph_manifest_sha256: 892e9472446dcb9a39563e61d4bcbd852aadc29e49f07e0b92066ba6c48b8099
+    append_test_endpoint_identities: true
+    test_endpoint_identity_features_only: true
+    validation_edges_used_for_message_passing: false
+    test_edges_used_for_message_passing: false
+    test_labels_used_for_graph_construction: false
+    normalization_fit_scope: reuse_sprint4_sampled_training_context_normalizer
+
+  prohibitions:
+    test_informed_model_selection: false
+    test_informed_hyperparameter_tuning: false
+    test_informed_feature_selection: false
+    test_informed_threshold_selection: false
+    model_retraining_during_or_after_final_evaluation: false
+    test_prevalence_rebalancing: false
+    unsupported_account_level_label_creation: false
+
+  outputs:
+    validation_reference_json: validation_reference.json
+    prevalence_comparison_json: prevalence_comparison.json
+    prevalence_comparison_csv: prevalence_comparison.csv
+    final_metrics_json: final_metrics.json
+    final_metrics_csv: final_metrics.csv
+    final_model_comparison_json: final_model_comparison.json
+    final_model_comparison_csv: final_model_comparison.csv
+    final_pr_curves_csv: final_pr_curves.csv
+    final_top_k_metrics_json: final_top_k_metrics.json
+    final_top_k_metrics_csv: final_top_k_metrics.csv
+    final_test_summary_json: final_test_summary.json
+    final_test_predictions_parquet: final_test_predictions.parquet
+    run_manifest_json: run_manifest.json
+    verification_report_json: verification_report.json
+    quality_report_json: quality_report.json
+    failure_marker_json: FINAL_EVALUATION_FAILED.json

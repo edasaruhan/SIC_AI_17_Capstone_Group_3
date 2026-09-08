@@ -237,7 +237,9 @@ def build_timeline_figure(case: dict[str, Any]) -> go.Figure | None:
     return figure
 
 
-def build_model_metric_figure(comparison: pd.DataFrame) -> go.Figure:
+def build_model_metric_figure(
+    comparison: pd.DataFrame, *, partition_label: str = "Validation"
+) -> go.Figure:
     """Compare only metrics that are present in the saved comparison artifact."""
 
     metric_columns = [
@@ -254,7 +256,7 @@ def build_model_metric_figure(comparison: pd.DataFrame) -> go.Figure:
             go.Bar(name=metric.replace("_", " ").upper(), x=labels, y=comparison[metric])
         )
     figure.update_layout(
-        title="Validation model metrics",
+        title=f"{partition_label} model metrics",
         barmode="group",
         yaxis_title="Metric value",
         height=430,
@@ -266,7 +268,9 @@ def build_model_metric_figure(comparison: pd.DataFrame) -> go.Figure:
     return figure
 
 
-def build_pr_curve_figure(curves: pd.DataFrame) -> go.Figure:
+def build_pr_curve_figure(
+    curves: pd.DataFrame, *, partition_label: str = "Validation"
+) -> go.Figure:
     """Render saved PR-curve points; never reconstruct curves from aggregate metrics."""
 
     figure = go.Figure()
@@ -281,7 +285,7 @@ def build_pr_curve_figure(curves: pd.DataFrame) -> go.Figure:
             )
         )
     figure.update_layout(
-        title="Saved validation precision–recall curves",
+        title=f"Saved {partition_label.lower()} precision–recall curves",
         xaxis_title="Recall",
         yaxis_title="Precision",
         height=430,

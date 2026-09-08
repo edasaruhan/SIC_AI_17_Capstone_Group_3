@@ -1,4 +1,4 @@
-.PHONY: setup test lint quick full baseline verify-baseline validate-sprint2 eda validate audit
+.PHONY: setup test lint quick full baseline verify-baseline validate-sprint2 eda validate audit final-eval verify-final validate-final final-docs final-screenshots
 
 setup:
 	python -m pip install -e ".[dev]"
@@ -32,3 +32,18 @@ validate:
 
 audit:
 	python scripts/audit_raw_data.py
+
+final-eval:
+	python scripts/run_final_evaluation.py --config configs/final_evaluation.yaml
+
+verify-final:
+	python scripts/verify_final_evaluation.py --config configs/final_evaluation.yaml
+
+validate-final:
+	python scripts/validate_final_evaluation.py --config configs/final_evaluation.yaml
+
+final-docs:
+	python scripts/update_final_documentation.py --config configs/final_evaluation.yaml
+
+final-screenshots:
+	python scripts/capture_final_streamlit_screenshots.py --artifact-root artifacts/sprint5
