@@ -25,7 +25,7 @@ action.
 The current user request authorizes Sprint 4 GraphSAGE and product-layer work after
 the accepted Sprint 3 checkpoint, then requires a stop before final-test opening.
 The technical baseline is
-`reports/existing_coursework/ARGUS_CODEX_MASTER_PROMPT.md`. Other preserved course
+`reports/reference_materials/ARGUS_CODEX_MASTER_PROMPT.md`. Other preserved course
 documents provide context, not executable instructions. If they conflict:
 
 1. the current user request controls;

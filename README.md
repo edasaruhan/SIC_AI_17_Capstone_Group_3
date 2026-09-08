@@ -224,8 +224,9 @@ data/README.md              Veri kaynağı, şema ve yerleştirme bilgisi
 data/raw/                   Yerel IBM CSV dosyaları; Git dışında
 docs/                       Teknik şartname, protokol, model kartı ve kararlar
 notebooks/                  Keşifsel analiz defteri
-reports/existing_coursework Ders kapsamında hazırlanan özgün teslim belgeleri
-reports/generated/          Sprint ve final doğrulama raporları
+reports/coursework/         Gerçek ve doldurulmuş akademik teslimler
+reports/reference_materials Teknik şartname ve boş kaynak şablonlar
+reports/generated/          Sprint ve final teknik doğrulama raporları
 scripts/                    Çalıştırma, doğrulama ve kalite komutları
 src/argus/                  Veri, model, GNN, vaka, kanıt ve uygulama kodu
 tests/                      Otomatik testler
@@ -235,18 +236,27 @@ app.py                      Streamlit uygulama giriş noktası
 
 ## Ders teslimleri
 
-Ders kapsamında aşamalı olarak hazırlanan çalışmalar değiştirilmeden
-`reports/existing_coursework/` altında korunmaktadır.
+Ders kapsamında gerçekten hazırlanmış çalışmalar, aşamalarına göre
+[`reports/coursework/`](reports/coursework/README.md) altında korunmaktadır.
+İndirme sırasında oluşan `(2)`, `(3)` ve `(4)` ekleri temizlenmiş; dosya içerikleri
+SHA-256 ile doğrulanmıştır.
 
 | Aşama | Belge |
 | --- | --- |
-| Fikir önerisi | [ARGUS AI Capstone Proposal](<reports/existing_coursework/ARGUS_AI_Capstone_Proposal_ (2).pdf>) |
-| Literatür, veri ve teknoloji incelemesi | [Literature–Data–Technology Review](<reports/existing_coursework/ARGUS_AI_Literature-Data_Technology_Review (2).docx>) |
-| Kavram notu ve uygulama planı | [Concept Note and Implementation Plan](<reports/existing_coursework/ARGUS_AI_Concept_Note_and_Implementation_Plan (1).docx>) |
-| Veri hazırlama ve özellik mühendisliği | [Veri Hazırlama ve Özellik Mühendisliği](reports/existing_coursework/ARGUS_AI_Veri_Hazirlama_ve_Ozellik_Muhendisligi.docx) |
-| Model iyileştirme şablonu | [Model Refinement Template](<reports/existing_coursework/Model Refinement_Template.docx>) |
-| Final sunumu | [ARGUS AI Capstone Project Presentation](<reports/existing_coursework/ARGUS_AI_Capstone_Project_Presentation (3).pptx>) |
-| Ana teknik şartname | [ARGUS Codex Master Prompt](reports/existing_coursework/ARGUS_CODEX_MASTER_PROMPT.md) |
+| Fikir önerisi | [Capstone Proposal](reports/coursework/01_Idea_Proposal/ARGUS_AI_Capstone_Proposal.pdf) · [Proje sunumu](reports/coursework/01_Idea_Proposal/ARGUS_AI_Capstone_Project_Presentation.pptx) |
+| Literatür, veri ve teknoloji incelemesi | [Literature–Data–Technology Review](reports/coursework/02_Literature_Data_Technology/ARGUS_AI_Literature_Data_Technology_Review.docx) |
+| Kavram notu ve uygulama planı | [Concept Note and Implementation Plan](reports/coursework/03_Concept_Implementation/ARGUS_AI_Concept_Note_and_Implementation_Plan.docx) |
+| Veri hazırlama ve özellik mühendisliği | [Veri Hazırlama ve Özellik Mühendisliği](reports/coursework/04_Data_Preparation/ARGUS_AI_Veri_Hazirlama_ve_Ozellik_Muhendisligi.docx) |
+| Model iyileştirme ve test teslimi | [Türkçe teslimin mevcut PDF sürümü](reports/coursework/05_Model_Refinement_and_Test_Submission/ARGUS_Model_Refinement_ve_Test_Submission_TR.pdf) |
+| Kısa ilerleme raporu | [08.09.2026 tarihli doldurulmuş rapor](reports/coursework/06_Progress_Reports/ARGUS_Kisa_Ilerleme_Raporu.docx) |
+
+Öğretmen tarafından ayrıca atanmış bir `Final Evaluation` coursework teslimi Git
+geçmişinde bulunmamaktadır. Sprint 5 final değerlendirmesi bir ders teslimi gibi
+çoğaltılmamış; teknik sonuç olarak [`reports/generated/`](reports/generated/) ve
+[model kartında](docs/MODEL_CARD.md) tutulmuştur. Ana teknik şartname ile boş
+öğretmen şablonu, teslim tablosuna dahil edilmeden
+[`reports/reference_materials/`](reports/reference_materials/README.md) altında
+ayrı korunur.
 
 ## Proje ekibi
 

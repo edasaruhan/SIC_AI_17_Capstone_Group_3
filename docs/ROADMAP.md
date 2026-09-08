@@ -14,7 +14,7 @@ EDA, chronological partitions, and leakage-safe initial features.
 
 | Gate | Required evidence | Current status |
 | --- | --- | --- |
-| Existing coursework preserved | Files and checksums under `reports/existing_coursework/` | PASS — all seven documents match Downloads by SHA-256 |
+| Existing coursework preserved | Real submissions under `reports/coursework/`; non-submission inputs under `reports/reference_materials/` | PASS — all seven original Sprint 1 documents remain byte-preserved; later real submissions are indexed separately |
 | Installable dependency set | Editable install and dependency check | PASS — install completed; `pip check` found no broken requirements |
 | IBM transaction/accounts loading | Real files load from documented local paths | PASS — 5,078,345 transactions and 518,581 accounts loaded |
 | Schema and quality validation | Machine-readable validation/profile output | PASS — full raw, canonical, and saved-output reports pass |

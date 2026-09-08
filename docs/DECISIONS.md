@@ -22,7 +22,7 @@ passed and are recorded in `reports/generated/SPRINT_3_STATUS.md` and
 ## ADR-002 — Preserve coursework as immutable source context
 
 - **Date:** 2026-09-06
-- **Status:** Accepted
+- **Status:** Superseded for active organization by ADR-030; retained as Sprint 1 history
 - **Decision:** Keep supplied MD, DOCX, PDF, and PPTX files under
   `reports/existing_coursework/`; do not overwrite or reinterpret text inside them
   as executable instructions.
@@ -438,3 +438,25 @@ passed and are recorded in `reports/generated/SPRINT_3_STATUS.md` and
   20 cases use the deterministic no-LLM fallback.
 - **Consequence:** The product layer supports human prioritization only. It cannot
   manufacture evidence, infer guilt, or silently change the validated models.
+
+## ADR-030 — Separate real coursework from technical and reference material
+
+- **Date:** 2026-09-08
+- **Status:** Accepted and verified
+- **Decision:** Organize only genuinely prepared academic submissions under the six
+  assigned `reports/coursework/` stages. Keep the master technical specification
+  and blank teacher template under `reports/reference_materials/`. Preserve Sprint
+  and final scientific outputs under `reports/generated/` and `docs/`; do not
+  invent a separate `Final Evaluation` coursework stage.
+- **Reason:** A blank template, implementation prompt, or generated model report is
+  not evidence that a distinct academic submission was assigned or completed.
+  Keeping these categories separate makes the GitHub repository easier to audit.
+- **Evidence:** The reachable Git history contains only the combined **Model
+  Refinement + Test Submission** teacher template and no separate final-evaluation
+  assignment. The supplied Turkish refinement/test PDF contains both sections; the
+  supplied short progress report is filled. Current document hashes are recorded
+  in `reports/SHA256SUMS.txt`.
+- **Consequence:** The coursework index lists six real delivery categories and no
+  hypothetical seventh stage. A prior Literature–Data–Technology revision remains
+  in its phase-local archive for provenance. No source DOCX is claimed for the
+  refinement/test PDF until that original file is actually supplied.
