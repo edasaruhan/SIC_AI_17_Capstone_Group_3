@@ -1,15 +1,15 @@
 # ARGUS AI Experiment Protocol
 
-**Protocol version:** 3.0
-**Completed execution scope:** Sprint 1 data proof, Sprint 2 transaction baselines, and Sprint 3 refinement/graph value
-**Sprint 3 status:** `PASS` — 15/15 acceptance gates and 207 tests passed
-**Current stop boundary:** Sprint 3 complete; Sprint 4/GraphSAGE not started
+**Protocol version:** 4.0
+**Completed execution scope:** Sprint 1 data proof through Sprint 4 GraphSAGE/product validation
+**Sprint 4 status:** `PASS` — 19/19 acceptance gates and 289 tests passed
+**Current stop boundary:** Sprint 4 complete; final-test evaluation not opened
 **Pipeline/test results:** generated artifacts control each sprint's empirical status
 
 This document defines how ARGUS experiments become comparable and scientifically
 defensible. Observed values are included only where they are read from generated
-manifests and status reports. The completed Sprint 3 evidence ledger is
-[`SPRINT_3_STATUS.md`](../reports/generated/SPRINT_3_STATUS.md).
+manifests and status reports. The completed Sprint 4 evidence ledger is
+[`SPRINT_4_STATUS.md`](../reports/generated/SPRINT_4_STATUS.md).
 
 ## 1. Reproducibility unit
 
@@ -25,10 +25,10 @@ The reproducibility unit is one run with:
 - an inventory of generated artifacts;
 - a terminal status and error details if incomplete.
 
-The quick, full, baseline, and refinement runs write inventories to
+The quick, full, baseline, refinement, and GraphSAGE/product runs write inventories to
 `artifacts/quick/run_manifest.json`, `artifacts/full/run_manifest.json`, and
-`artifacts/sprint2/run_manifest.json`, and `artifacts/sprint3/run_manifest.json`.
-Generated artifacts and local datasets are
+`artifacts/sprint2/run_manifest.json`, `artifacts/sprint3/run_manifest.json`, and
+`artifacts/sprint4/run_manifest.json`. Generated artifacts and local datasets are
 Git-ignored, so manifests and commands must make them reproducible rather than
 implying they are committed.
 
@@ -577,12 +577,109 @@ artifacts/sprint3/quality_report.json
 reports/generated/SPRINT_3_STATUS.md
 ```
 
-Stop after these gates. Sprint 4/GraphSAGE, case/evidence, explainability, and
-product work are not part of this protocol version and were not started.
+Sprint 3 stopped after these gates. Sprint 4 is a separate execution governed by
+the following section and does not rewrite this evidence.
 
-## 12. Human review
+## 12. Sprint 4 GraphSAGE and product protocol
+
+Sprint 4 executes from `configs/sprint4.yaml` and preserves the frozen Sprint 3
+transaction-only and graph-enhanced LightGBM validation scores. The primary GNN
+task is transaction/edge classification: sender and receiver GraphSAGE embeddings
+are combined with transaction features to predict the supplied transaction label.
+No transaction labels are aggregated or transformed into unsupported account-level
+fraud labels.
+
+### Bounded graph construction and label-safe sampling
+
+The available workstation budget did not support a defensible full-graph training
+claim. Sampling is deterministic and its scope is part of the result:
+
+- training message graph: 150,000 of 1,422,288 eligible prefix edges;
+- supervised training: 52,396 later train transactions, comprising all 2,396
+  eligible positives and 50,000 deterministic negatives;
+- validation-inference message graph: 300,000 of 3,554,957 outer-train edges;
+- outer-validation scoring: all 761,749 frozen rows.
+
+Message-context sampling is target-agnostic and ordered by a stable MD5 digest of
+transaction identity. The training graph ends at `2022-09-02T09:27:00`; supervised
+edges begin at `2022-09-02T09:28:00`. Validation message passing uses sampled
+outer-train edges only. No validation or final-test edge is admitted to its
+historical graph. Directed endpoints and repeated edges are retained, with
+repetition acting as frequency weight in neighbor aggregation.
+
+### Fair validation comparison and stopping rule
+
+GraphSAGE, refined transaction LightGBM, and graph-enhanced LightGBM are compared on
+the identical 761,749 outer-validation rows. The two LightGBM vectors remain frozen
+Sprint 3 references. Average precision is primary, ROC-AUC is secondary, and the
+shared validation-only operating rule supplies precision, recall, F1, FPR, and
+alert volume. The observed results are:
+
+| Validation model | AP | ROC-AUC | Alerts | Precision | Recall | F1 | FPR |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Graph-enhanced LightGBM | 0.47175420 | 0.98635944 | 4,995 | 0.11631632 | 0.76447368 | 0.20191138 | 0.00580035 |
+| Refined transaction LightGBM | 0.35535042 | 0.98179242 | 4,931 | 0.10302170 | 0.66842105 | 0.17852750 | 0.00581217 |
+| GraphSAGE edge classifier | 0.00943876 | 0.84664170 | 4,953 | 0.00969110 | 0.06315789 | 0.01680378 | 0.00644556 |
+
+The sampled GraphSAGE result is materially below both frozen references and must
+not be presented as added graph-model value. Final-test fitting, transformation,
+graph construction, inference, tuning, predictions, metrics, and feedback remain
+prohibited until a separately authorized final evaluation.
+
+### Case, evidence, explanation, and application contract
+
+Cases are generated only from saved validation scores and graph outputs. Each case
+must contain at least three concrete observed facts stored separately from model
+evidence; the completed export has 20 cases with at least seven observed facts
+each. LightGBM explanations use native TreeSHAP and must pass an additivity check.
+The GNN explanation is local gradient-times-input sensitivity and must never be
+labeled SHAP or causal attribution.
+
+An LLM, if configured later, may only turn supplied evidence into a case note. The
+complete deterministic fallback is authoritative when no API is available and ran
+for all 20 cases. Streamlit reads saved artifacts only and must not fit or score a
+model on page load. The required screens are Executive Dashboard, Investigation
+Queue, Case Investigator, and Model Comparison.
+
+Node structural inputs contain directed in/out degrees and deterministic composite-
+identity features. Monetary node aggregates are excluded because no versioned FX
+source exists, so summing across currencies would mix units. Transaction amounts
+remain available as edge features. Raw logits drive ranking; sigmoid values are
+explicitly uncalibrated because sampled negatives and positive weighting alter the
+training prior.
+
+Run, independently verify, and close quality checks with:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/train_graphsage_product.py --config configs/sprint4.yaml
+.\.venv\Scripts\python.exe scripts/verify_sprint4.py --config configs/sprint4.yaml
+.\.venv\Scripts\python.exe scripts/validate_sprint4.py --config configs/sprint4.yaml
+```
+
+The executable evidence contract includes:
+
+```text
+artifacts/sprint4/run_manifest.json
+artifacts/sprint4/model/graphsage.pt
+artifacts/sprint4/model/inference_node_embeddings.npy
+artifacts/sprint4/validation_predictions.parquet
+artifacts/sprint4/model_comparison.csv
+artifacts/sprint4/final_test_policy.json
+artifacts/sprint4/product/cases.json
+artifacts/sprint4/product/investigation_queue.csv
+artifacts/sprint4/product/dashboard_summary.json
+artifacts/sprint4/verification_report.json
+artifacts/sprint4/quality_report.json
+reports/generated/SPRINT_4_STATUS.md
+```
+
+The completed run took 49.928 seconds. Independent artifact verification, 289
+tests, Ruff lint/format, real-artifact Streamlit smoke testing, and `pip check`
+passed. Stop before final-test opening.
+
+## 13. Human review
 
 Metrics measure ranking/classification behavior on synthetic labels. They do not
-establish guilt or justify adverse action. Any later alert or case must show
-observed evidence separately from model contribution, state uncertainty, and remain
-subject to trained human review.
+establish guilt or justify adverse action. Every alert and case must show observed
+evidence separately from model contribution, state uncertainty, and remain subject
+to trained human review.

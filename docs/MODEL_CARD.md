@@ -1,4 +1,4 @@
-# Model Card — Sprint 2 Baseline and Sprint 3 Refinement Evidence
+# Model Card — Sprint 2–4 Validation Evidence
 
 ## Current state
 
@@ -7,16 +7,20 @@ chronological protocol. Random Forest remains the **Transaction Baseline Champio
 for that immutable snapshot. Sprint 3 completed temporal refinement and selected
 LightGBM as the **Refined Transaction Baseline Champion** at validation AP
 0.35535042. The controlled LightGBM graph-enhanced C arm reached validation AP
-0.47175420, +0.11640378 over the same-model B arm.
+0.47175420, +0.11640378 over the same-model B arm. Sprint 4 then evaluated a
+transaction-edge GraphSAGE classifier at validation AP 0.00943876 on the same full
+761,749-row validation partition. It did not outperform either frozen LightGBM
+reference.
 
-All 15 Sprint 3 acceptance gates, artifact verification, and 207 tests passed.
+All 19 Sprint 4 acceptance gates, artifact verification, and 289 tests passed.
 These are experiment results on synthetic data, not production model approval.
-Final-test inference remained closed, and Sprint 4/GraphSAGE has not started.
+Final-test inference remains closed.
 
 ## Intended use
 
-The model ranks transactions as candidates for trained human review and provides a
-transaction-only reference for the controlled Sprint 3 graph-value experiment. A score
+The models rank transactions as candidates for trained human review. The
+transaction-only model provides a reference for controlled graph-value experiments;
+the product layer turns saved scores and graph facts into reviewable cases. A score
 means elevated investigation priority under the experimental protocol. It is not
 proof of laundering, guilt, or a basis for automatic blocking, freezing, reporting,
 or another adverse action.
@@ -181,13 +185,56 @@ versus 0.35535042 for B. This is a tabular feature-family experiment, not GraphS
 Complete folds, thresholds, tie diagnostics, runtimes, and artifacts are in
 [`SPRINT_3_STATUS.md`](../reports/generated/SPRINT_3_STATUS.md).
 
+## Sprint 4 GraphSAGE and product-layer results
+
+GraphSAGE uses the supplied transaction label for edge classification. Sender and
+receiver node embeddings are combined with transaction features; no account-level
+fraud label is derived. The frozen Sprint 3 LightGBM scores are reference artifacts,
+not retrained comparators.
+
+Full-graph training was not represented as feasible on the available workstation.
+The deterministic run used 150,000 of 1,422,288 eligible train-prefix edges for the
+training message graph, then supervised on 52,396 later train transactions: all
+2,396 eligible positives and 50,000 deterministic negatives. Validation inference
+used a 300,000-of-3,554,957 sampled outer-train message graph and scored all 761,749
+validation transactions. No validation edge entered message passing.
+
+| Validation model | PR-AUC (AP) | ROC-AUC | Precision | Recall | F1 | FPR | Alerts |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| **Graph-enhanced LightGBM** | **0.47175420** | **0.98635944** | **0.11631632** | **0.76447368** | **0.20191138** | **0.00580035** | **4,995** |
+| Refined transaction LightGBM | 0.35535042 | 0.98179242 | 0.10302170 | 0.66842105 | 0.17852750 | 0.00581217 | 4,931 |
+| GraphSAGE edge classifier | 0.00943876 | 0.84664170 | 0.00969110 | 0.06315789 | 0.01680378 | 0.00644556 | 4,953 |
+
+All three rows use the identical frozen validation transactions and the same
+validation-only 5,000-alert/1% FPR operating rule. GraphSAGE's substantially lower
+AP is negative experimental evidence for this sampled architecture and training
+scope; it is not evidence that graph neural networks are categorically ineffective.
+The graph-enhanced LightGBM remains the validation leader.
+
+Twenty investigation cases were generated from real saved validation model and
+graph output. Each contains at least seven observed evidence items, stored
+separately from model evidence. LightGBM explanations use native TreeSHAP with
+verified additivity. GNN explanations are explicitly labeled local
+gradient-times-input sensitivity, not SHAP or causal attribution. All cases have a
+deterministic no-LLM note, and the Streamlit application loads saved artifacts only
+for Executive Dashboard, Investigation Queue, Case Investigator, and Model
+Comparison. Full evidence is in
+[`SPRINT_4_STATUS.md`](../reports/generated/SPRINT_4_STATUS.md).
+
+GraphSAGE node structure uses directed in/out degree and deterministic composite-
+identity inputs. Monetary node aggregates are excluded because a versioned FX
+conversion source is unavailable; transaction amounts remain edge features. Raw
+logits drive ordering, while displayed sigmoid values are uncalibrated ranking
+scores rather than event probabilities because training uses sampled negatives and
+positive weighting.
+
 ## Final-test policy
 
-Final-test inference was **not performed** in Sprint 2 or Sprint 3. Neither sprint
-used test rows for preprocessing fit, training, model selection, threshold work,
-prediction, or evaluation. Test counts above come only from pre-existing Sprint 1
-split metadata. Any later test evaluation may not revise the frozen selected
-specification.
+Final-test inference was **not performed** in Sprint 2, Sprint 3, or Sprint 4. No
+sprint used test rows for preprocessing fit, training, graph construction, model
+selection, threshold work, prediction, or evaluation. Test counts above come only
+from pre-existing Sprint 1 split metadata. Any later test evaluation may not revise
+the frozen selected specification.
 
 ## Limitations
 
@@ -200,9 +247,14 @@ specification.
   optimized.
 - Sprint 3 results are validation evidence after repeated development comparisons;
   they are not a final-test estimate.
+- Sprint 4 GraphSAGE training uses explicitly disclosed deterministic graph and
+  supervised samples, not all eligible training edges; only validation scoring is
+  full-partition.
+- GraphSAGE underperformed both frozen LightGBM references in this experiment. The
+  result applies to this sampled architecture and protocol, not every possible GNN.
 - No fairness, subgroup, calibration, robustness, or deployment validation is
   provided by this scope.
-- No GraphSAGE or other network-model result is available. The Sprint 3 graph
-  conclusion concerns only the same-model tabular graph-feature ablation.
+- Case evidence is generated from synthetic transactions and model outputs; it is
+  not independently verified real-world intelligence.
 - Validation metrics measure synthetic-label ranking/classification behavior and
   are not causal explanations or evidence of wrongdoing.

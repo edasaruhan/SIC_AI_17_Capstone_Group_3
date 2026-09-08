@@ -427,9 +427,14 @@ def _source_snapshot(project_root: Path) -> dict[str, Any]:
             for path in root.rglob("*")
             if path.is_file()
             and "__pycache__" not in path.parts
+            and not any(part.endswith(".egg-info") for part in path.parts)
             and not path.name.endswith((".pyc", ".pyo"))
         )
-    files.extend(project_root / name for name in ("pyproject.toml", "requirements.txt"))
+    files.extend(
+        path
+        for name in ("app.py", "pyproject.toml", "requirements.txt")
+        if (path := project_root / name).is_file()
+    )
     inventory = [
         {
             "path": path.relative_to(project_root).as_posix(),

@@ -16,6 +16,7 @@ from argus.modeling.artifacts import (
     sha256_file,
     write_run_manifest,
 )
+from argus.modeling.baseline import _source_snapshot
 
 
 def _temporary_files(directory: Path) -> list[Path]:
@@ -153,3 +154,24 @@ def test_manifest_cannot_be_written_outside_run_directory(tmp_path: Path) -> Non
         write_run_manifest({"status": "PASS"}, run_dir, outside)
 
     assert not outside.exists()
+
+
+def test_source_snapshot_includes_app_and_excludes_generated_package_metadata(
+    tmp_path: Path,
+) -> None:
+    for directory in ("configs", "scripts", "src/argus_ai.egg-info", "tests"):
+        (tmp_path / directory).mkdir(parents=True)
+    (tmp_path / "app.py").write_text("# app\n", encoding="utf-8")
+    (tmp_path / "pyproject.toml").write_text("[project]\n", encoding="utf-8")
+    (tmp_path / "requirements.txt").write_text("pandas\n", encoding="utf-8")
+    (tmp_path / "scripts" / "run.py").write_text("# run\n", encoding="utf-8")
+    (tmp_path / "src" / "argus_ai.egg-info" / "PKG-INFO").write_text(
+        "generated\n", encoding="utf-8"
+    )
+
+    snapshot = _source_snapshot(tmp_path)
+    paths = {item["path"] for item in snapshot["files"]}
+
+    assert "app.py" in paths
+    assert "scripts/run.py" in paths
+    assert not any(".egg-info" in path for path in paths)

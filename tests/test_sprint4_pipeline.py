@@ -1,0 +1,148 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import duckdb
+import numpy as np
+import pandas as pd
+import pytest
+
+from argus.sprint4.graph_data import build_graph_view
+from argus.sprint4.pipeline import (
+    Sprint4PipelineError,
+    _prepare_run_directory,
+    _train_graphsage,
+    _write_frame_parquet,
+    _write_validation_predictions,
+)
+
+
+def _settings() -> dict[str, object]:
+    return {
+        "torch_threads": 1,
+        "model": {
+            "node_hidden_dim": 6,
+            "node_embedding_dim": 4,
+            "edge_hidden_dim": 5,
+            "dropout": 0.0,
+            "epochs": 2,
+            "learning_rate": 0.01,
+            "weight_decay": 0.0,
+        },
+    }
+
+
+def test_prepare_sprint4_run_directory_preserves_only_marker(tmp_path: Path) -> None:
+    run_dir = tmp_path / "artifacts" / "sprint4"
+    run_dir.mkdir(parents=True)
+    (run_dir / ".gitkeep").write_text("", encoding="utf-8")
+    (run_dir / "old.json").write_text("{}", encoding="utf-8")
+    (run_dir / "old").mkdir()
+    (run_dir / "old" / "payload.txt").write_text("old", encoding="utf-8")
+
+    _prepare_run_directory(run_dir)
+
+    assert [path.name for path in run_dir.iterdir()] == [".gitkeep"]
+
+
+def test_prepare_sprint4_run_directory_rejects_unexpected_target(tmp_path: Path) -> None:
+    with pytest.raises(Sprint4PipelineError, match="Refusing"):
+        _prepare_run_directory(tmp_path / "artifacts" / "full")
+
+
+def test_small_graphsage_training_is_transaction_edge_supervision_only() -> None:
+    context = pd.DataFrame(
+        {
+            "from_node_id": ["001::A", "002::B", "003::C"],
+            "to_node_id": ["002::B", "003::C", "001::A"],
+            "amount_paid": [10.0, 20.0, 30.0],
+        }
+    )
+    supervised = pd.DataFrame(
+        {
+            "from_node_id": ["001::A", "002::B", "003::C", "001::A"],
+            "to_node_id": ["002::B", "003::C", "001::A", "003::C"],
+            "is_laundering": [0, 1, 0, 1],
+        }
+    )
+    matrix = np.asarray([[0.0, 1.0], [1.0, 0.0], [0.2, 0.8], [0.8, 0.2]], dtype=np.float32)
+    view = build_graph_view(context, required_node_ids=())
+
+    model, adjacency, evidence = _train_graphsage(view, supervised, matrix, _settings(), seed=7)
+
+    assert model.config.transaction_feature_dim == 2
+    assert adjacency.edge_count == 3
+    assert evidence["target_unit"] == "transaction_edge"
+    assert evidence["unsupported_account_level_label_created"] is False
+    assert evidence["epochs_completed"] == 2
+    assert evidence["outer_validation_used_for_fit_or_early_stopping"] is False
+    assert evidence["final_test_used"] is False
+
+
+def test_validation_prediction_writer_requires_validation_join_and_aligns_references(
+    tmp_path: Path,
+) -> None:
+    connection = duckdb.connect()
+    try:
+        feature = pd.DataFrame(
+            {
+                "transaction_id": ["T1", "T2", "T3"],
+                "source_row_number": [1, 2, 3],
+                "is_laundering": [0, 1, 0],
+            }
+        )
+        split = pd.DataFrame(
+            {"transaction_id": ["T1", "T2", "T3"], "partition": ["validation"] * 3}
+        )
+        reference = pd.DataFrame(
+            {
+                "source_row_number": [1, 2, 3],
+                "is_laundering": [0, 1, 0],
+                "raw_score_refined_lightgbm": [0.1, 0.8, 0.2],
+                "probability_refined_lightgbm": [0.2, 0.7, 0.3],
+                "raw_score_ablation_transaction_temporal_history_graph": [0.0, 0.9, 0.1],
+                "probability_ablation_transaction_temporal_history_graph": [0.1, 0.8, 0.2],
+            }
+        )
+        feature_path = _write_frame_parquet(
+            connection, feature, tmp_path / "feature.parquet", compression="zstd"
+        )
+        split_path = _write_frame_parquet(
+            connection, split, tmp_path / "split.parquet", compression="zstd"
+        )
+        reference_path = _write_frame_parquet(
+            connection, reference, tmp_path / "reference.parquet", compression="zstd"
+        )
+        values = {
+            "source_row_number": np.array([1, 2, 3]),
+            "is_laundering": np.array([0, 1, 0]),
+            "raw_score_graphsage_edge_classifier": np.array([-1.0, 2.0, 0.0]),
+            "probability_graphsage_edge_classifier": np.array([0.2, 0.9, 0.5]),
+        }
+
+        audit = _write_validation_predictions(
+            connection,
+            values,
+            feature_table=feature_path,
+            split_table=split_path,
+            sprint3_predictions=reference_path,
+            destination=tmp_path / "predictions.parquet",
+            compression="zstd",
+        )
+
+        assert audit["partition"] == "validation"
+        assert audit["rows"] == 3
+        assert audit["positive_labels"] == 1
+        assert audit["test_predictions_included"] is False
+        columns = (
+            connection.execute(
+                "DESCRIBE SELECT * FROM read_parquet(?)",
+                [str(tmp_path / "predictions.parquet")],
+            )
+            .fetch_df()["column_name"]
+            .tolist()
+        )
+        assert "raw_score_graph_enhanced_lightgbm" in columns
+        assert "raw_score_graphsage_edge_classifier" in columns
+    finally:
+        connection.close()

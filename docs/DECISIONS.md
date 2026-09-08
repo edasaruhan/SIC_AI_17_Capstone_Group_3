@@ -4,8 +4,9 @@ Decisions are recorded before results so implementation choices cannot be rewrit
 to fit a preferred narrative. “Accepted” means the design rule is authoritative;
 it does not mean its implementation has passed tests. Runtime verification remains
 in `reports/generated/SPRINT_1_STATUS.md` and
-`reports/generated/SPRINT_2_STATUS.md`; Sprint 3 runtime verification passed and is
-recorded in `reports/generated/SPRINT_3_STATUS.md`.
+`reports/generated/SPRINT_2_STATUS.md`; Sprint 3 and Sprint 4 runtime verifications
+passed and are recorded in `reports/generated/SPRINT_3_STATUS.md` and
+`reports/generated/SPRINT_4_STATUS.md`.
 
 ## ADR-001 — Limit the initial build to Sprint 1
 
@@ -158,13 +159,13 @@ recorded in `reports/generated/SPRINT_3_STATUS.md`.
 ## ADR-014 — Keep labels at transaction/edge level
 
 - **Date:** 2026-09-06
-- **Status:** Accepted for future work
+- **Status:** Accepted and verified in Sprint 4
 - **Decision:** Do not invent account-level laundering targets from transaction
-  labels. Any future graph model should predict transactions/edges or document a
+  labels. Any graph model should predict transactions/edges or document a
   defensible alternative target.
 - **Reason:** The IBM source supplies transaction-level ground truth only.
-- **Consequence:** Sprint 2 remains transaction-baseline work; GraphSAGE is deferred
-  beyond it.
+- **Consequence:** Sprint 4 GraphSAGE classifies transaction edges from endpoint
+  embeddings and transaction features; no account-level fraud target is created.
 
 ## ADR-015 — Require human review and non-accusatory language
 
@@ -174,8 +175,9 @@ recorded in `reports/generated/SPRINT_3_STATUS.md`.
   guilt or an instruction for adverse action.
 - **Reason:** Synthetic labels and probabilistic patterns do not justify legal or
   operational conclusions.
-- **Consequence:** Later case output must separate observed evidence from model
-  evidence, state uncertainty, and require trained analyst review.
+- **Consequence:** Sprint 4 case output separates observed evidence from model
+  evidence, uses non-accusatory notes, and remains subject to trained analyst
+  review.
 
 ## ADR-016 — Require validation-first model selection for Sprint 2
 
@@ -311,14 +313,16 @@ recorded in `reports/generated/SPRINT_3_STATUS.md`.
 - **Decision:** Implement bounded model refinement, expanding temporal CV,
   validation-only threshold selection, and controlled graph-feature ablation on
   the frozen Sprint 1/Sprint 2 data snapshot. Do not load, transform, score, or
-  evaluate the final-test rows. Stop before Sprint 4/GraphSAGE.
+  evaluate the final-test rows. At the Sprint 3 checkpoint, stop before
+  Sprint 4/GraphSAGE.
 - **Reason:** Refinement and graph value require multiple development comparisons;
   using final-test feedback for those choices would bias the final estimate.
 - **Evidence:** All 15 Sprint 3 acceptance gates passed. Independent artifact
   verification, 207 tests, Ruff lint/format, and `pip check` passed; the final-test
   policy records no test fit, transform, inference, prediction, metric, or feedback.
-- **Consequence:** Sprint 3 is complete. Test counts/prevalence are reported only
-  from existing split metadata, and Sprint 4/GraphSAGE was not started.
+- **Consequence:** Sprint 3 completed with test counts/prevalence reported only
+  from existing split metadata. This was the entry checkpoint for the later,
+  separately verified Sprint 4 execution.
 
 ## ADR-024 — Tune on expanding folds wholly inside outer train
 
@@ -377,3 +381,60 @@ recorded in `reports/generated/SPRINT_3_STATUS.md`.
   validation delta. The sensitivity adds only sender prior fan-in, receiver prior
   fan-out, and prior repeated-pair count. This tabular experiment is not GraphSAGE
   and supports no GNN-superiority claim.
+
+## ADR-027 — Run GraphSAGE as a sampled transaction-edge experiment
+
+- **Date:** 2026-09-08
+- **Status:** Accepted and verified
+- **Decision:** Preserve the frozen Sprint 3 references and train a GraphSAGE edge
+  classifier from sender/receiver node embeddings plus transaction features. Use
+  deterministic bounded graph samples when the full graph exceeds the declared
+  workstation budget, disclose every denominator, and still score the complete
+  frozen outer-validation partition. Keep final-test rows out of graph
+  construction, fitting, inference, tuning, and evaluation.
+- **Reason:** The IBM label belongs to transactions, while the available 16 GB RAM,
+  approximately 4.6 GB free memory, and 4 GB GPU do not justify describing an
+  unbounded full-graph training run as reproducible on this workstation.
+- **Evidence:** The run used 150,000 of 1,422,288 eligible message-graph edges,
+  52,396 supervised edges (all 2,396 eligible positives plus 50,000 deterministic
+  negatives), and a 300,000-of-3,554,957 outer-train inference graph. It scored all
+  761,749 validation rows. GraphSAGE AP was 0.00943876, below the frozen refined
+  transaction LightGBM AP 0.35535042 and graph-enhanced LightGBM AP 0.47175420.
+- **Consequence:** Sprint 4 supplies an honest bounded GNN value experiment, not a
+  full-graph claim and not evidence of GNN superiority. The graph-enhanced LightGBM
+  remains the validation leader; the final test stays sealed.
+
+## ADR-028 — Exclude cross-currency node totals and label sigmoid scores honestly
+
+- **Date:** 2026-09-08
+- **Status:** Accepted and verified
+- **Decision:** Use directed node-degree and deterministic composite-identity
+  inputs for GraphSAGE, but exclude node-level monetary aggregates without a
+  versioned FX conversion source. Rank by raw GraphSAGE logit and label the sigmoid
+  value as an uncalibrated ranking score rather than an event probability.
+- **Reason:** A node may transact in multiple currencies, so raw monetary sums mix
+  units. Deterministic negative sampling plus positive weighting also changes the
+  fitted class prior and prevents a probability-calibration claim.
+- **Consequence:** Transaction amounts remain available in leakage-safe edge
+  features and observed case evidence, while node features do not make invalid
+  cross-currency totals. The UI and case schema state the score limitation.
+
+## ADR-029 — Build cases from saved evidence with a deterministic fallback
+
+- **Date:** 2026-09-08
+- **Status:** Accepted and verified
+- **Decision:** Build cases only from real saved model and graph outputs. Store
+  observed evidence separately from model evidence, require at least three observed
+  facts, label GNN gradient-times-input output as local sensitivity rather than
+  SHAP, and use an evidence-bound deterministic note generator when no LLM is
+  available. Streamlit must load artifacts and must not train on page load.
+- **Reason:** An investigation interface must remain reproducible and usable without
+  an external API, while explanations must not be confused with observed facts or
+  causal proof.
+- **Evidence:** Twenty saved validation cases each contain at least seven observed
+  evidence items. Native LightGBM TreeSHAP passed its additivity check; GNN saved-
+  score reproduction had zero maximum error. Executive Dashboard, Investigation
+  Queue, Case Investigator, and Model Comparison load from saved artifacts, and all
+  20 cases use the deterministic no-LLM fallback.
+- **Consequence:** The product layer supports human prioritization only. It cannot
+  manufacture evidence, infer guilt, or silently change the validated models.

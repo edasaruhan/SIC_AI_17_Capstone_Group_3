@@ -14,6 +14,7 @@ import math
 import re
 from collections.abc import Mapping, MutableMapping
 from copy import deepcopy
+from datetime import datetime
 from pathlib import Path
 from typing import Any, TypeAlias
 
@@ -270,6 +271,10 @@ def validate_config(config: Mapping[str, Any]) -> None:
     sprint3 = config.get("sprint3")
     if sprint3 is not None:
         _validate_refinement_config(sprint3, baseline=baseline)
+
+    sprint4 = config.get("sprint4")
+    if sprint4 is not None:
+        _validate_sprint4_config(sprint4, sprint3=sprint3)
 
 
 def _validate_baseline_config(baseline: object) -> None:
@@ -768,6 +773,488 @@ def _validate_refinement_ablation(value: object) -> None:
         raise ConfigError(
             "sprint3.ablation.duplicate_graph_pairs must declare the two reviewed exact pairs"
         )
+
+
+def _require_boolean(value: object, name: str, *, expected: bool | None = None) -> bool:
+    if not isinstance(value, bool):
+        raise ConfigError(f"{name} must be boolean")
+    if expected is not None and value is not expected:
+        raise ConfigError(f"{name} must be {str(expected).lower()}")
+    return value
+
+
+def _require_non_empty_string(value: object, name: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ConfigError(f"{name} must be a non-empty string")
+    return value.strip()
+
+
+def _validate_sprint4_config(sprint4: object, *, sprint3: object) -> None:
+    """Validate the sealed-test, sampled-training Sprint 4 contract."""
+
+    if not isinstance(sprint4, Mapping):
+        raise ConfigError("sprint4 must be a mapping")
+    _require_exact_keys(
+        sprint4,
+        {
+            "protocol_version",
+            "experiment_scope",
+            "final_test_access",
+            "final_test_policy",
+            "selection_partition",
+            "selection_metric",
+            "ranking_score_type",
+            "ranking_tie_break",
+            "top_k",
+            "batch_rows",
+            "memory_limit",
+            "max_temp_directory_size",
+            "threads",
+            "torch_threads",
+            "parquet_compression",
+            "frozen_references",
+            "graph_sampling",
+            "supervised_training",
+            "node_features",
+            "model",
+            "threshold_optimization",
+            "case_builder",
+            "explanations",
+            "llm",
+            "application",
+        },
+        "sprint4",
+    )
+    if sprint4.get("protocol_version") != 1 or isinstance(sprint4.get("protocol_version"), bool):
+        raise ConfigError("sprint4.protocol_version must be integer 1")
+    expected_values = {
+        "experiment_scope": "deterministic_sampled_graphsage_training_full_validation_evaluation",
+        "final_test_policy": "metadata_only_no_transform_no_inference",
+        "selection_partition": "validation",
+        "selection_metric": "average_precision",
+        "ranking_score_type": "raw_logit",
+        "ranking_tie_break": "source_row_number_ascending",
+    }
+    for key, expected in expected_values.items():
+        if sprint4.get(key) != expected:
+            raise ConfigError(f"sprint4.{key} must be {expected!r}")
+    _require_boolean(sprint4.get("final_test_access"), "sprint4.final_test_access", expected=False)
+    if not isinstance(sprint3, Mapping):
+        raise ConfigError("Sprint 4 requires the inherited Sprint 3 contract")
+    if sprint4.get("top_k") != sprint3.get("top_k"):
+        raise ConfigError("sprint4.top_k must match sprint3.top_k")
+    if sprint4.get("ranking_tie_break") != sprint3.get("ranking_tie_break"):
+        raise ConfigError("sprint4.ranking_tie_break must match sprint3.ranking_tie_break")
+    _require_positive_integer(sprint4.get("batch_rows"), "sprint4.batch_rows")
+    _require_positive_integer(sprint4.get("threads"), "sprint4.threads")
+    _require_positive_integer(sprint4.get("torch_threads"), "sprint4.torch_threads")
+    _require_positive_size(sprint4.get("memory_limit"), "sprint4.memory_limit")
+    _require_positive_size(
+        sprint4.get("max_temp_directory_size"), "sprint4.max_temp_directory_size"
+    )
+    if sprint4.get("parquet_compression") not in {"snappy", "zstd"}:
+        raise ConfigError("sprint4.parquet_compression must be 'snappy' or 'zstd'")
+
+    _validate_sprint4_frozen_references(sprint4.get("frozen_references"))
+    _validate_sprint4_graph_sampling(sprint4.get("graph_sampling"))
+    _validate_sprint4_supervised_training(sprint4.get("supervised_training"))
+    _validate_sprint4_node_features(sprint4.get("node_features"))
+    _validate_sprint4_model(sprint4.get("model"))
+    _validate_sprint4_threshold(sprint4.get("threshold_optimization"), sprint3=sprint3)
+    _validate_sprint4_cases(sprint4.get("case_builder"))
+    _validate_sprint4_explanations(sprint4.get("explanations"))
+    _validate_sprint4_llm(sprint4.get("llm"))
+    _validate_sprint4_application(sprint4.get("application"))
+
+
+def _validate_sprint4_frozen_references(value: object) -> None:
+    if not isinstance(value, Mapping):
+        raise ConfigError("sprint4.frozen_references must be a mapping")
+    _require_exact_keys(
+        value,
+        {
+            "sprint3_commit",
+            "sprint3_manifest_sha256",
+            "refined_baseline_model",
+            "refined_baseline_average_precision",
+            "graph_enhanced_model",
+            "graph_enhanced_average_precision",
+            "validation_rows",
+            "validation_positives",
+        },
+        "sprint4.frozen_references",
+    )
+    for key, length in (("sprint3_commit", 40), ("sprint3_manifest_sha256", 64)):
+        item = value.get(key)
+        if not isinstance(item, str) or re.fullmatch(rf"[0-9a-f]{{{length}}}", item) is None:
+            raise ConfigError(f"sprint4.frozen_references.{key} must be lowercase hex")
+    if value.get("refined_baseline_model") != "lightgbm":
+        raise ConfigError("Sprint 4 frozen refined baseline must be lightgbm")
+    if value.get("graph_enhanced_model") != "ablation_transaction_temporal_history_graph":
+        raise ConfigError("Sprint 4 frozen graph-enhanced reference is invalid")
+    for key in ("refined_baseline_average_precision", "graph_enhanced_average_precision"):
+        _require_finite_number(
+            value.get(key), f"sprint4.frozen_references.{key}", minimum=0.0, maximum=1.0
+        )
+    rows = _require_positive_integer(
+        value.get("validation_rows"), "sprint4.frozen_references.validation_rows"
+    )
+    positives = _require_positive_integer(
+        value.get("validation_positives"), "sprint4.frozen_references.validation_positives"
+    )
+    if positives >= rows:
+        raise ConfigError("Sprint 4 frozen validation positives must be less than rows")
+
+
+def _validate_sprint4_graph_sampling(value: object) -> None:
+    if not isinstance(value, Mapping):
+        raise ConfigError("sprint4.graph_sampling must be a mapping")
+    _require_exact_keys(
+        value,
+        {
+            "method",
+            "label_agnostic_context_sampling",
+            "directed",
+            "repeated_edges_preserved_as_message_weight",
+            "training_context_end",
+            "training_context_population_rows",
+            "training_context_max_edges",
+            "inference_context_partition",
+            "inference_context_population_rows",
+            "inference_context_max_edges",
+            "full_graph_training_attempted",
+            "full_graph_training_exclusion_reason",
+        },
+        "sprint4.graph_sampling",
+    )
+    if value.get("method") != "md5_order_without_replacement":
+        raise ConfigError("sprint4.graph_sampling.method must be md5_order_without_replacement")
+    for key in (
+        "label_agnostic_context_sampling",
+        "directed",
+        "repeated_edges_preserved_as_message_weight",
+    ):
+        _require_boolean(value.get(key), f"sprint4.graph_sampling.{key}", expected=True)
+    _require_boolean(
+        value.get("full_graph_training_attempted"),
+        "sprint4.graph_sampling.full_graph_training_attempted",
+        expected=False,
+    )
+    _require_non_empty_string(
+        value.get("full_graph_training_exclusion_reason"),
+        "sprint4.graph_sampling.full_graph_training_exclusion_reason",
+    )
+    timestamp = _require_non_empty_string(
+        value.get("training_context_end"), "sprint4.graph_sampling.training_context_end"
+    )
+    try:
+        datetime.fromisoformat(timestamp)
+    except ValueError as exc:
+        raise ConfigError("sprint4.graph_sampling.training_context_end must be ISO-8601") from exc
+    if value.get("inference_context_partition") != "train":
+        raise ConfigError("sprint4.graph_sampling.inference_context_partition must be 'train'")
+    for prefix in ("training_context", "inference_context"):
+        population = _require_positive_integer(
+            value.get(f"{prefix}_population_rows"),
+            f"sprint4.graph_sampling.{prefix}_population_rows",
+        )
+        sampled = _require_positive_integer(
+            value.get(f"{prefix}_max_edges"), f"sprint4.graph_sampling.{prefix}_max_edges"
+        )
+        if sampled >= population:
+            raise ConfigError(f"sprint4.graph_sampling.{prefix}_max_edges must be a subset")
+
+
+def _validate_sprint4_supervised_training(value: object) -> None:
+    if not isinstance(value, Mapping):
+        raise ConfigError("sprint4.supervised_training must be a mapping")
+    _require_exact_keys(
+        value,
+        {
+            "partition",
+            "strictly_after_training_context",
+            "population_rows",
+            "include_all_positives",
+            "maximum_negative_rows",
+            "negative_sampling_method",
+            "transaction_feature_family",
+            "preprocessing_state_scope",
+        },
+        "sprint4.supervised_training",
+    )
+    expected = {
+        "partition": "train",
+        "negative_sampling_method": "md5_order_without_replacement",
+        "transaction_feature_family": "transaction_temporal_history",
+        "preprocessing_state_scope": "sprint3_outer_train_frozen",
+    }
+    for key, item in expected.items():
+        if value.get(key) != item:
+            raise ConfigError(f"sprint4.supervised_training.{key} must be {item!r}")
+    _require_boolean(
+        value.get("strictly_after_training_context"),
+        "sprint4.supervised_training.strictly_after_training_context",
+        expected=True,
+    )
+    _require_boolean(
+        value.get("include_all_positives"),
+        "sprint4.supervised_training.include_all_positives",
+        expected=True,
+    )
+    population = _require_positive_integer(
+        value.get("population_rows"), "sprint4.supervised_training.population_rows"
+    )
+    negatives = _require_positive_integer(
+        value.get("maximum_negative_rows"),
+        "sprint4.supervised_training.maximum_negative_rows",
+    )
+    if negatives >= population:
+        raise ConfigError("sprint4.supervised_training.maximum_negative_rows must be a subset")
+
+
+def _validate_sprint4_node_features(value: object) -> None:
+    if not isinstance(value, Mapping):
+        raise ConfigError("sprint4.node_features must be a mapping")
+    _require_exact_keys(
+        value,
+        {
+            "structural_features",
+            "deterministic_identity_features",
+            "normalization_fit_scope",
+            "amount_aggregation_policy",
+        },
+        "sprint4.node_features",
+    )
+    if value.get("structural_features") != [
+        "log1p_in_degree",
+        "log1p_out_degree",
+    ]:
+        raise ConfigError("Sprint 4 structural node features differ from the reviewed contract")
+    if value.get("deterministic_identity_features") != [
+        "bank_hash_sin",
+        "bank_hash_cos",
+        "account_hash_sin",
+        "account_hash_cos",
+    ]:
+        raise ConfigError("Sprint 4 deterministic identity features differ from the contract")
+    if value.get("normalization_fit_scope") != "sampled_training_context_nodes_only":
+        raise ConfigError("Sprint 4 node normalization must fit sampled training-context nodes")
+    if (
+        value.get("amount_aggregation_policy")
+        != "excluded_without_fx_rates_to_avoid_cross_currency_sums"
+    ):
+        raise ConfigError("Sprint 4 must not aggregate cross-currency node amounts without FX")
+
+
+def _validate_sprint4_model(value: object) -> None:
+    if not isinstance(value, Mapping):
+        raise ConfigError("sprint4.model must be a mapping")
+    _require_exact_keys(
+        value,
+        {
+            "architecture",
+            "node_hidden_dim",
+            "node_embedding_dim",
+            "edge_hidden_dim",
+            "dropout",
+            "epochs",
+            "learning_rate",
+            "weight_decay",
+            "positive_weight_policy",
+            "device",
+            "deterministic_algorithms",
+            "unsupported_node_label_created",
+        },
+        "sprint4.model",
+    )
+    expected = {
+        "architecture": "directed_graphsage_edge_classifier",
+        "positive_weight_policy": "sqrt_sample_negative_to_positive_ratio",
+        "device": "cpu",
+    }
+    for key, item in expected.items():
+        if value.get(key) != item:
+            raise ConfigError(f"sprint4.model.{key} must be {item!r}")
+    for key in ("node_hidden_dim", "node_embedding_dim", "edge_hidden_dim", "epochs"):
+        _require_positive_integer(value.get(key), f"sprint4.model.{key}")
+    _require_finite_number(
+        value.get("dropout"),
+        "sprint4.model.dropout",
+        minimum=0.0,
+        maximum=1.0,
+        maximum_inclusive=False,
+    )
+    _require_finite_number(
+        value.get("learning_rate"),
+        "sprint4.model.learning_rate",
+        minimum=0.0,
+        maximum=1.0,
+        minimum_inclusive=False,
+    )
+    _require_finite_number(value.get("weight_decay"), "sprint4.model.weight_decay", minimum=0.0)
+    _require_boolean(
+        value.get("deterministic_algorithms"),
+        "sprint4.model.deterministic_algorithms",
+        expected=True,
+    )
+    _require_boolean(
+        value.get("unsupported_node_label_created"),
+        "sprint4.model.unsupported_node_label_created",
+        expected=False,
+    )
+
+
+def _validate_sprint4_threshold(value: object, *, sprint3: Mapping[str, Any]) -> None:
+    if not isinstance(value, Mapping):
+        raise ConfigError("sprint4.threshold_optimization must be a mapping")
+    _require_exact_keys(
+        value,
+        {"partition", "score_type", "primary_rule", "alert_budget", "fpr_ceiling", "tie_policy"},
+        "sprint4.threshold_optimization",
+    )
+    expected = {
+        "partition": "validation",
+        "score_type": "raw_logit",
+        "primary_rule": "maximize_recall_subject_to_joint_constraints",
+        "tie_policy": "include_complete_equal_score_group",
+    }
+    for key, item in expected.items():
+        if value.get(key) != item:
+            raise ConfigError(f"sprint4.threshold_optimization.{key} must be {item!r}")
+    _require_positive_integer(
+        value.get("alert_budget"), "sprint4.threshold_optimization.alert_budget"
+    )
+    _require_finite_number(
+        value.get("fpr_ceiling"),
+        "sprint4.threshold_optimization.fpr_ceiling",
+        minimum=0.0,
+        maximum=1.0,
+        minimum_inclusive=False,
+        maximum_inclusive=False,
+    )
+    reference = sprint3.get("threshold_optimization")
+    if not isinstance(reference, Mapping):
+        raise ConfigError("Sprint 4 requires Sprint 3 threshold settings")
+    for key in ("alert_budget", "fpr_ceiling", "primary_rule", "tie_policy"):
+        if value.get(key) != reference.get(key):
+            raise ConfigError(f"sprint4.threshold_optimization.{key} must match Sprint 3")
+
+
+def _validate_sprint4_cases(value: object) -> None:
+    if not isinstance(value, Mapping):
+        raise ConfigError("sprint4.case_builder must be a mapping")
+    _require_exact_keys(
+        value,
+        {
+            "model_score",
+            "maximum_cases",
+            "neighborhood_hops",
+            "maximum_display_edges",
+            "minimum_observed_evidence",
+            "include_only_seed_time_or_earlier",
+            "seed_ranking_tie_break",
+        },
+        "sprint4.case_builder",
+    )
+    if value.get("model_score") != "graphsage_uncalibrated_sigmoid_score":
+        raise ConfigError(
+            "sprint4.case_builder.model_score must identify the uncalibrated sigmoid score"
+        )
+    if value.get("seed_ranking_tie_break") != "source_row_number_ascending":
+        raise ConfigError("Sprint 4 case ranking tie break must use source row number")
+    for key in ("maximum_cases", "maximum_display_edges"):
+        _require_positive_integer(value.get(key), f"sprint4.case_builder.{key}")
+    hops = _require_positive_integer(
+        value.get("neighborhood_hops"), "sprint4.case_builder.neighborhood_hops"
+    )
+    if hops not in {1, 2}:
+        raise ConfigError("sprint4.case_builder.neighborhood_hops must be 1 or 2")
+    minimum = _require_positive_integer(
+        value.get("minimum_observed_evidence"),
+        "sprint4.case_builder.minimum_observed_evidence",
+    )
+    if minimum < 3:
+        raise ConfigError("Sprint 4 cases require at least three observed evidence facts")
+    _require_boolean(
+        value.get("include_only_seed_time_or_earlier"),
+        "sprint4.case_builder.include_only_seed_time_or_earlier",
+        expected=True,
+    )
+
+
+def _validate_sprint4_explanations(value: object) -> None:
+    if not isinstance(value, Mapping):
+        raise ConfigError("sprint4.explanations must be a mapping")
+    _require_exact_keys(
+        value,
+        {
+            "tree_method",
+            "tree_top_features_per_case",
+            "gnn_method",
+            "gnn_claim_scope",
+            "fabricated_scores_allowed",
+        },
+        "sprint4.explanations",
+    )
+    if value.get("tree_method") != "lightgbm_native_pred_contrib_treeshap":
+        raise ConfigError("Sprint 4 requires native LightGBM TreeSHAP contributions")
+    if value.get("gnn_method") != "local_gradient_x_input_sensitivity":
+        raise ConfigError("Sprint 4 GNN explanation method is unsupported")
+    if value.get("gnn_claim_scope") != "sensitivity_not_shap":
+        raise ConfigError("Sprint 4 GNN explanation must be labeled sensitivity_not_shap")
+    _require_positive_integer(
+        value.get("tree_top_features_per_case"),
+        "sprint4.explanations.tree_top_features_per_case",
+    )
+    _require_boolean(
+        value.get("fabricated_scores_allowed"),
+        "sprint4.explanations.fabricated_scores_allowed",
+        expected=False,
+    )
+
+
+def _validate_sprint4_llm(value: object) -> None:
+    if not isinstance(value, Mapping):
+        raise ConfigError("sprint4.llm must be a mapping")
+    _require_exact_keys(
+        value,
+        {"enabled", "input_contract", "fallback", "human_review_required"},
+        "sprint4.llm",
+    )
+    _require_boolean(value.get("enabled"), "sprint4.llm.enabled", expected=False)
+    _require_boolean(
+        value.get("human_review_required"),
+        "sprint4.llm.human_review_required",
+        expected=True,
+    )
+    if value.get("input_contract") != "structured_evidence_only":
+        raise ConfigError("Sprint 4 LLM input must be structured evidence only")
+    if value.get("fallback") != "deterministic_template":
+        raise ConfigError("Sprint 4 LLM fallback must be deterministic_template")
+
+
+def _validate_sprint4_application(value: object) -> None:
+    if not isinstance(value, Mapping):
+        raise ConfigError("sprint4.application must be a mapping")
+    _require_exact_keys(
+        value,
+        {"artifact_only", "train_on_page_load", "required_screens", "optional_screen"},
+        "sprint4.application",
+    )
+    _require_boolean(value.get("artifact_only"), "sprint4.application.artifact_only", expected=True)
+    _require_boolean(
+        value.get("train_on_page_load"),
+        "sprint4.application.train_on_page_load",
+        expected=False,
+    )
+    if value.get("required_screens") != [
+        "Investigation Queue",
+        "Case Investigator",
+        "Model Comparison",
+    ]:
+        raise ConfigError("Sprint 4 application required screens differ from the contract")
+    if value.get("optional_screen") != ["Executive Dashboard"]:
+        raise ConfigError("Sprint 4 optional screen must be Executive Dashboard")
 
 
 def load_config(

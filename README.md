@@ -14,10 +14,11 @@ score means elevated investigation priority, not a legal conclusion.
 ## Current status
 
 This checkout has completed **Sprint 1: Repository Foundation + Data Proof**,
-**Sprint 2: Baseline + Model Exploration**, and **Sprint 3: Model Refinement +
-Graph Value Experiment**. The executed Sprint 3 run, independent artifact
-verification, and repository quality suite all passed. Final-test inference remains
-closed, and Sprint 4/GraphSAGE and the Streamlit product have not started.
+**Sprint 2: Baseline + Model Exploration**, **Sprint 3: Model Refinement + Graph
+Value Experiment**, and **Sprint 4: GraphSAGE + Product Layer**. The executed
+Sprint 4 run, independent artifact verification, and repository quality suite all
+passed. The final-test period remains sealed: it was not fitted, transformed,
+included in a graph, scored, tuned against, or evaluated.
 
 | Item | Status | Evidence |
 | --- | --- | --- |
@@ -41,11 +42,17 @@ closed, and Sprint 4/GraphSAGE and the Streamlit product have not started.
 | Refined Transaction Baseline Champion | **LightGBM** | Validation AP 0.35535042; selected using validation only |
 | Same-model graph-value experiment | **PASS** | LightGBM B AP 0.35535042; C AP 0.47175420; delta +0.11640378 |
 | Sprint 3 final quality suite | **PASS** | 207 passed in 30.74 seconds; artifact verification, Ruff lint/format, and `pip check` passed |
+| Sprint 4 GraphSAGE + Product Layer | **PASS (19/19)** | Sampled GraphSAGE training, full frozen-validation scoring, cases, evidence, explanations, and saved-artifact UI completed |
+| GraphSAGE validation result | **BELOW BOTH REFERENCES** | AP 0.00943876; no GNN superiority claim |
+| Sprint 4 product evidence | **PASS** | 20 real validation cases; at least 7 observed evidence items per case; deterministic no-LLM notes |
+| Sprint 4 Streamlit application | **PASS** | Four saved-artifact screens; no model training on page load |
+| Sprint 4 final quality suite | **PASS** | 289 passed in 34.21 seconds; artifact verification, four-screen Streamlit smoke, Ruff lint/format, and `pip check` passed |
 
 The completed-run evidence ledgers are
 [`SPRINT_1_STATUS.md`](reports/generated/SPRINT_1_STATUS.md),
-[`SPRINT_2_STATUS.md`](reports/generated/SPRINT_2_STATUS.md), and
-[`SPRINT_3_STATUS.md`](reports/generated/SPRINT_3_STATUS.md).
+[`SPRINT_2_STATUS.md`](reports/generated/SPRINT_2_STATUS.md),
+[`SPRINT_3_STATUS.md`](reports/generated/SPRINT_3_STATUS.md), and
+[`SPRINT_4_STATUS.md`](reports/generated/SPRINT_4_STATUS.md).
 
 ## Research question
 
@@ -58,10 +65,13 @@ The final project is intended to answer, with executable evidence:
 Sprint 2 established the fixed transaction-only reference. In Sprint 3, the
 same-family LightGBM comparison measured validation AP 0.35535042 for B
 (transaction + temporal/history) and 0.47175420 for C (B + graph), an absolute
-delta of +0.11640378. This is validation evidence for tabular strict-prior graph
-features, not a GraphSAGE/GNN result or a production-performance claim.
+delta of +0.11640378. Sprint 4 then evaluated a transaction-edge GraphSAGE
+classifier on the same 761,749 frozen validation transactions. Its AP was
+0.00943876, well below both frozen LightGBM references, so this run provides no
+evidence that the sampled GNN improves prioritization. These are validation
+results for this synthetic dataset, not production-performance claims.
 
-## Implemented architecture through Sprint 3
+## Implemented architecture through Sprint 4
 
 ```mermaid
 flowchart LR
@@ -81,6 +91,13 @@ flowchart LR
     C --> R[Expanding temporal CV\nand bounded refinement]
     R --> X[Same-model A / B / C\ngraph-value experiment]
     X --> O[Validation-only\noperating threshold]
+    S --> SG[Deterministically sampled\ntrain-only message graph]
+    SG --> N[GraphSAGE node embeddings]
+    N --> EC[Sender + receiver embeddings\nand transaction-edge classifier]
+    EC --> VC[Full frozen-validation scoring]
+    O --> PB[Saved-artifact product layer]
+    VC --> PB
+    PB --> UI[Streamlit queue, investigator,\ncomparison, and executive screens]
 ```
 
 Every historical or graph-history feature for an event at time `t` may use only
@@ -90,6 +107,13 @@ history signals; it deliberately withholds the five graph-history columns from
 the Sprint 2 baselines. Sprint 3 adds them only in the controlled C-family arm,
 with identical model family, selected parameters, frozen outer split, and
 evaluation protocol used for the B-versus-C comparison.
+
+Sprint 4 preserves the IBM transaction label as an edge target; it does not invent
+an unsupported account-level fraud label. GraphSAGE message passing uses only
+sampled outer-train history. Validation edges never enter that graph, while all
+761,749 frozen validation transactions are scored and compared against the two
+immutable Sprint 3 references. The product layer reads saved results and never
+trains a model while a page is opening.
 
 ## Verified source-data facts
 
@@ -280,22 +304,86 @@ artifact verifier recomputed validation AP/ROC-AUC from saved scores, deserializ
 all three models, repeated validation-only champion selection, confirmed zero test
 prediction artifacts, and returned `PASS`.
 
+## Verified Sprint 4 GraphSAGE and product evidence
+
+The executable `configs/sprint4.yaml` run kept the Sprint 3 refined transaction
+LightGBM and graph-enhanced LightGBM outputs frozen. GraphSAGE was trained as a
+transaction/edge classifier: learned sender and receiver node embeddings are
+combined with transaction features to score the transaction label. No account-
+level fraud label was derived or used.
+
+Resource limits made full-graph GraphSAGE training inappropriate on the available
+workstation, so the run uses a disclosed deterministic training sample rather than
+presenting a subset as a full-data GNN result:
+
+- the train-prefix message graph contains 150,000 of 1,422,288 eligible edges;
+- the validation-inference history graph contains 300,000 of 3,554,957 outer-train
+  edges;
+- the supervised training set contains 52,396 transactions: all 2,396 positives
+  after the message-graph cutoff plus 50,000 deterministic negatives;
+- context edges are selected without target labels by stable MD5 transaction-ID
+  order;
+- validation evaluation is not sampled: all 761,749 frozen validation rows,
+  including all 760 positives, are scored.
+
+The training message graph ends at `2022-09-02 09:27`; supervised edges begin at
+`2022-09-02 09:28`. Validation inference uses sampled outer-train edges only, so
+no validation transaction participates in message passing. Directed endpoints and
+repeated transfers are retained.
+
+| Model | PR-AUC (AP) | ROC-AUC | Precision | Recall | F1 | FPR | Alerts |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Graph-enhanced LightGBM | 0.47175420 | 0.98635944 | 0.11631632 | 0.76447368 | 0.20191138 | 0.00580035 | 4,995 |
+| Refined transaction LightGBM | 0.35535042 | 0.98179242 | 0.10302170 | 0.66842105 | 0.17852750 | 0.00581217 | 4,931 |
+| GraphSAGE edge classifier | 0.00943876 | 0.84664170 | 0.00969110 | 0.06315789 | 0.01680378 | 0.00644556 | 4,953 |
+
+All three rows use the identical frozen validation identities and the same
+validation-only 5,000-alert / 1% FPR operating-point rule. Raw GraphSAGE logits
+are used for ranking. The GNN underperforms both frozen LightGBM references,
+including the transaction-only reference; it is retained as a reproducible
+negative experimental result, not described as a champion.
+
+Sprint 4 generated 20 investigation cases from real saved validation scores. Each
+case contains at least seven concrete observed-evidence items, keeps observed facts
+separate from model-derived explanation, and has a deterministic no-LLM narrative.
+LightGBM explanations use native `pred_contrib` TreeSHAP with a verified additivity
+check. GraphSAGE explanations are explicitly labeled local gradient-times-input
+sensitivity, not SHAP, causal explanation, or proof of wrongdoing.
+
+GraphSAGE node structure uses directed in/out degree plus deterministic composite-
+identity signals. Node-level monetary sums are deliberately excluded because no FX
+table exists and cross-currency totals would be scientifically invalid. The saved
+sigmoid output is also labeled an **uncalibrated ranking score**, not an event
+probability, because training combines deterministic negative sampling with
+positive class weighting.
+
+The Streamlit application reads only persisted Sprint 4 artifacts and exposes four
+screens: **Executive Dashboard**, **Investigation Queue**, **Case Investigator**,
+and **Model Comparison**. It does not train or rescore models on page load. The
+end-to-end Sprint 4 pipeline completed in 49.928 seconds; independent artifact
+verification passed, and the quality suite passed 289 tests in 34.21 seconds plus
+a four-screen saved-artifact Streamlit smoke test, Ruff lint/format, and `pip
+check`. Final-test features, labels, graph construction, predictions, and metrics
+remain unopened.
+
 ## Repository map
 
 ```text
-configs/                    versioned quick/full/baseline/refinement settings
+configs/                    versioned quick/full/baseline/refinement/Sprint 4 settings
 data/README.md              source placement, provenance, and raw schema
 data/raw/                   local IBM files; ignored by Git
 docs/                       scope, dictionary, protocol, roadmap, decisions
 reports/existing_coursework preserved academic source documents
 reports/generated/          generated engineering status reports
-scripts/                    data-pipeline and baseline command entry points
-src/argus/                  reusable data, feature, and transaction-model code
-tests/                      automated data, leakage, feature, metric, and protocol checks
+scripts/                    data, model, GraphSAGE, verification, and quality entry points
+src/argus/                  reusable data, model, GNN, case, evidence, and app code
+tests/                      automated data, leakage, model, GNN, product, and UI checks
 artifacts/quick/             deterministic quick-run outputs; ignored by Git
 artifacts/full/              full-data outputs; ignored by Git
 artifacts/sprint2/           baseline outputs; ignored by Git except `.gitkeep`
 artifacts/sprint3/           refinement/ablation outputs; ignored by Git except `.gitkeep`
+artifacts/sprint4/           GraphSAGE/product outputs; ignored by Git except `.gitkeep`
+app.py                       saved-artifact Streamlit application entry point
 ```
 
 Raw/interim/processed data and generated artifacts are deliberately excluded by
@@ -304,7 +392,7 @@ Raw/interim/processed data and generated artifacts are deliberately excluded by
 ## Quick start
 
 The commands below reproduce the verified Sprint 1 data path, Sprint 2 baseline,
-and executable Sprint 3 refinement experiment.
+Sprint 3 refinement experiment, and Sprint 4 GraphSAGE/product pipeline.
 
 ### 1. Open the repository
 
@@ -331,15 +419,15 @@ Python 3.11–3.13 is supported by the package metadata.
 ```powershell
 py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install --upgrade pip
-.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+.\.venv\Scripts\python.exe -m pip install -e ".[graph,app,dev]"
 ```
 
 ### 4. Run quality checks and the deterministic pipelines
 
 ```powershell
 .\.venv\Scripts\pytest.exe -q
-.\.venv\Scripts\python.exe -m ruff check --no-cache src scripts tests
-.\.venv\Scripts\python.exe -m ruff format --no-cache --check src scripts tests
+.\.venv\Scripts\python.exe -m ruff check --no-cache src scripts tests app.py
+.\.venv\Scripts\python.exe -m ruff format --no-cache --check src scripts tests app.py
 .\.venv\Scripts\python.exe -m pip check
 .\.venv\Scripts\python.exe scripts/run_quick_pipeline.py
 .\.venv\Scripts\python.exe scripts/verify_run.py
@@ -350,6 +438,11 @@ py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe scripts/train_refined_models.py --config configs/refinement.yaml
 .\.venv\Scripts\python.exe scripts/verify_refinement.py --config configs/refinement.yaml
 .\.venv\Scripts\python.exe scripts/validate_sprint3.py --config configs/refinement.yaml
+.\.venv\Scripts\python.exe scripts/train_graphsage_product.py --config configs/sprint4.yaml
+.\.venv\Scripts\python.exe scripts/verify_sprint4.py --config configs/sprint4.yaml
+.\.venv\Scripts\python.exe scripts/validate_sprint4.py --config configs/sprint4.yaml
+.\.venv\Scripts\python.exe scripts/smoke_streamlit_sprint4.py --artifact-root artifacts/sprint4/product
+.\.venv\Scripts\streamlit.exe run app.py
 ```
 
 Equivalent Make targets are:
@@ -373,14 +466,17 @@ data contract. `baseline.yaml` inherits that contract, freezes upstream hashes,
 and declares the train/validation-only model protocol. `refinement.yaml` inherits
 the frozen baseline contract and declares bounded candidate grids, three expanding-
 window temporal folds inside outer train, validation-only operating-point rules,
-and the same-model feature-family ablation. The full EDA manifest
+and the same-model feature-family ablation. `sprint4.yaml` freezes the Sprint 3
+references and declares deterministic graph sampling, train-only GraphSAGE message
+passing, full-validation edge scoring, saved case/evidence generation, and the
+final-test stop boundary. The full EDA manifest
 separately labels exact all-row tables and the deterministic sampled plot/NetworkX
 scope. A quick or sampled artifact must never be described as a full-population
 result.
 
 ## Generated experiment outputs
 
-The verified quick and full runs generated these core paths:
+The verified Sprint 1 through Sprint 4 runs generated these core paths:
 
 ```text
 artifacts/quick/run_manifest.json
@@ -435,6 +531,21 @@ artifacts/sprint3/saturation/sprint2_vs_refined.json
 artifacts/sprint3/threshold/analysis.json
 artifacts/sprint3/validation_predictions.parquet
 artifacts/sprint3/final_test_policy.json
+artifacts/sprint4/run_manifest.json
+artifacts/sprint4/verification_report.json
+artifacts/sprint4/quality_report.json
+artifacts/sprint4/final_test_policy.json
+artifacts/sprint4/sampling/sampling_disclosure.json
+artifacts/sprint4/model/graphsage.pt
+artifacts/sprint4/model/inference_node_embeddings.npy
+artifacts/sprint4/validation_predictions.parquet
+artifacts/sprint4/model_comparison.csv
+artifacts/sprint4/thresholds.json
+artifacts/sprint4/product/cases.json
+artifacts/sprint4/product/investigation_queue.csv
+artifacts/sprint4/product/tree_shap_explanations.json
+artifacts/sprint4/product/graphsage_explanations.json
+artifacts/sprint4/product/dashboard_summary.json
 ```
 
 `run_manifest.json` inventories and hashes 38 payloads; together with the manifest,
@@ -469,6 +580,16 @@ feature-family ablation. Independent verification passed, as did 207 tests, Ruff
 lint/format, and `pip check`. The complete runtime and metric ledger is
 [`SPRINT_3_STATUS.md`](reports/generated/SPRINT_3_STATUS.md).
 
+Sprint 4 artifacts are likewise executable outputs. The saved checkpoint,
+inference adjacency, node embeddings, full-validation score table, model
+comparison, threshold analysis, cases, explanations, and dashboard tables are
+hash-inventoried by `run_manifest.json`. `verification_report.json` rechecks the
+artifact inventory, frozen Sprint 3 reference hash, 761,749 validation identities,
+recomputed AP, model/embedding shapes, top-20 case identities, explanation schema,
+saved-artifact UI contract, and the final-test seal. The complete disclosure,
+runtime, metrics, and 19-gate acceptance ledger is
+[`SPRINT_4_STATUS.md`](reports/generated/SPRINT_4_STATUS.md).
+
 ## Experiment rules
 
 - Split chronologically; do not use a shuffled row split as the primary protocol.
@@ -487,6 +608,20 @@ lint/format, and `pip check`. The complete runtime and metric ledger is
   configured alert-budget/FPR-recall rule; never use test feedback.
 - Measure graph value with the same selected LightGBM configuration across
   transaction-only (A), transaction + temporal/history (B), and B + graph (C).
+- Keep the GraphSAGE target at transaction/edge level. Do not infer or synthesize
+  an account-level fraud label from transaction labels.
+- Build GraphSAGE message graphs only from eligible outer-train history. If graph
+  training is sampled for resource safety, select context without target labels,
+  disclose the exact numerator/denominator, and never call it a full-graph run.
+- Compare GraphSAGE with frozen references on every outer-validation row before
+  opening the final test; do not use validation edges for message passing.
+- Build analyst cases only from saved model and graph outputs. Keep observed facts
+  separate from model explanations, require at least three observed evidence items,
+  and provide a deterministic narrative when no LLM is configured.
+- Treat TreeSHAP contribution values and GNN sensitivity as model diagnostics, not
+  causal explanations or evidence of guilt. Do not call gradient sensitivity SHAP.
+- Keep Streamlit inference-free on page load: screens consume saved, verified
+  artifacts and must not fit, tune, or rescore models.
 - Use composite `normalized_bank_id::account_id` node identities.
 - Preserve edge direction and repeated transfers.
 - Treat PR-AUC, Recall@K, Precision@K, F1, FPR, and alert volume as core metrics;
@@ -522,20 +657,31 @@ weighting as upstream causes in the Sprint 2 estimators.
 Full-population NetworkX component/local-subgraph materialization remains
 intentionally excluded for bounded memory: those visual analyses use the clearly
 labeled deterministic sample above. No sampled graph statistic is a full-population
-estimate. No final-test result is claimed. The Sprint 3 graph-value conclusion
-applies only to the controlled tabular feature ablation; Sprint 4/GraphSAGE remains
-outside the implemented scope and was not started.
+estimate. Full-graph GraphSAGE training was also not attempted on the available
+16 GB RAM / 4 GB GPU workstation. Its context and supervised training data are
+deterministically sampled and explicitly disclosed; only validation scoring is
+full. The observed GNN underperformance may depend on this sampling design,
+training budget, architecture, and synthetic-data topology, so it is neither proof
+that GNNs generally fail nor a reason to reinterpret the stronger tabular result.
+
+The case builder prioritizes review; it does not establish guilt. TreeSHAP values
+describe the fitted LightGBM score locally, and GraphSAGE gradient-times-input
+sensitivity describes local model response. Neither is causal evidence. The
+deterministic narrative fallback summarizes only saved evidence and should be
+reviewed against source transactions by a trained analyst. No final-test result is
+claimed, and Sprint 4 stopped before final evaluation as required.
 
 ## Documentation
 
 - [`PROJECT_SPEC.md`](docs/PROJECT_SPEC.md): canonical scope and system contract
 - [`DATA_DICTIONARY.md`](docs/DATA_DICTIONARY.md): raw, canonical, and engineered fields
 - [`EXPERIMENT_PROTOCOL.md`](docs/EXPERIMENT_PROTOCOL.md): leakage-safe evaluation rules
-- [`ROADMAP.md`](docs/ROADMAP.md): completed Sprint 1/2/3 gates and later boundaries
+- [`ROADMAP.md`](docs/ROADMAP.md): completed Sprint 1/2/3/4 gates and later boundaries
 - [`DECISIONS.md`](docs/DECISIONS.md): architecture decision log
 - [`SPRINT_1_STATUS.md`](reports/generated/SPRINT_1_STATUS.md): evidence-backed status
 - [`SPRINT_2_STATUS.md`](reports/generated/SPRINT_2_STATUS.md): generated baseline evidence
 - [`SPRINT_3_STATUS.md`](reports/generated/SPRINT_3_STATUS.md): generated Sprint 3 evidence and acceptance ledger
+- [`SPRINT_4_STATUS.md`](reports/generated/SPRINT_4_STATUS.md): generated GraphSAGE/product evidence and acceptance ledger
 
 The original proposal, presentation, reports, templates, and master prompt are
 preserved unchanged in `reports/existing_coursework/`.

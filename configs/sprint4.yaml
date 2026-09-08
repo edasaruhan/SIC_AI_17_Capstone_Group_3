@@ -1,0 +1,133 @@
+extends: refinement.yaml
+
+project:
+  mode: sprint4_graphsage_product
+  random_seed: 42
+
+paths:
+  run_dir: artifacts/sprint4
+  generated_report: reports/generated/SPRINT_4_STATUS.md
+  sprint3_run_dir: artifacts/sprint3
+  streamlit_app: app.py
+
+sprint4:
+  protocol_version: 1
+  experiment_scope: deterministic_sampled_graphsage_training_full_validation_evaluation
+  final_test_access: false
+  final_test_policy: metadata_only_no_transform_no_inference
+  selection_partition: validation
+  selection_metric: average_precision
+  ranking_score_type: raw_logit
+  ranking_tie_break: source_row_number_ascending
+  top_k: [100, 500, 1000]
+  batch_rows: 100000
+  memory_limit: 4GB
+  max_temp_directory_size: 100GB
+  threads: 1
+  torch_threads: 4
+  parquet_compression: zstd
+
+  frozen_references:
+    sprint3_commit: 4be0c9a49a7e447aca80126c14f1fecc0a568755
+    sprint3_manifest_sha256: 895f1352558cb024e157918c489214226f0901bdf440210f2d9ddf46934ace0e
+    refined_baseline_model: lightgbm
+    refined_baseline_average_precision: 0.35535042120390775
+    graph_enhanced_model: ablation_transaction_temporal_history_graph
+    graph_enhanced_average_precision: 0.47175419936926843
+    validation_rows: 761749
+    validation_positives: 760
+
+  graph_sampling:
+    method: md5_order_without_replacement
+    label_agnostic_context_sampling: true
+    directed: true
+    repeated_edges_preserved_as_message_weight: true
+    training_context_end: "2022-09-02T09:27:00"
+    training_context_population_rows: 1422288
+    training_context_max_edges: 150000
+    inference_context_partition: train
+    inference_context_population_rows: 3554957
+    inference_context_max_edges: 300000
+    full_graph_training_attempted: false
+    full_graph_training_exclusion_reason: >-
+      The workstation has 16 GB physical RAM with approximately 4.6 GB available and a
+      4 GB GPU. Full-gradient GraphSAGE over 3,554,957 training edges and more than
+      500,000 train nodes would not be a defensible bounded-memory execution. The run
+      therefore uses predeclared deterministic context-edge subsets and reports their
+      exact coverage; outer validation scoring remains full-population.
+
+  supervised_training:
+    partition: train
+    strictly_after_training_context: true
+    population_rows: 2132669
+    include_all_positives: true
+    maximum_negative_rows: 50000
+    negative_sampling_method: md5_order_without_replacement
+    transaction_feature_family: transaction_temporal_history
+    preprocessing_state_scope: sprint3_outer_train_frozen
+
+  node_features:
+    structural_features:
+      - log1p_in_degree
+      - log1p_out_degree
+    deterministic_identity_features:
+      - bank_hash_sin
+      - bank_hash_cos
+      - account_hash_sin
+      - account_hash_cos
+    normalization_fit_scope: sampled_training_context_nodes_only
+    amount_aggregation_policy: excluded_without_fx_rates_to_avoid_cross_currency_sums
+
+  model:
+    architecture: directed_graphsage_edge_classifier
+    node_hidden_dim: 24
+    node_embedding_dim: 16
+    edge_hidden_dim: 48
+    dropout: 0.10
+    epochs: 20
+    learning_rate: 0.003
+    weight_decay: 0.0001
+    positive_weight_policy: sqrt_sample_negative_to_positive_ratio
+    device: cpu
+    deterministic_algorithms: true
+    unsupported_node_label_created: false
+
+  threshold_optimization:
+    partition: validation
+    score_type: raw_logit
+    primary_rule: maximize_recall_subject_to_joint_constraints
+    alert_budget: 5000
+    fpr_ceiling: 0.01
+    tie_policy: include_complete_equal_score_group
+
+  case_builder:
+    model_score: graphsage_uncalibrated_sigmoid_score
+    maximum_cases: 20
+    neighborhood_hops: 1
+    maximum_display_edges: 200
+    minimum_observed_evidence: 3
+    include_only_seed_time_or_earlier: true
+    seed_ranking_tie_break: source_row_number_ascending
+
+  explanations:
+    tree_method: lightgbm_native_pred_contrib_treeshap
+    tree_top_features_per_case: 8
+    gnn_method: local_gradient_x_input_sensitivity
+    gnn_claim_scope: sensitivity_not_shap
+    fabricated_scores_allowed: false
+
+  llm:
+    enabled: false
+    input_contract: structured_evidence_only
+    fallback: deterministic_template
+    human_review_required: true
+
+  application:
+    artifact_only: true
+    train_on_page_load: false
+    required_screens:
+      - Investigation Queue
+      - Case Investigator
+      - Model Comparison
+    optional_screen:
+      - Executive Dashboard

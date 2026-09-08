@@ -1,10 +1,11 @@
 # ARGUS AI Roadmap
 
-**Completed checkpoint:** Sprint 1, Sprint 2, and Sprint 3
+**Completed checkpoint:** Sprint 1 through Sprint 4
 **Overall Sprint 1 status:** `PASS` — 14/14 acceptance criteria  
 **Sprint 2 status:** `PASS` — three baselines and validation-only champion verified
 **Sprint 3 status:** `PASS` — 15/15 acceptance gates and 207 tests passed
-**Current stop boundary:** Sprint 3 complete; Sprint 4/GraphSAGE not started
+**Sprint 4 status:** `PASS` — 19/19 acceptance gates and 289 tests passed
+**Current stop boundary:** Sprint 4 complete; final-test evaluation not opened
 
 ## Sprint 1 — Repository Foundation + Data Proof
 
@@ -159,12 +160,63 @@ Reproduction commands:
 .\.venv\Scripts\python.exe scripts/validate_sprint3.py --config configs/refinement.yaml
 ```
 
-## Sprint 4 and later — Not started
+## Sprint 4 — GraphSAGE + Product Layer
 
-GraphSAGE/GNN modeling, case/evidence cards, explainability, Streamlit, and final-
-test opening remain outside Sprint 3. The project must stop before those phases;
-the tabular graph-feature ablation is not GraphSAGE and must not be described as a
-GNN result.
+Sprint 4 completed from `configs/sprint4.yaml` while preserving the two Sprint 3
+LightGBM score vectors as immutable references. GraphSAGE predicts the supplied
+transaction/edge label; no unsupported account-level fraud label was created.
+Resource limits made a full-graph training run unsuitable, so the run explicitly
+uses deterministic sampled training graphs and evaluates the saved GNN on all
+761,749 frozen outer-validation transactions. It is not represented as full-graph
+GraphSAGE training.
+
+| Gate | Executed evidence | Status |
+| --- | --- | --- |
+| Frozen references | Sprint 3 commit, manifest hash, rows, and scores verified | PASS |
+| Transaction target | Edge classifier; no derived account fraud label | PASS |
+| Deterministic bounded training | 150,000 context edges; 52,396 supervised edges | PASS |
+| Leakage-safe inference graph | 300,000 sampled outer-train edges; no validation/test message edge | PASS |
+| Fair validation comparison | Same 761,749 validation rows and operating rule for all three arms | PASS |
+| Full-validation scoring | GraphSAGE logits saved for every validation transaction | PASS |
+| Cases and evidence | 20 real cases; minimum seven observed evidence items per case | PASS |
+| Explanation | LightGBM TreeSHAP additivity; GNN gradient×input labeled as sensitivity | PASS |
+| No-LLM operation | Deterministic evidence-to-note fallback completed for all cases | PASS |
+| Product layer | Four saved-artifact-only Streamlit screens | PASS |
+| Final-test gate | No fit, graph, transform, inference, tuning, or metric on test | PASS |
+| Quality | Independent verification, 289 tests, Streamlit smoke, Ruff, and `pip check` | PASS |
+
+Validation AP was 0.47175420 for graph-enhanced LightGBM, 0.35535042 for the
+refined transaction LightGBM, and 0.00943876 for the GraphSAGE edge classifier.
+The sampled GraphSAGE experiment therefore does not establish added value over
+either frozen reference. At the shared validation-only operating rule it produced
+4,953 alerts, 0.00969110 precision, 0.06315789 recall, 0.01680378 F1, and
+0.00644556 FPR. The complete run took 49.928 seconds.
+
+The product export contains 20 cases derived from real saved validation scores and
+graph data. Observed facts and model attributions are separate. Streamlit exposes
+Executive Dashboard, Investigation Queue, Case Investigator, and Model Comparison
+screens and performs no training on page load. See
+[`SPRINT_4_STATUS.md`](../reports/generated/SPRINT_4_STATUS.md) for the generated
+ledger.
+
+Node structure uses directed degrees rather than monetary totals, avoiding invalid
+cross-currency aggregation when no FX source is available. GraphSAGE sigmoid values
+are labeled uncalibrated ranking scores; raw logits determine ordering.
+
+Reproduction commands:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/train_graphsage_product.py --config configs/sprint4.yaml
+.\.venv\Scripts\python.exe scripts/verify_sprint4.py --config configs/sprint4.yaml
+.\.venv\Scripts\python.exe scripts/validate_sprint4.py --config configs/sprint4.yaml
+.\.venv\Scripts\streamlit.exe run app.py
+```
+
+## Sprint 5 and final evaluation — Not started
+
+The final-test partition remains sealed. Sprint 4 validation comparisons, sampled-
+graph design choices, case presentation, or thresholds must not be revised using
+future final-test feedback.
 
 ## Stop conditions
 
