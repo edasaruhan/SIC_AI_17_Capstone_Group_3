@@ -28,9 +28,7 @@ Sistem otomatik yaptırım uygulamaz. Üretilen skorlar yalnızca inceleme önce
 4. Transaction LightGBM, graph-enhanced LightGBM ve GraphSAGE aynı kronolojik
    protokolde karşılaştırılır.
 5. Graph-enhanced LightGBM birincil sıralama modeli olarak kullanılır.
-6. Mevcut kayıtlı vaka örnekleri GraphSAGE araştırma karşılaştırmasına ait artifact
-   setinden alınır.
-7. Vaka ekranı gözlenen kanıtı model açıklamasından ayrı gösterir.
+6. Vaka ekranı gözlenen kanıtı model açıklamasından ayrı gösterir.
 
 ## Veri
 
