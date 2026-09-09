@@ -25,10 +25,10 @@ def main() -> int:
     os.environ["ARGUS_SPRINT4_ARTIFACT_DIR"] = str(artifact_root)
 
     pages = (
-        "Executive Dashboard",
-        "Investigation Queue",
+        "Overview",
+        "Investigations",
         "Case Investigator",
-        "Model Comparison",
+        "Model Evidence",
     )
     app = AppTest.from_file(str(project_root / "app.py")).run(timeout=30)
     rendered: list[str] = []

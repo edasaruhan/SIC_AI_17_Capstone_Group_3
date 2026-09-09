@@ -35,24 +35,6 @@ def _model_label(name: str) -> str:
     }.get(name, name)
 
 
-def _model_label_tr(name: str) -> str:
-    return {
-        "graph_enhanced_lightgbm": "Graf özellikli LightGBM",
-        "refined_transaction_lightgbm": "İyileştirilmiş işlem LightGBM",
-        "graphsage_edge_classifier": "GraphSAGE işlem sınıflandırıcısı",
-    }.get(name, name)
-
-
-def _metric_tr(value: object, *, digits: int = 6) -> str:
-    if value is None:
-        return "Yok"
-    return f"{float(value):.{digits}f}".replace(".", ",")
-
-
-def _integer_tr(value: object) -> str:
-    return f"{int(value):,}".replace(",", ".")
-
-
 def _top_k_lookup(rows: Sequence[Mapping[str, Any]]) -> dict[tuple[str, int], Mapping[str, Any]]:
     result: dict[tuple[str, int], Mapping[str, Any]] = {}
     for row in rows:
@@ -180,97 +162,6 @@ def render_final_comparison_markdown(
     return "\n".join(lines)
 
 
-def render_final_readme_summary_markdown(
-    comparison: Sequence[Mapping[str, Any]],
-    top_k_rows: Sequence[Mapping[str, Any]],
-    prevalence_shift: Mapping[str, Any],
-    *,
-    quality: Mapping[str, Any] | None = None,
-) -> str:
-    """Render the concise Turkish final-evaluation block used by the public README."""
-
-    # Reuse the complete artifact-contract validation from the detailed report renderer.
-    render_final_comparison_markdown(comparison, top_k_rows, prevalence_shift)
-    by_name = {str(row["model"]): row for row in comparison}
-    ordered_names = (
-        "graph_enhanced_lightgbm",
-        "refined_transaction_lightgbm",
-        "graphsage_edge_classifier",
-    )
-    top_k = _top_k_lookup(top_k_rows)
-    lines = [
-        "### Final bilimsel değerlendirme",
-        "",
-        "Final model, test kümesi açılmadan önce doğrulama (validation) PR-AUC sonucuna göre",
-        "**graf özellikli LightGBM** olarak donduruldu. Test sonuçlarından sonra model,",
-        "özellik kümesi, hiperparametre veya karar eşiği değiştirilmedi.",
-        "",
-        "| Rol | Model | PR-AUC | ROC-AUC | Precision | Recall | F1 | FPR | Alarm |",
-        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
-    ]
-    for name in ordered_names:
-        row = by_name[name]
-        role = "Donmuş final model" if row["role"] == "frozen_champion" else "Karşılaştırma"
-        ap = _metric_tr(row["average_precision"])
-        if row["role"] == "frozen_champion":
-            ap = f"**{ap}**"
-        lines.append(
-            "| {role} | {model} | {ap} | {roc} | {precision} | {recall} | {f1} | "
-            "{fpr} | {alerts} |".format(
-                role=role,
-                model=_model_label_tr(name),
-                ap=ap,
-                roc=_metric_tr(row["roc_auc"]),
-                precision=_metric_tr(row["precision"]),
-                recall=_metric_tr(row["recall"]),
-                f1=_metric_tr(row["f1"]),
-                fpr=_metric_tr(row["false_positive_rate"]),
-                alerts=_integer_tr(row["alert_count"]),
-            )
-        )
-    lines.extend(
-        [
-            "",
-            "Donmuş final modelin operasyonel sıralama sonuçları:",
-            "",
-            "| K | Precision@K | Recall@K | Doğru pozitif |",
-            "| ---: | ---: | ---: | ---: |",
-        ]
-    )
-    for k in (100, 500, 1000):
-        item = top_k[("graph_enhanced_lightgbm", k)]
-        lines.append(
-            f"| {_integer_tr(k)} | {_metric_tr(item['precision_at_k'])} | "
-            f"{_metric_tr(item['recall_at_k'])} | {_integer_tr(item['true_positives'])} |"
-        )
-    validation = prevalence_shift["validation"]
-    test = prevalence_shift["test"]
-    ratio = float(prevalence_shift["test_to_validation_positive_rate_ratio"])
-    lines.extend(
-        [
-            "",
-            "Doğrulama (validation) kümesindeki pozitif oranı "
-            f"`%{_metric_tr(100 * float(validation['positive_rate']))}`, final testte ise",
-            f"`%{_metric_tr(100 * float(test['positive_rate']))}` olarak ölçüldü. Yaklaşık "
-            f"`{_metric_tr(ratio, digits=2)}×` prevalans artışı nedeniyle precision ve",
-            "kesinlik (precision) ve alarm hacmi iki dönem arasında karşılaştırılırken",
-            "dikkatli yorumlanmalıdır.",
-        ]
-    )
-    if quality:
-        lines.extend(
-            [
-                "",
-                "Kalite doğrulaması: "
-                f"**{quality.get('status', 'BİLİNMİYOR')}** · "
-                f"{quality.get('pytest_passed', 'BİLİNMİYOR')} test · kayıtlı çıktı "
-                f"doğrulaması {quality.get('artifact_verification_status', 'BİLİNMİYOR')}.",
-            ]
-        )
-    lines.append("")
-    return "\n".join(lines)
-
-
 def _replace_block(text: str, start: str, end: str, block: str, *, after: str) -> str:
     payload = f"{start}\n{block.rstrip()}\n{end}"
     pattern = re.compile(re.escape(start) + r".*?" + re.escape(end), flags=re.DOTALL)
@@ -326,11 +217,15 @@ def publish_final_documentation(
     comparison_path = project_root / "reports" / "generated" / "FINAL_MODEL_COMPARISON.md"
     _atomic_markdown(comparison_path, generated)
 
-    readme_block = render_final_readme_summary_markdown(
+    readme_table = render_final_comparison_markdown(
         comparison,
         top_k_rows,
         shift,
         quality=quality,
+        artifact_prefix="artifacts/sprint5",
+    )
+    readme_block = "## Sprint 5 one-shot final evaluation\n\n" + "\n".join(
+        readme_table.splitlines()[4:]
     )
     readme_path = project_root / "README.md"
     readme = readme_path.read_text(encoding="utf-8")
@@ -339,7 +234,7 @@ def publish_final_documentation(
         _README_START,
         _README_END,
         readme_block,
-        after="## Güncel durum",
+        after="## Current status",
     )
     _atomic_markdown(readme_path, readme)
 
@@ -380,5 +275,4 @@ __all__ = [
     "FinalDocumentationError",
     "publish_final_documentation",
     "render_final_comparison_markdown",
-    "render_final_readme_summary_markdown",
 ]

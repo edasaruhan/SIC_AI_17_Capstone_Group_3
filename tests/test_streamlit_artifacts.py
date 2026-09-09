@@ -144,7 +144,7 @@ def test_missing_artifacts_report_expected_paths(tmp_path: Path) -> None:
 
 
 def test_nonexistent_root_explains_offline_pipeline_requirement(tmp_path: Path) -> None:
-    with pytest.raises(ArtifactLoadError, match="offline Sprint 4 artifact pipeline"):
+    with pytest.raises(ArtifactLoadError, match="offline product artifact pipeline"):
         load_dashboard_artifacts(tmp_path / "absent")
 
 
@@ -159,7 +159,7 @@ def test_queue_may_not_reference_an_absent_case(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize(
     ("partition", "test_metrics_used", "expected"),
-    [("test", False, "contains test metrics"), ("validation", True, "test_metrics_used=true")],
+    [("test", False, "final-test metrics"), ("validation", True, "test_metrics_used=true")],
 )
 def test_sprint4_loader_rejects_opened_test_metrics(
     tmp_path: Path, partition: str, test_metrics_used: bool, expected: str

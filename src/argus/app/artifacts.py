@@ -1,8 +1,8 @@
-"""Load and validate saved Sprint 4 and Sprint 5 product artifacts.
+"""Load and validate saved validation and final-evaluation product artifacts.
 
 The application deliberately has no model-training dependency. It accepts either a
-single Sprint 4 ``dashboard_bundle.json`` or the documented collection of product files.
-Sprint 5 final-test evidence is loaded into a separate object so it cannot influence the
+single ``dashboard_bundle.json`` or the documented collection of product files.
+Final-test evidence is loaded into a separate object so it cannot influence the
 validation-leader or investigation-queue logic.
 """
 
@@ -40,7 +40,7 @@ class DashboardArtifacts:
 
 @dataclass(frozen=True)
 class FinalEvaluationArtifacts:
-    """Strictly validated, presentation-only Sprint 5 final-test artifacts."""
+    """Strictly validated, presentation-only final-test artifacts."""
 
     summary: dict[str, Any]
     model_comparison: pd.DataFrame
@@ -270,17 +270,14 @@ def _normalise_comparison(frame: pd.DataFrame) -> pd.DataFrame:
         partitions = set(comparison["evaluation_partition"].dropna().astype(str).str.lower())
         if "test" in partitions:
             raise ArtifactLoadError(
-                "Model comparison contains test metrics; Sprint 4 dashboard must remain "
-                "validation-only."
+                "Validation model comparison cannot contain final-test metrics."
             )
     if "test_metrics_used" in comparison:
         opened = comparison["test_metrics_used"].map(
             lambda value: value is True or str(value).strip().lower() == "true"
         )
         if opened.any():
-            raise ArtifactLoadError(
-                "Model comparison reports test_metrics_used=true; final test must remain unopened."
-            )
+            raise ArtifactLoadError("Validation model comparison reports test_metrics_used=true.")
     return comparison
 
 
@@ -858,12 +855,12 @@ def _resolve_validation_root(root: Path) -> Path:
             return candidate
 
     if not any((root / relative).is_file() for relative in _FINAL_PATHS.values()):
-        # Preserve the detailed Sprint 4 missing-artifact diagnostics for a legacy root.
+        # Preserve detailed missing-artifact diagnostics for a direct validation root.
         return root
 
     expected = ", ".join(str(root / name) for name in _VALIDATION_REFERENCE_CANDIDATES)
     raise ArtifactLoadError(
-        "Sprint 5 artifacts do not include the validation-derived Sprint 4 product payload. "
+        "Final-evaluation artifacts do not include the validation product payload. "
         f"Provide a copied payload or a configured reference at one of: {expected}"
     )
 
@@ -910,7 +907,7 @@ def load_dashboard_artifacts(root: str | Path) -> DashboardArtifacts:
     if not presentation_root.is_dir():
         raise ArtifactLoadError(
             f"Dashboard artifact directory does not exist: {presentation_root}. "
-            "Run the offline Sprint 4 artifact pipeline before starting Streamlit."
+            "Run the offline product artifact pipeline before starting Streamlit."
         )
     artifact_root = _resolve_validation_root(presentation_root)
 
@@ -1014,7 +1011,7 @@ def load_dashboard_artifacts(root: str | Path) -> DashboardArtifacts:
         provenance["summary"] = str(summary_path)
     if summary_value.get("final_test_opened") is True:
         raise ArtifactLoadError(
-            "Dashboard summary says final_test_opened=true; Sprint 4 must be validation-only."
+            "Validation dashboard summary cannot report final_test_opened=true."
         )
     summary = _derive_summary(summary_value, queue, comparison)
     final_evaluation = _load_final_evaluation(presentation_root)

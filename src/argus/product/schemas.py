@@ -326,7 +326,7 @@ class EvidenceBundle:
     observed_evidence: tuple[ObservedEvidenceFact, ...]
     model_evidence: ModelEvidence
     limitations: tuple[str, ...] = (
-        "The supplied neighborhood may be a bounded view rather than the complete network.",
+        "The saved case network may be a bounded view rather than the complete network.",
         "Model scores and feature attributions are associational, not causal.",
     )
     schema_version: str = field(default=SCHEMA_VERSION, init=False)

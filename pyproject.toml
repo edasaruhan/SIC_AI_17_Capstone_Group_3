@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "argus-ai"
 version = "0.1.0"
-description = "Finansal suç incelemeleri için veri sızıntısını önleyen işlem ve hesap ağı araştırma prototipi."
+description = "Leakage-safe transaction and account-network research prototype for financial-crime investigation."
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
 license = {text = "MIT"}
@@ -42,9 +42,6 @@ dev = [
 where = ["src"]
 
 [tool.pytest.ini_options]
-# pytest's cache finalizer can block indefinitely in this OneDrive-backed
-# workspace. Disabling that non-essential plugin keeps the plain `pytest`
-# command deterministic; test execution and reporting are unchanged.
 addopts = "-ra -p no:cacheprovider"
 testpaths = ["tests"]
 

@@ -1,325 +1,249 @@
-# Model Card — Sprint 2–4 Validation Evidence
+# Model Card — Graph-Enhanced LightGBM
 
-## Current state
+## Model summary
 
-<!-- ARGUS_FINAL_MODEL_CARD_START -->
-## One-shot final-test evidence
+| Field | Value |
+| --- | --- |
+| Model key | `graph_enhanced_lightgbm` |
+| Role | Frozen primary transaction-ranking model |
+| Model family | LightGBM gradient-boosted decision trees |
+| Prediction unit | Directed financial transaction/edge |
+| Primary metric | PR-AUC / average precision |
+| Selection partition | Chronological validation partition |
+| Final evaluation | One-shot chronological test partition |
+| Scientific reference | `v1.0-scientific-final` (`ce182474cd8ee36bcab2449a61347eb9803451ae`) |
 
-| Role | Frozen model | PR-AUC (AP) | ROC-AUC | Precision | Recall | F1 | FPR | Alerts |
-| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Frozen champion | Graph-enhanced LightGBM | 0.69005906 | 0.99127213 | 0.17816018 | 0.88212684 | 0.29644779 | 0.00835704 | 7,729 |
-| Comparator | GraphSAGE edge classifier | 0.01341710 | 0.82662724 | 0.00600590 | 0.11338885 | 0.01140758 | 0.03854078 | 29,471 |
-| Comparator | Refined transaction LightGBM | 0.53079643 | 0.98731443 | 0.16072332 | 0.81422165 | 0.26845496 | 0.00873200 | 7,908 |
-
-## Operational Top-K metrics
-
-| Model | K | Precision@K | Recall@K | True positives |
-| --- | ---: | ---: | ---: | ---: |
-| Graph-enhanced LightGBM | 100 | 0.98000000 | 0.06278027 | 98 |
-| Graph-enhanced LightGBM | 500 | 0.96800000 | 0.31005766 | 484 |
-| Graph-enhanced LightGBM | 1,000 | 0.83900000 | 0.53747598 | 839 |
-| GraphSAGE edge classifier | 100 | 0.18000000 | 0.01153107 | 18 |
-| GraphSAGE edge classifier | 500 | 0.08200000 | 0.02626521 | 41 |
-| GraphSAGE edge classifier | 1,000 | 0.06000000 | 0.03843690 | 60 |
-| Refined transaction LightGBM | 100 | 0.92000000 | 0.05893658 | 92 |
-| Refined transaction LightGBM | 500 | 0.86200000 | 0.27610506 | 431 |
-| Refined transaction LightGBM | 1,000 | 0.66600000 | 0.42664958 | 666 |
-
-## Prevalence shift
-
-- Validation: 760 / 761,749 (0.00099770).
-- Final test: 1,561 / 761,639 (0.00204953).
-- Test/validation positive-rate ratio: 2.05424401.
-- Interpretation: Precision and fixed-threshold alert volume are prevalence-sensitive; the observed chronological shift was reported without resampling or threshold changes.
-
-## Frozen protocol statement
-
-`graph_enhanced_lightgbm` was selected by validation PR-AUC and frozen before final-test access. Test results did not change the model, feature family, hyperparameters, or validation-selected threshold. No post-test tuning or retraining was performed.
-
-## Machine-readable evidence
-
-- [Final metrics](../artifacts/sprint5/final_metrics.json)
-- [Final comparison](../artifacts/sprint5/final_model_comparison.json)
-- [Final Top-K metrics](../artifacts/sprint5/final_top_k_metrics.json)
-- [Saved final predictions](../artifacts/sprint5/final_test_predictions.parquet)
-- [Prevalence analysis](../artifacts/sprint5/prevalence_shift.json)
-- [Test identity/leakage audit](../artifacts/sprint5/test_identity_audit.json)
-- [Immutable run manifest](../artifacts/sprint5/run_manifest.json)
-- [Read-only verification](../artifacts/sprint5/verification_report.json)
-- [Quality report](../artifacts/sprint5/quality_report.json)
-- [Streamlit: Executive Dashboard](../artifacts/sprint5/screenshots/executive_dashboard.png)
-- [Streamlit: Investigation Queue](../artifacts/sprint5/screenshots/investigation_queue.png)
-- [Streamlit: Case Investigator](../artifacts/sprint5/screenshots/case_investigator.png)
-- [Streamlit: Model Comparison](../artifacts/sprint5/screenshots/model_comparison.png)
-
-## Final quality
-
-- Status: **PASS**
-- Pytest: 377 passed
-- Saved-artifact verification: PASS
-<!-- ARGUS_FINAL_MODEL_CARD_END -->
-
-Sprint 2 trained three transaction-level baselines on the frozen Sprint 1
-chronological protocol. Random Forest remains the **Transaction Baseline Champion**
-for that immutable snapshot. Sprint 3 completed temporal refinement and selected
-LightGBM as the **Refined Transaction Baseline Champion** at validation AP
-0.35535042. The controlled LightGBM graph-enhanced C arm reached validation AP
-0.47175420, +0.11640378 over the same-model B arm. Sprint 4 then evaluated a
-transaction-edge GraphSAGE classifier at validation AP 0.00943876 on the same full
-761,749-row validation partition. It did not outperform either frozen LightGBM
-reference.
-
-All 19 Sprint 4 acceptance gates, artifact verification, and 289 tests passed.
-These are experiment results on synthetic data, not production model approval.
-Sprint 5 subsequently consumed the frozen final test exactly once. The
-graph-enhanced LightGBM specification had already been selected on validation and
-remained unchanged; saved predictions were independently re-evaluated and no
-post-test tuning or retraining occurred.
+ARGUS ranks transactions for analyst investigation by combining transaction fields,
+strictly prior temporal/account history, and directed graph-history features. The
+graph-enhanced LightGBM model is the primary model because it achieved the highest
+validation PR-AUC under the frozen comparison protocol. The sampled GraphSAGE
+edge classifier is retained only as a research comparator.
 
 ## Intended use
 
-The models rank transactions as candidates for trained human review. The
-transaction-only model provides a reference for controlled graph-value experiments;
-the product layer turns saved scores and graph facts into reviewable cases. A score
-means elevated investigation priority under the experimental protocol. It is not
-proof of laundering, guilt, or a basis for automatic blocking, freezing, reporting,
-or another adverse action.
+- prioritize suspicious transactions and connected account activity for trained
+  financial-crime analysts;
+- compare transaction-only, temporal/history, and graph-enhanced feature families;
+- support case investigation with observed transaction/network facts and model
+  contribution evidence;
+- reproduce a leakage-safe experiment on the synthetic IBM AML HI-Small dataset.
 
-## Data and evaluation protocol
+The model is not designed to establish guilt, identify a person as a money
+launderer, or trigger automatic blocking, freezing, regulatory reporting, or
+another adverse action. Every flagged case requires source-record checks and human
+analysis.
 
-The source is the synthetic IBM AML-Data HI-Small dataset. Sprint 2 consumes the
-unsampled 5,078,345-row Sprint 1 feature Parquet and its frozen timestamp-group-
-preserving split.
+## Data
 
-| Partition | Rows | Positives | Positive rate | Sprint 2 use |
-| --- | ---: | ---: | ---: | --- |
-| Train | 3,554,957 | 2,856 | 0.080338524% | Preprocessing fit and model fit |
-| Validation | 761,749 | 760 | 0.099770397% | Transform, metrics, and champion selection |
-| Test | 761,639 | 1,561 | 0.204952740% | Metadata only; no model access |
+The study uses the synthetic IBM AML-Data HI-Small dataset: 5,078,345 transactions,
+518,581 account records, and 5,177 positive transaction labels. The target is
+transaction-level; no account-level fraud label is inferred.
 
-Validation prevalence is 1.2418748968 times train prevalence; test prevalence is
-2.0542440105 times validation prevalence. Precision and fixed-threshold alert
-volume are prevalence-sensitive, so validation values must not be assumed to
-transfer unchanged to the later test period. The partitions were not shuffled,
-resampled, or rebalanced to equalize these rates.
+| Partition | Time range | Rows | Positives | Positive rate | Role |
+| --- | --- | ---: | ---: | ---: | --- |
+| Train | 2022-09-01 00:00 – 2022-09-07 14:55 | 3,554,957 | 2,856 | 0.0803385% | Preprocessing and model fit |
+| Validation | 2022-09-07 14:56 – 2022-09-09 03:16 | 761,749 | 760 | 0.0997704% | Model and threshold selection |
+| Test | 2022-09-09 03:17 – 2022-09-18 16:18 | 761,639 | 1,561 | 0.2049527% | One-shot confirmatory evaluation |
 
-## Predictor and preprocessing contract
+Partitions are chronological, timestamp groups remain intact, and the rates are
+not rebalanced. Test prevalence is 2.05424401 times validation prevalence.
+Precision and fixed-threshold alert volume are therefore interpreted alongside
+this temporal shift.
 
-All three models use the same 74 transformed predictors:
+## Inputs and preprocessing
 
-- 31 transaction, time, and strictly-prior account-history numeric fields;
-- four explicit missing-value indicators;
-- train-vocabulary one-hot encodings for payment currency, receiving currency, and
-  payment format;
-- train-frequency encodings for sender and receiver bank.
+The primary model receives 79 transformed predictors:
 
-Numeric medians, means, population standard deviations, category vocabularies, and
-bank frequencies were fit from training rows only. Validation uses transform-only
-state. Unknown low-cardinality values map to an all-zero one-hot block; unknown
-banks map to frequency zero.
+- current transaction amount, currency, payment-format, and bank-relationship
+  fields;
+- calendar and elapsed-time fields;
+- strictly prior sender and receiver activity, amount, counterparty, and rolling
+  window history;
+- five directed graph-history fields: sender prior fan-out/fan-in, receiver prior
+  fan-out/fan-in, and prior repeated-pair transfer count;
+- explicit missing-value indicators and train-fitted categorical/bank encodings.
 
-The target, partition, transaction/source identity, raw timestamp, and account/node
-IDs are always excluded. All five directed graph-history fields are excluded from
-the Sprint 2 and Sprint 3 A/B transaction-reference arms. Sprint 3 adds them only
-to the controlled C arm so graph value is measured against the same-model B arm.
+Numeric medians, means, population standard deviations, categorical vocabularies,
+and bank frequencies are fitted from training rows only. Validation and test rows
+are transform-only. The target, partition, timestamps, transaction/source
+identities, and account/node identifiers are excluded from predictors.
 
-## Candidate implementations and imbalance handling
+Historical state for a transaction at time `t` uses only events before `t`.
+Same-timestamp peers cannot influence one another. Amount differences and ratios
+are defined only for matching currencies; no exchange rate is imputed.
 
-| Candidate | Implementation | Imbalance handling | Fit seconds |
-| --- | --- | --- | ---: |
-| Logistic Regression | `SGDClassifier(loss="log_loss")` | `class_weight="balanced"` | 56.8203844 |
-| Random Forest | `RandomForestClassifier` | `class_weight="balanced_subsample"` | 177.2493681 |
-| LightGBM | `LGBMClassifier` | train-only `scale_pos_weight=1243.7328431372548` | 100.0102195 |
+## Model specification
 
-The SGD logistic implementation is a resource-bounded Logistic Regression baseline,
-not `sklearn.linear_model.LogisticRegression`. It reached the configured maximum of
-20 iterations before convergence; that warning is retained as evidence. None of
-the three score outputs is probability-calibrated.
+The frozen LightGBM configuration is:
 
-LightGBM was selected once over XGBoost for the boosting slot because its CPU
-histogram path supported the planned full-data, deterministic single-thread,
-bounded-memory configuration. XGBoost was not run, so no empirical LightGBM-versus-
-XGBoost performance claim is made.
+| Parameter | Value |
+| --- | ---: |
+| Boosting | `gbdt` |
+| Estimators | 300 |
+| Learning rate | 0.04 |
+| Maximum depth | 8 |
+| Leaves | 31 |
+| Minimum child samples | 100 |
+| Minimum child weight | 1.0 |
+| L1 regularization | 1.0 |
+| L2 regularization | 20.0 |
+| Class weight / `scale_pos_weight` | none / 1.0 |
+| Seed | 42 |
 
-## Validation results
+Training is deterministic and column-wise. Raw LightGBM margins provide the
+ranking score. The selected raw-score threshold is
+`-4.3019702136515985`, chosen on validation by maximizing recall subject to at
+most 5,000 alerts and FPR at most 0.01. Complete equal-score groups are included.
+The output is not presented as a calibrated event probability.
 
-PR-AUC below is average precision and the sole champion-selection metric. ROC-AUC
-is secondary. Remaining metrics use the fixed configuration threshold `0.5`; it
-was not optimized or tuned in Sprint 2. Accuracy is intentionally not primary.
+## Development evidence
 
-| Model | PR-AUC (AP) | ROC-AUC | Precision | Recall | F1 | FPR | Alerts |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| **Random Forest** | **0.08859105** | 0.97497347 | 0.03127670 | 0.72236842 | 0.05995741 | 0.02234461 | 17,553 |
-| Logistic Regression | 0.00663424 | 0.91808364 | 0.00491412 | 0.96184211 | 0.00977828 | 0.19451530 | 148,755 |
-| LightGBM | 0.00547556 | 0.85107181 | 0.00507521 | 0.87368421 | 0.01009180 | 0.17105109 | 130,832 |
+### Transaction baselines
 
-Random Forest top-K validation results are:
+The first baseline comparison used Logistic Regression, Random Forest, and
+LightGBM. Random Forest led that immutable baseline snapshot at validation PR-AUC
+0.08859105. The initial linear model reached its 20-iteration limit, and initial
+linear/boosting probabilities contained large exact-one plateaus.
+
+Refinement used expanding-window temporal cross-validation, stronger
+regularization, corrected linear-model convergence, and raw decision scores for
+ranking. Diagnostics confirmed that the earlier 0/1 probability plateaus resulted
+from extreme raw margins passing through the link transformation, not from model
+serialization. The refined graph-enhanced LightGBM produced no exact-zero or
+exact-one probabilities on validation.
+
+### Feature-family ablation
+
+The same LightGBM candidate, parameters, seed, chronological split, and evaluation
+protocol were used for every arm.
+
+| Feature family | Predictors | Validation PR-AUC | Validation ROC-AUC |
+| --- | ---: | ---: | ---: |
+| Transaction only | 49 | 0.09984124 | 0.96441199 |
+| Transaction + temporal/history | 74 | 0.35535042 | 0.98179242 |
+| Transaction + temporal/history + graph | 79 | **0.47175420** | **0.98635944** |
+| Duplicate-removed graph sensitivity | 77 | **0.47175420** | **0.98635944** |
+
+Graph-history fields increased validation PR-AUC by 0.11640378 over the same-model
+temporal/history arm. Two graph columns are exact aliases of existing history
+columns on the frozen data; the three non-duplicate graph fields reproduced the
+same result.
+
+### Validation comparison
+
+All rows use the full 761,749-transaction validation partition and the same
+validation-only alert-budget/FPR operating rule.
+
+| Model | Role | PR-AUC | ROC-AUC | Precision | Recall | F1 | FPR | Alerts |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| **Graph-enhanced LightGBM** | Primary | **0.47175420** | **0.98635944** | **0.11631632** | **0.76447368** | **0.20191138** | **0.00580035** | **4,995** |
+| Refined transaction LightGBM | Comparator | 0.35535042 | 0.98179242 | 0.10302170 | 0.66842105 | 0.17852750 | 0.00581217 | 4,931 |
+| GraphSAGE edge classifier | Research comparator | 0.00943876 | 0.84664170 | 0.00969110 | 0.06315789 | 0.01680378 | 0.00644556 | 4,953 |
+
+## GraphSAGE comparator
+
+GraphSAGE combines sender and receiver embeddings with transaction features and
+predicts transaction edges. Full-graph training exceeded the available compute
+budget, so the recorded experiment used deterministic bounded samples:
+
+- 150,000 of 1,422,288 eligible context edges;
+- 52,396 supervised transactions, comprising all 2,396 eligible positives and
+  50,000 deterministic negatives;
+- 300,000 of 3,554,957 outer-training edges for validation message passing;
+- complete scoring of all 761,749 validation transactions.
+
+No validation edge entered the message-passing graph. Raw logits determine ranking;
+sigmoid values are uncalibrated because class weighting and negative sampling alter
+the fitted prior. The substantially lower GraphSAGE PR-AUC is evidence about this
+sampled architecture and training protocol, not graph neural networks in general.
+
+## One-shot final-test results
+
+Graph-enhanced LightGBM, its 79-feature contract, hyperparameters, preprocessing
+state, and threshold were frozen before test access. Test metrics were confirmatory
+and were not used for model, feature, parameter, or threshold selection. No model
+was retrained or tuned after the result.
+
+| Model | Role | PR-AUC | ROC-AUC | Precision | Recall | F1 | FPR | Alerts |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| **Graph-enhanced LightGBM** | Frozen primary | **0.69005906** | **0.99127213** | **0.17816018** | **0.88212684** | **0.29644779** | **0.00835704** | **7,729** |
+| Refined transaction LightGBM | Comparator | 0.53079643 | 0.98731443 | 0.16072332 | 0.81422165 | 0.26845496 | 0.00873200 | 7,908 |
+| GraphSAGE edge classifier | Research comparator | 0.01341710 | 0.82662724 | 0.00600590 | 0.11338885 | 0.01140758 | 0.03854078 | 29,471 |
+
+The primary model produced 1,377 true positives, 6,352 false positives, 753,726
+true negatives, and 184 false negatives at the frozen threshold.
+
+### Primary-model Top-K results
 
 | K | Precision@K | Recall@K | True positives |
 | ---: | ---: | ---: | ---: |
-| 100 | 0.34 | 0.04473684 | 34 |
-| 500 | 0.172 | 0.11315789 | 86 |
-| 1,000 | 0.13 | 0.17105263 | 130 |
+| 100 | 0.98000000 | 0.06278027 | 98 |
+| 500 | 0.96800000 | 0.31005766 | 484 |
+| 1,000 | 0.83900000 | 0.53747598 | 839 |
 
-Ranking ties use score descending and `source_row_number` ascending. The fixed
-threshold produces 17,553 validation alerts for the champion, far above the three
-reported K budgets; these are different operating views and not a selected
-production capacity.
+Exact test membership was joined by frozen transaction identity rather than a time
+range approximation. The audit found 761,639 unique matches, no missing feature
+rows, no duplicate feature matches, and no timestamp mismatches. The saved
+prediction vectors were independently re-evaluated without reopening raw test
+data.
 
-Logistic Regression assigns exact score `1.0` to 60,119 validation rows containing
-427 positives; LightGBM assigns it to 108,347 rows containing 663 positives. Since
-K 100/500/1,000 falls inside those tied groups, their source-row tie-break
-materially determines which equally scored rows enter K. Those top-K values are
-reproducible but do not show discrimination within the tied score plateau. Random
-Forest has no exact score-1 rows; champion selection uses tie-aware average
-precision and is unaffected by the source-row ordering of equal scores.
+## Explanations and case presentation
 
-The precision-recall PNG alone uses deterministic endpoint-preserving display
-decimation capped at 10,000 points per model. Every numerical metric and champion
-selection calculation uses the complete 761,749-row validation score vectors.
+The product layer builds cases from saved transaction, graph, and model outputs.
+Observed facts remain separate from model contributions. LightGBM explanations use
+native TreeSHAP and pass an additivity check. GraphSAGE explanations are explicitly
+labeled local gradient-times-input sensitivity rather than SHAP or causal
+attribution.
 
-## Reproducibility and verification
-
-The full Sprint 2 run took 389.0078022000016 seconds. Machine-readable evidence is
-in `artifacts/sprint2/model_comparison.json`,
-`transaction_baseline_champion.json`, per-model metadata/metric files, and the
-761,749-row `validation_predictions.parquet`. The independent verifier recomputed
-AP and ROC-AUC from saved scores, deserialized all models, repeated validation-only
-selection, and confirmed that no test prediction artifact exists. The refreshed
-manifest inventories 26 payloads, excluding itself. The final repository suite
-passed 81 tests in 19.87 seconds; Ruff lint/format and `pip check` also passed.
-
-## Sprint 3 refinement and graph-value results
-
-`configs/refinement.yaml` declares bounded candidate grids for Logistic Regression,
-Random Forest, and LightGBM. Candidate selection uses mean average precision over
-three expanding chronological folds contained entirely within outer train. Each
-fold fits its own preprocessing state on its training prefix. Selected candidates
-were refit on all outer train and compared on outer validation; the final test
-remained unopened.
-
-| Validation arm | Model | PR-AUC (AP) | ROC-AUC |
-| --- | --- | ---: | ---: |
-| Refined transaction baseline | Logistic Regression | 0.02600700 | 0.95570357 |
-| Refined transaction baseline | Random Forest | 0.12967475 | 0.97718091 |
-| **Refined transaction baseline** | **LightGBM** | **0.35535042** | **0.98179242** |
-| Graph-enhanced C arm | LightGBM | 0.47175420 | 0.98635944 |
-
-At the predeclared validation-only joint operating rule, refined LightGBM B emitted
-4,931 alerts with precision 0.10302170, recall 0.66842105, F1 0.17852750, and FPR
-0.00581217. This operating point is research evidence, not a deployment policy.
-
-The selected refined Logistic Regression uses `LogisticRegression` with the
-`newton-cholesky` solver, L2 regularization, square-root class weighting, and
-`C=0.01`. Its saved convergence evidence passed; the Sprint 2 Logistic warning
-remains part of the historical baseline.
-
-Sprint 3 treats raw decision margins as the ranking representation for Logistic
-Regression and LightGBM and retains probabilities for diagnostics. Saturation
-artifacts report raw ranges, probability collapse, exact/near boundary counts,
-unique scores, tied-group label composition, class-weight controls, and estimator
-stability. Top-K output includes deterministic row selection plus tie-aware
-expected/minimum/maximum true positives; a K that cuts a tie does not demonstrate
-within-tie superiority.
-
-Executable reproduction confirmed that the Sprint 2 exact-zero/one plateaus came
-from sigmoid/link conversion of distinguishable extreme raw margins, not model
-serialization. The upstream Sprint 2 causes were the nonconverged, weakly
-regularized balanced SGD with heavy-tailed amount signals and full positive-class
-weight with near-zero leaf/Hessian regularization in LightGBM. Refined LightGBM had
-no exact probability-zero/one rows; refined Logistic Regression retained 135 exact
-ones, while raw-score and probability AP agreed at 0.02600700.
-
-Operating thresholds are chosen only on outer validation. The configured primary
-rule includes complete equal-score groups and maximizes recall subject to a 5,000-
-alert budget and 0.01 FPR ceiling, alongside maximum-F1 and single-constraint
-alternatives. These values are research evidence, not a deployment policy.
-
-Graph value was tested with the same selected LightGBM candidate, parameters, seed,
-outer split, and evaluation protocol across A transaction-only, B transaction plus
-temporal/history, and C B plus all five graph-history fields. Because two C fields
-duplicate existing history columns on the frozen data, a separate novel-three arm
-adds only sender prior fan-in, receiver prior fan-out, and repeated-pair count.
-Both C and the duplicate-removed novel-three sensitivity measured AP 0.47175420,
-versus 0.35535042 for B. This is a tabular feature-family experiment, not GraphSAGE.
-Complete folds, thresholds, tie diagnostics, runtimes, and artifacts are in
-[`SPRINT_3_STATUS.md`](../reports/generated/SPRINT_3_STATUS.md).
-
-## Sprint 4 GraphSAGE and product-layer results
-
-GraphSAGE uses the supplied transaction label for edge classification. Sender and
-receiver node embeddings are combined with transaction features; no account-level
-fraud label is derived. The frozen Sprint 3 LightGBM scores are reference artifacts,
-not retrained comparators.
-
-Full-graph training was not represented as feasible on the available workstation.
-The deterministic run used 150,000 of 1,422,288 eligible train-prefix edges for the
-training message graph, then supervised on 52,396 later train transactions: all
-2,396 eligible positives and 50,000 deterministic negatives. Validation inference
-used a 300,000-of-3,554,957 sampled outer-train message graph and scored all 761,749
-validation transactions. No validation edge entered message passing.
-
-| Validation model | PR-AUC (AP) | ROC-AUC | Precision | Recall | F1 | FPR | Alerts |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| **Graph-enhanced LightGBM** | **0.47175420** | **0.98635944** | **0.11631632** | **0.76447368** | **0.20191138** | **0.00580035** | **4,995** |
-| Refined transaction LightGBM | 0.35535042 | 0.98179242 | 0.10302170 | 0.66842105 | 0.17852750 | 0.00581217 | 4,931 |
-| GraphSAGE edge classifier | 0.00943876 | 0.84664170 | 0.00969110 | 0.06315789 | 0.01680378 | 0.00644556 | 4,953 |
-
-All three rows use the identical frozen validation transactions and the same
-validation-only 5,000-alert/1% FPR operating rule. GraphSAGE's substantially lower
-AP is negative experimental evidence for this sampled architecture and training
-scope; it is not evidence that graph neural networks are categorically ineffective.
-The graph-enhanced LightGBM remains the validation leader.
-
-Twenty investigation cases were generated from real saved validation model and
-graph output. Each contains at least seven observed evidence items, stored
-separately from model evidence. LightGBM explanations use native TreeSHAP with
-verified additivity. GNN explanations are explicitly labeled local
-gradient-times-input sensitivity, not SHAP or causal attribution. All cases have a
-deterministic no-LLM note, and the Streamlit application loads saved artifacts only
-for Executive Dashboard, Investigation Queue, Case Investigator, and Model
-Comparison. Full evidence is in
-[`SPRINT_4_STATUS.md`](../reports/generated/SPRINT_4_STATUS.md).
-
-GraphSAGE node structure uses directed in/out degree and deterministic composite-
-identity inputs. Monetary node aggregates are excluded because a versioned FX
-conversion source is unavailable; transaction amounts remain edge features. Raw
-logits drive ordering, while displayed sigmoid values are uncalibrated ranking
-scores rather than event probabilities because training uses sampled negatives and
-positive weighting.
-
-## Final-test policy
-
-Final-test inference was **not performed** in Sprint 2, Sprint 3, or Sprint 4. No
-sprint used test rows for preprocessing fit, training, graph construction, model
-selection, or threshold work. Sprint 5 then performed the separately authorized
-single confirmatory evaluation on all 761,639 exact frozen test rows. The access
-receipt was created before the first test query; the champion, feature family,
-hyperparameters, train-fitted preprocessors, and validation-selected raw-score
-thresholds were fixed before access. Test results did not revise the specification,
-and no additional final-test inference run is permitted.
+The Streamlit application reads saved artifacts and performs no training at page
+load. It presents portfolio-level results, prioritized investigations, directed
+account-network context, case evidence, and model comparison. Evidence-only case
+notes have a deterministic fallback and do not require an external language-model
+service.
 
 ## Limitations
 
-- IBM AML-Data is synthetic and does not establish production-bank performance.
-- Severe class imbalance makes accuracy uninformative and precision highly
-  sensitive to prevalence and operational capacity.
-- Temporal prevalence shift is already visible across the frozen partitions.
-- Sprint 2 candidate configurations were fixed baselines, not tuned estimators; its
-  linear model retained a convergence warning and its `0.5` threshold was not
-  optimized.
-- Sprint 3 results are validation evidence after repeated development comparisons;
-  the separate Sprint 5 block above is the one-shot final-test estimate.
-- Sprint 4 GraphSAGE training uses explicitly disclosed deterministic graph and
-  supervised samples, not all eligible training edges; only validation scoring is
-  full-partition.
-- GraphSAGE underperformed both frozen LightGBM references in this experiment. The
-  result applies to this sampled architecture and protocol, not every possible GNN.
-- No fairness, subgroup, calibration, robustness, or deployment validation is
-  provided by this scope.
-- Case evidence is generated from synthetic transactions and model outputs; it is
-  not independently verified real-world intelligence.
-- Validation metrics measure synthetic-label ranking/classification behavior and
-  are not causal explanations or evidence of wrongdoing.
-- Final metrics come from one synthetic chronological holdout and are not external,
-  prospective, fairness, calibration, or production validation.
+- HI-Small is synthetic and does not establish production-bank performance.
+- Extreme class imbalance makes accuracy uninformative and makes precision
+  sensitive to prevalence and alert capacity.
+- The final estimate comes from one chronological synthetic holdout, not external
+  or prospective validation.
+- The positive rate more than doubled between validation and test; fixed-threshold
+  alarm counts and precision do not transfer unchanged across periods.
+- GraphSAGE training used a deterministic subset, not every eligible graph edge.
+- The primary model is not probability-calibrated.
+- No fairness, subgroup, calibration, robustness, drift, or deployment validation
+  is included.
+- SHAP and GNN sensitivity describe model behaviour, not causal evidence.
+- Synthetic case evidence is not real-world financial intelligence.
+
+## Evidence and reproducibility
+
+Repository-tracked summaries:
+
+- [Final evaluation status](../reports/generated/FINAL_EVALUATION_STATUS.md)
+- [Final model comparison](../reports/generated/FINAL_MODEL_COMPARISON.md)
+- [Experiment protocol](EXPERIMENT_PROTOCOL.md)
+- [Data dictionary](DATA_DICTIONARY.md)
+
+Local machine-readable artifacts are generated under `artifacts/` and excluded
+from version control:
+
+```text
+artifacts/sprint3/ablation/feature_family_ablation.csv
+artifacts/sprint3/threshold/analysis.json
+artifacts/sprint4/model_comparison.json
+artifacts/sprint4/product/cases.json
+artifacts/sprint5/final_metrics.json
+artifacts/sprint5/final_model_comparison.json
+artifacts/sprint5/final_top_k_metrics.json
+artifacts/sprint5/prevalence_shift.json
+artifacts/sprint5/test_identity_audit.json
+artifacts/sprint5/run_manifest.json
+artifacts/sprint5/verification_report.json
+```
+
+The frozen experiment rules and standard reproduction commands are documented in
+[EXPERIMENT_PROTOCOL.md](EXPERIMENT_PROTOCOL.md). The one-shot final scoring command
+is excluded from routine reproduction; persisted outputs can be verified without
+reopening raw test data.

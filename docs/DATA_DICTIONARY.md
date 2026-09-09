@@ -14,7 +14,7 @@ sender versus receiver; pandas commonly exposes the second as `Account.1`.
 
 | Pos. | Raw field | Canonical field | Canonical type | Validation and meaning |
 | ---: | --- | --- | --- | --- |
-| 1 | `Timestamp` | `timestamp` | `datetime64[ns]` | Parse `%Y/%m/%d %H:%M`; no timezone supplied |
+| 1 | `Timestamp` | `timestamp` | `datetime64[ns]` | Parse `%Y/%m/%d %H:%M`; source values are timezone-naive |
 | 2 | `From Bank` | `from_bank` | string | Decimal sender bank ID; normalize leading zeroes for identity |
 | 3 | first `Account` | `from_account` | string | Sender account; trim and uppercase for identity |
 | 4 | `To Bank` | `to_bank` | string | Decimal receiver bank ID; normalize leading zeroes for identity |

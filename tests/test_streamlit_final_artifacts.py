@@ -404,18 +404,30 @@ def test_streamlit_labels_final_test_as_frozen_reporting_only(
 
     app = AppTest.from_file(str(app_path)).run(timeout=20)
     assert not app.exception
-    assert any("Frozen one-shot final test" in item.value for item in app.subheader)
+    assert app.title[0].value == "Overview"
+    assert app.sidebar.radio[0].options == [
+        "Overview",
+        "Investigations",
+        "Case Investigator",
+        "Model Evidence",
+    ]
+    assert any("Frozen final evaluation" in item.value for item in app.subheader)
     assert any("reporting-only" in item.value for item in app.caption)
+    assert any("GraphSAGE research comparator" in item.value for item in app.info)
 
-    app.sidebar.radio[0].set_value("Investigation Queue")
+    app.sidebar.radio[0].set_value("Investigations")
     app.run(timeout=20)
     assert not app.exception
-    assert any("saved validation cases" in item.value for item in app.caption)
+    assert any("GraphSAGE research-comparator ranking" in item.value for item in app.info)
+    assert all("uncalibrated_ranking_score" not in str(item.value) for item in app.dataframe)
 
-    app.sidebar.radio[0].set_value("Model Comparison")
+    app.sidebar.radio[0].set_value("Model Evidence")
     app.run(timeout=20)
     assert not app.exception
     assert any("Final evaluation" in item.value for item in app.header)
-    assert any("Pre-frozen champion" in item.value for item in app.success)
+    assert any("Primary operational model" in item.value for item in app.success)
     assert any("test metrics did not select" in item.value for item in app.success)
     assert any("no post-test tuning" in item.value.lower() for item in app.warning)
+    assert any(
+        "GraphSAGE is retained as a research comparator" in item.value for item in app.caption
+    )

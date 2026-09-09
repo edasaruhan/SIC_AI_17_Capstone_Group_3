@@ -92,9 +92,10 @@ def test_streamlit_all_required_screens_render_from_saved_artifacts(
 
     app = AppTest.from_file(str(app_path)).run(timeout=20)
     assert not app.exception
-    assert app.title[0].value == "Executive Dashboard"
+    assert app.title[0].value == "Overview"
+    assert all(metric.label != "GraphSAGE queue alerts" for metric in app.metric)
 
-    for page in ("Investigation Queue", "Case Investigator", "Model Comparison"):
+    for page in ("Investigations", "Case Investigator", "Model Evidence"):
         app.sidebar.radio[0].set_value(page)
         app.run(timeout=20)
         assert not app.exception
@@ -108,7 +109,7 @@ def test_streamlit_missing_artifacts_shows_actionable_error(tmp_path: Path, monk
     app = AppTest.from_file(str(app_path)).run(timeout=20)
 
     assert not app.exception
-    assert app.error[0].value == "Saved Sprint 4 artifacts are not ready."
+    assert app.error[0].value == "Saved analysis artifacts are unavailable."
     assert any("investigation_queue.csv" in element.value for element in app.code)
 
 

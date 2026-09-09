@@ -8,6 +8,19 @@ from typing import Any
 import pandas as pd
 import plotly.graph_objects as go
 
+_MODEL_LABELS = {
+    "lightgbm": "LightGBM",
+    "graph_enhanced_lightgbm": "Graph-enhanced LightGBM",
+    "refined_transaction_lightgbm": "Refined transaction LightGBM",
+    "graphsage_edge_classifier": "GraphSAGE (research comparator)",
+    "graphsage": "GraphSAGE (research comparator)",
+}
+
+
+def _display_model_name(value: Any) -> str:
+    canonical = "_".join(str(value).strip().lower().replace("-", " ").split())
+    return _MODEL_LABELS.get(canonical, str(value).replace("_", " ").strip().title())
+
 
 def _case_transactions(case: dict[str, Any]) -> list[dict[str, Any]]:
     transactions = case.get("transactions", [])
@@ -102,7 +115,7 @@ def build_network_figure(case: dict[str, Any]) -> go.Figure | None:
         width = 3.0 if focal else 2.5 if prioritized else 1.2
         amount = edge.get("amount", edge.get("amount_paid", "N/A"))
         transaction_id = edge.get("transaction_id", "N/A")
-        edge_role = "focal transaction" if focal else "strictly-prior context"
+        edge_role = "focal transaction" if focal else "earlier case context"
         figure.add_trace(
             go.Scatter(
                 x=[x0, x1],
@@ -142,10 +155,10 @@ def build_network_figure(case: dict[str, Any]) -> go.Figure | None:
         metadata = node_metadata.get(node_id, {})
         is_seed = node_id in seed_nodes or bool(metadata.get("is_seed", False))
         node_colors.append("#f59e0b" if is_seed else "#0f766e")
-        hover.append(
-            f"Account: {node_id}<br>Role: {metadata.get('role', 'network account')}"
-            f"<br>Uncalibrated score: {metadata.get('risk_score', 'N/A')}"
-        )
+        details = f"Account: {node_id}<br>Role: {metadata.get('role', 'network account')}"
+        if metadata.get("risk_score") is not None:
+            details += f"<br>Saved node score: {metadata['risk_score']}"
+        hover.append(details)
     figure.add_trace(
         go.Scatter(
             x=[positions[node_id][0] for node_id in ordered],
@@ -165,7 +178,7 @@ def build_network_figure(case: dict[str, Any]) -> go.Figure | None:
     )
     figure.update_layout(
         annotations=annotations,
-        title="Directed transaction neighborhood",
+        title="Directed account network",
         height=520,
         margin={"l": 15, "r": 15, "t": 55, "b": 15},
         paper_bgcolor="rgba(0,0,0,0)",
@@ -248,9 +261,7 @@ def build_model_metric_figure(
         if column in comparison and comparison[column].notna().any()
     ]
     figure = go.Figure()
-    labels = comparison["model"].astype(str)
-    if "version" in comparison:
-        labels = comparison["version"].fillna(comparison["model"]).astype(str)
+    labels = comparison["model"].map(_display_model_name)
     for metric in metric_columns:
         figure.add_trace(
             go.Bar(name=metric.replace("_", " ").upper(), x=labels, y=comparison[metric])
@@ -280,7 +291,7 @@ def build_pr_curve_figure(
             go.Scatter(
                 x=ordered["recall"],
                 y=ordered["precision"],
-                name=str(model),
+                name=_display_model_name(model),
                 mode="lines",
             )
         )

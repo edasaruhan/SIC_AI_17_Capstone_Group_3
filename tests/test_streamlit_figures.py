@@ -79,6 +79,10 @@ def test_model_figures_use_only_supplied_saved_values() -> None:
     bars = build_model_metric_figure(comparison)
     assert list(bars.data[0].y) == [0.47, 0.31]
     assert list(bars.data[1].y) == [0.005, 0.007]
+    assert list(bars.data[0].x) == [
+        "LightGBM",
+        "GraphSAGE (research comparator)",
+    ]
 
     curves = pd.DataFrame(
         [
@@ -89,3 +93,4 @@ def test_model_figures_use_only_supplied_saved_values() -> None:
     curve = build_pr_curve_figure(curves)
     assert list(curve.data[0].x) == [0.2, 1.0]
     assert list(curve.data[0].y) == [0.4, 0.001]
+    assert curve.data[0].name == "GraphSAGE (research comparator)"

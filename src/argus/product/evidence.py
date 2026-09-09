@@ -232,7 +232,7 @@ def _neighborhood_observations(
             evidence_id="obs-prior-pair-activity",
             kind="strictly_prior_directed_pair_activity",
             statement=(
-                f"The supplied neighborhood contains {len(pair):,} earlier transfer(s) on "
+                f"The saved case context contains {len(pair):,} earlier transfer(s) on "
                 "the same directed sender-to-receiver route."
             ),
             values={
@@ -246,7 +246,7 @@ def _neighborhood_observations(
             evidence_id="obs-prior-sender-neighborhood",
             kind="strictly_prior_sender_neighborhood",
             statement=(
-                f"Before the focal time, the supplied neighborhood contains "
+                f"Before the focal time, the saved case context contains "
                 f"{len(sender_outgoing):,} outgoing and {len(sender_incoming):,} incoming "
                 "sender transaction(s)."
             ),
@@ -267,7 +267,7 @@ def _neighborhood_observations(
             evidence_id="obs-prior-receiver-neighborhood",
             kind="strictly_prior_receiver_neighborhood",
             statement=(
-                f"Before the focal time, the supplied neighborhood contains "
+                f"Before the focal time, the saved case context contains "
                 f"{len(receiver_incoming):,} incoming and {len(receiver_outgoing):,} outgoing "
                 "receiver transaction(s)."
             ),

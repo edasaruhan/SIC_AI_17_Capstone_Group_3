@@ -315,10 +315,10 @@ def main() -> int:
     )
     browser = _browser()
     pages = {
-        "executive_dashboard": "Executive Dashboard",
-        "investigation_queue": "Investigation Queue",
+        "executive_dashboard": "Overview",
+        "investigation_queue": "Investigations",
         "case_investigator": "Case Investigator",
-        "model_comparison": "Model Comparison",
+        "model_comparison": "Model Evidence",
     }
     created: list[Path] = []
     try:

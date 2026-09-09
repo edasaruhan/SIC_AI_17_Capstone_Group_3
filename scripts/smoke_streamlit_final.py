@@ -32,10 +32,10 @@ def main() -> int:
     os.environ["ARGUS_ARTIFACT_DIR"] = str(artifact_root)
     os.environ.pop("ARGUS_SPRINT4_ARTIFACT_DIR", None)
     pages = (
-        "Executive Dashboard",
-        "Investigation Queue",
+        "Overview",
+        "Investigations",
         "Case Investigator",
-        "Model Comparison",
+        "Model Evidence",
     )
     app = AppTest.from_file(str(project_root / "app.py")).run(timeout=30)
     rendered: list[str] = []
@@ -61,7 +61,7 @@ def main() -> int:
     if not any("Final evaluation" in value for value in final_headers):
         print("Final Streamlit artifact smoke status: FAIL (final section absent)")
         return 1
-    if not any("Pre-frozen champion" in value for value in final_successes):
+    if not any("Primary operational model" in value for value in final_successes):
         print("Final Streamlit artifact smoke status: FAIL (frozen champion absent)")
         return 1
 

@@ -24,11 +24,150 @@ from argus.app.figures import (
 )
 
 _PAGES = (
-    "Executive Dashboard",
-    "Investigation Queue",
+    "Overview",
+    "Investigations",
     "Case Investigator",
-    "Model Comparison",
+    "Model Evidence",
 )
+
+_PRIMARY_MODEL = "graph_enhanced_lightgbm"
+_MODEL_LABELS = {
+    "lightgbm": "LightGBM",
+    "graph_enhanced_lightgbm": "Graph-enhanced LightGBM",
+    "refined_transaction_lightgbm": "Refined transaction LightGBM",
+    "graphsage_edge_classifier": "GraphSAGE",
+    "graphsage": "GraphSAGE",
+}
+
+
+def _canonical_model_name(value: Any) -> str:
+    return "_".join(str(value).strip().lower().replace("-", " ").split())
+
+
+def _display_model_name(value: Any) -> str:
+    canonical = _canonical_model_name(value)
+    if canonical in _MODEL_LABELS:
+        return _MODEL_LABELS[canonical]
+    return str(value).replace("_", " ").strip().title() or "N/A"
+
+
+def _model_role(value: Any) -> str:
+    canonical = _canonical_model_name(value)
+    if canonical == _PRIMARY_MODEL:
+        return "Primary operational model"
+    if canonical in {"graphsage", "graphsage_edge_classifier"}:
+        return "Research comparator"
+    return "Comparator"
+
+
+def _ordered_models(comparison: pd.DataFrame) -> pd.DataFrame:
+    """Return a display copy with the frozen operational model listed first."""
+
+    order = {
+        _PRIMARY_MODEL: 0,
+        "refined_transaction_lightgbm": 1,
+        "graphsage_edge_classifier": 2,
+        "graphsage": 2,
+    }
+    displayed = comparison.copy()
+    displayed["_display_order"] = displayed["model"].map(
+        lambda value: order.get(_canonical_model_name(value), 3)
+    )
+    return displayed.sort_values("_display_order", kind="mergesort").drop(columns="_display_order")
+
+
+def _humanize(value: Any) -> str:
+    if value is None or pd.isna(value):
+        return "N/A"
+    return str(value).replace("_", " ").strip().title()
+
+
+def _display_pattern(value: Any) -> str:
+    canonical = _canonical_model_name(value)
+    if canonical == "high_graphsage_transaction_score":
+        return "Elevated transaction ranking (research comparator)"
+    return _humanize(value)
+
+
+def _display_feature_name(value: Any) -> str:
+    label = str(value).split("::")[-1]
+    for prefix in ("numeric__", "categorical__"):
+        if label.startswith(prefix):
+            label = label.removeprefix(prefix)
+    return _humanize(label)
+
+
+def _display_evidence_statement(value: Any) -> str:
+    return (
+        str(value)
+        .replace("the supplied neighborhood", "the saved case context")
+        .replace("The supplied neighborhood", "The saved case context")
+    )
+
+
+def _display_case_note(case: dict[str, Any], value: Any) -> str:
+    text = str(value)
+    model = case.get("model_evidence", {})
+    if not isinstance(model, dict):
+        return text
+    model_name = model.get("model_name")
+    if model_name:
+        text = text.replace(str(model_name), _display_model_name(model_name))
+    score_name = model.get("score_name")
+    if score_name:
+        score_label = (
+            "saved research ranking score"
+            if _canonical_model_name(model_name) in {"graphsage", "graphsage_edge_classifier"}
+            else "saved priority score"
+        )
+        text = text.replace(str(score_name), score_label)
+    return text.replace("The supplied context", "The saved case context")
+
+
+def _case_model_name(case: dict[str, Any]) -> str | None:
+    evidence = case.get("model_evidence", {})
+    if not isinstance(evidence, dict):
+        return None
+    value = evidence.get("model_name")
+    return str(value) if value is not None else None
+
+
+def _queue_model_names(artifacts: DashboardArtifacts) -> tuple[str, ...]:
+    names = {
+        name for case in artifacts.cases.values() if (name := _case_model_name(case)) is not None
+    }
+    return tuple(sorted(names))
+
+
+def _queue_uses_graphsage(artifacts: DashboardArtifacts) -> bool:
+    names = _queue_model_names(artifacts)
+    return bool(names) and all(
+        _canonical_model_name(name) in {"graphsage", "graphsage_edge_classifier"} for name in names
+    )
+
+
+def _display_model_table(comparison: pd.DataFrame, *, final: bool = False) -> pd.DataFrame:
+    ordered = _ordered_models(comparison)
+    displayed = pd.DataFrame(index=ordered.index)
+    displayed["Role"] = ordered["model"].map(_model_role)
+    displayed["Model"] = ordered["model"].map(_display_model_name)
+    if not final and "feature_family" in ordered:
+        displayed["Feature Set"] = ordered["feature_family"].map(_humanize)
+    metric_labels = {
+        "pr_auc": "PR-AUC",
+        "roc_auc": "ROC-AUC",
+        "precision": "Precision",
+        "recall": "Recall",
+        "f1": "F1",
+        "fpr": "FPR",
+        "recall_at_k": "Recall@K",
+        "precision_at_k": "Precision@K",
+        "alerts": "Alerts",
+    }
+    for source, label in metric_labels.items():
+        if source in ordered:
+            displayed[label] = ordered[source]
+    return displayed.reset_index(drop=True)
 
 
 def _project_root() -> Path:
@@ -153,39 +292,58 @@ def _page_heading(eyebrow: str, title: str, description: str) -> None:
 
 def render_executive_dashboard(artifacts: DashboardArtifacts) -> None:
     _page_heading(
-        "ARGUS NETWORK INVESTIGATOR",
-        "Executive Dashboard",
-        "Validation-only prioritization evidence loaded from the frozen Sprint 4 artifact set.",
+        "ARGUS FINANCIAL CRIME INVESTIGATION",
+        "Overview",
+        "Model results and saved investigation cases from the completed ARGUS study.",
     )
     focus = _comparison_focus(artifacts)
+    focus_is_primary = _canonical_model_name(focus.get("model")) == _PRIMARY_MODEL
     summary = artifacts.summary
     first = st.columns(3)
-    first[0].metric("Transactions analyzed", _format_count(summary.get("transactions_analyzed")))
-    first[1].metric("GraphSAGE queue alerts", _format_count(summary.get("flagged_transactions")))
+    first[0].metric("Transactions evaluated", _format_count(summary.get("transactions_analyzed")))
+    first[1].metric("Saved investigation cases", _format_count(len(artifacts.queue)))
     first[2].metric("High-priority cases", _format_count(summary.get("high_priority_cases")))
     second = st.columns(4)
-    second[0].metric("Validation PR-AUC", _format_metric(_metric_value(summary, focus, "pr_auc")))
-    second[1].metric("Recall@K", _format_metric(_metric_value(summary, focus, "recall_at_k")))
-    second[2].metric("FPR", _format_metric(_metric_value(summary, focus, "fpr")))
-    second[3].metric("Leader alert volume", _format_count(_metric_value(summary, focus, "alerts")))
-    st.caption(
-        f"Validation-leader metrics use {focus.get('model', 'the selected model')}; "
-        "the queue-alert count refers specifically to the GraphSAGE case-source model."
+    second[0].metric(
+        "Primary model validation PR-AUC" if focus_is_primary else "Validation PR-AUC",
+        _format_metric(_metric_value(summary, focus, "pr_auc")),
     )
+    second[1].metric(
+        "Validation Recall@K", _format_metric(_metric_value(summary, focus, "recall_at_k"))
+    )
+    second[2].metric("Validation FPR", _format_metric(_metric_value(summary, focus, "fpr")))
+    second[3].metric("Validation alerts", _format_count(_metric_value(summary, focus, "alerts")))
+    if focus_is_primary:
+        st.caption(
+            f"Primary operational ranking: {_display_model_name(focus.get('model'))}. "
+            "It was selected using validation evidence before the final test."
+        )
+    else:
+        st.caption(
+            f"Loaded validation metrics refer to {_display_model_name(focus.get('model'))}. "
+            "The primary Graph-enhanced LightGBM result is not present in this artifact set."
+        )
+    if _queue_uses_graphsage(artifacts):
+        st.info(
+            "The saved case examples were produced by the GraphSAGE research comparator. "
+            "They are presented as evidence-led case examples and are not relabeled or rescored "
+            "as outputs of the primary LightGBM model."
+        )
 
     st.subheader("Model evidence at a glance")
-    card_columns = st.columns(min(4, len(artifacts.model_comparison)))
-    for column, (_, model) in zip(
-        card_columns, artifacts.model_comparison.iterrows(), strict=False
-    ):
-        label = str(model.get("version", model["model"])).replace("_", " ").title()
+    ordered_comparison = _ordered_models(artifacts.model_comparison)
+    card_columns = st.columns(min(4, len(ordered_comparison)))
+    for column, (_, model) in zip(card_columns, ordered_comparison.iterrows(), strict=False):
+        label = _display_model_name(model["model"])
         column.metric(label, _format_metric(model["pr_auc"]), help="Validation PR-AUC")
         recall = _format_metric(model.get("recall_at_k"))
         precision = _format_metric(model.get("precision_at_k"))
-        column.caption(f"Recall@K {recall} · Precision@K {precision}")
+        column.caption(
+            f"{_model_role(model['model'])} · Recall@K {recall} · Precision@K {precision}"
+        )
 
     st.plotly_chart(
-        build_model_metric_figure(artifacts.model_comparison),
+        build_model_metric_figure(ordered_comparison),
         width="stretch",
         key="executive-model-comparison",
     )
@@ -194,14 +352,14 @@ def render_executive_dashboard(artifacts: DashboardArtifacts) -> None:
         "authorize an automatic action, or replace human review."
     )
     if artifacts.final_evaluation is None:
-        st.caption("Final test remains unopened in this Sprint 4 artifact set.")
+        st.caption("Final-test results are not included in the loaded artifact set.")
     else:
         final = artifacts.final_evaluation
         champion = final.model_comparison.loc[final.model_comparison["is_frozen_champion"]].iloc[0]
-        st.subheader("Frozen one-shot final test")
+        st.subheader("Frozen final evaluation")
         st.caption(
-            "The graph_enhanced_lightgbm champion was frozen from validation before test access. "
-            "These test metrics are reporting-only and never drive model selection."
+            f"{_display_model_name(champion['model'])} was frozen from validation before the "
+            "single final-test evaluation. Test metrics are reporting-only."
         )
         final_metrics = st.columns(4)
         final_metrics[0].metric("Final-test PR-AUC", _format_metric(champion["pr_auc"]))
@@ -210,13 +368,17 @@ def render_executive_dashboard(artifacts: DashboardArtifacts) -> None:
         final_metrics[3].metric("Final-test alerts", _format_count(champion["alerts"]))
 
 
-def _filter_queue(queue: pd.DataFrame) -> pd.DataFrame:
+def _filter_queue(queue: pd.DataFrame, *, score_label: str) -> pd.DataFrame:
     filtered = queue.copy()
     controls = st.columns(3)
     if "priority" in filtered:
         values = sorted(filtered["priority"].dropna().astype(str).unique())
-        selected = controls[0].multiselect("Priority", values, default=values)
-        filtered = filtered[filtered["priority"].astype(str).isin(selected)]
+        priority_options = {_humanize(value): value for value in values}
+        selected = controls[0].multiselect(
+            "Priority", list(priority_options), default=list(priority_options)
+        )
+        selected_values = [priority_options[label] for label in selected]
+        filtered = filtered[filtered["priority"].astype(str).isin(selected_values)]
     else:
         controls[0].caption("Priority filter unavailable")
     if "risk_score" in filtered and not filtered.empty:
@@ -224,17 +386,18 @@ def _filter_queue(queue: pd.DataFrame) -> pd.DataFrame:
         upper = float(filtered["risk_score"].max())
         if lower < upper:
             minimum = controls[1].slider(
-                "Minimum uncalibrated ranking score",
+                f"Minimum {score_label.lower()}",
                 min_value=lower,
                 max_value=upper,
                 value=lower,
+                help="A saved ranking score, not a calibrated probability of wrongdoing.",
             )
             filtered = filtered[filtered["risk_score"] >= minimum]
         else:
-            controls[1].caption(f"All saved cases have ranking score {lower:.4f}")
+            controls[1].caption(f"All saved cases have a score of {lower:.4f}")
     else:
-        controls[1].caption("Risk-score filter unavailable")
-    query = controls[2].text_input("Find case or pattern", placeholder="ARG-0001")
+        controls[1].caption("Score filter unavailable")
+    query = controls[2].text_input("Search cases", placeholder="Case ID or pattern")
     if query:
         text = filtered.astype(str).agg(" ".join, axis=1)
         filtered = filtered[text.str.contains(query, case=False, regex=False)]
@@ -242,36 +405,60 @@ def _filter_queue(queue: pd.DataFrame) -> pd.DataFrame:
 
 
 def render_investigation_queue(artifacts: DashboardArtifacts) -> None:
+    research_queue = _queue_uses_graphsage(artifacts)
+    score_label = "research score" if research_queue else "priority score"
     _page_heading(
         "HUMAN REVIEW WORKLIST",
-        "Investigation Queue",
-        "Filter and sort saved validation cases. Queue order is evidence, not an accusation.",
+        "Investigations",
+        "Review and sort saved candidate cases. Queue order supports triage and is not "
+        "an accusation.",
     )
-    filtered = _filter_queue(artifacts.queue)
+    if research_queue:
+        st.info(
+            "These saved case examples use the GraphSAGE research-comparator ranking. "
+            "Graph-enhanced LightGBM remains the primary operational model."
+        )
+    filtered = _filter_queue(artifacts.queue, score_label=score_label)
     if filtered.empty:
         st.warning("No saved cases match the current filters.")
         return
-    sortable = [
-        column
-        for column in ("risk_score", "priority", "total_flow", "transaction_count", "case_id")
-        if column in filtered
-    ]
-    sort_column = st.selectbox("Sort queue by", sortable, index=0)
-    descending = st.toggle("Highest first", value=sort_column != "case_id")
+    sort_labels = {
+        "risk_score": score_label.title(),
+        "priority": "Priority",
+        "total_flow": "Total Flow",
+        "transaction_count": "Transfers",
+        "case_id": "Case ID",
+    }
+    sortable = {label: column for column, label in sort_labels.items() if column in filtered}
+    selected_sort = st.selectbox("Sort by", list(sortable), index=0)
+    sort_column = sortable[selected_sort]
+    descending = st.toggle("Descending", value=sort_column != "case_id")
     filtered = filtered.sort_values(sort_column, ascending=not descending, kind="mergesort")
-    preferred = [
-        "priority",
-        "case_id",
-        "risk_score",
-        "account_count",
-        "transaction_count",
-        "total_flow",
-        "major_pattern",
-        "evidence_count",
-    ]
-    columns = [column for column in preferred if column in filtered]
-    columns.extend(column for column in filtered.columns if column not in columns)
-    display = filtered[columns].rename(columns={"risk_score": "uncalibrated_ranking_score"})
+    labels = {
+        "priority": "Priority",
+        "case_id": "Case ID",
+        "risk_score": score_label.title(),
+        "account_count": "Accounts",
+        "transaction_count": "Transfers",
+        "total_flow": "Total Flow",
+        "major_pattern": "Primary Pattern",
+        "focal_timestamp": "Last Activity",
+        "last_activity": "Last Activity",
+        "status": "Status",
+        "evidence_count": "Evidence Items",
+    }
+    columns = [column for column in labels if column in filtered]
+    display = filtered[columns].copy()
+    for column in ("priority", "status"):
+        if column in display:
+            display[column] = display[column].map(_humanize)
+    if "major_pattern" in display:
+        display["major_pattern"] = display["major_pattern"].map(_display_pattern)
+    for column in ("focal_timestamp", "last_activity"):
+        if column in display:
+            timestamps = pd.to_datetime(display[column], errors="coerce", utc=True)
+            display[column] = timestamps.dt.strftime("%Y-%m-%d %H:%M UTC").fillna("N/A")
+    display.rename(columns=labels, inplace=True)
     st.dataframe(display, width="stretch", hide_index=True)
     st.caption(f"Showing {len(filtered):,} of {len(artifacts.queue):,} saved cases.")
 
@@ -313,10 +500,18 @@ def _render_observed_evidence(case: dict[str, Any]) -> None:
     if len(evidence) < 3:
         st.warning(f"Only {len(evidence)} observed evidence item(s) were saved for this case.")
     for item in evidence:
-        kind = html.escape(str(item.get("kind", "Observed fact")).replace("_", " "))
-        statement = html.escape(str(item["statement"]))
+        kind = html.escape(_humanize(item.get("kind", "Observed fact")))
+        statement = html.escape(_display_evidence_statement(item["statement"]))
         scope = item.get("scope")
-        scope_text = f"<br><small>Scope: {html.escape(str(scope))}</small>" if scope else ""
+        scope_labels = {
+            "focal_transaction": "Focal transaction",
+            "strictly_prior_supplied_neighborhood": "Earlier case context",
+            "strictly_prior_neighborhood": "Earlier case context",
+        }
+        scope_label = scope_labels.get(str(scope), _humanize(scope)) if scope else None
+        scope_text = (
+            f"<br><small>Context: {html.escape(scope_label)}</small>" if scope_label else ""
+        )
         st.markdown(
             f'<div class="evidence-card"><div class="evidence-kind">{kind}</div>'
             f"{statement}{scope_text}</div>",
@@ -330,11 +525,12 @@ def _render_model_evidence(case: dict[str, Any]) -> None:
     if not model:
         st.warning("No saved model explanation is available for this case.")
         return
+    model_name = model.get("model_name", "N/A")
     header = st.columns(4)
-    header[0].metric("Model", str(model.get("model_name", "N/A")))
+    header[0].metric("Model", _display_model_name(model_name))
     header[1].metric("Ranking score", _format_metric(model.get("score")))
     header[2].metric("Threshold", _format_metric(model.get("threshold")))
-    header[3].metric("Validation rank", _format_count(model.get("rank")))
+    header[3].metric("Model role", _model_role(model_name))
     contributions = model.get("feature_contributions", case.get("feature_contributions", []))
     if not isinstance(contributions, list) or not contributions:
         st.caption("No local feature-contribution artifact was saved.")
@@ -350,6 +546,7 @@ def _render_model_evidence(case: dict[str, Any]) -> None:
         st.dataframe(frame, width="stretch", hide_index=True)
         return
     frame[value_column] = pd.to_numeric(frame[value_column], errors="coerce")
+    frame[feature_column] = frame[feature_column].map(_display_feature_name)
     chart = frame.dropna(subset=[value_column]).copy()
     chart = chart.reindex(chart[value_column].abs().sort_values(ascending=True).index).tail(15)
     if not chart.empty:
@@ -364,8 +561,8 @@ def _render_model_evidence(case: dict[str, Any]) -> None:
             )
         )
         figure.update_layout(
-            title="Saved local feature contributions",
-            xaxis_title="Contribution to model score",
+            title="Factors influencing the saved score",
+            xaxis_title="Contribution to saved score",
             height=max(320, len(chart) * 28),
             margin={"l": 20, "r": 15, "t": 55, "b": 40},
             paper_bgcolor="rgba(0,0,0,0)",
@@ -373,9 +570,48 @@ def _render_model_evidence(case: dict[str, Any]) -> None:
         )
         st.plotly_chart(figure, width="stretch", key="case-local-explanation")
     st.caption(
-        "Model evidence explains the saved prioritization score. It is separate from directly "
-        "observed transaction and graph facts. GraphSAGE sigmoid scores are uncalibrated."
+        "Model contribution is shown separately from directly observed transaction and network "
+        "facts. A model score does not establish wrongdoing."
     )
+    if _canonical_model_name(model_name) in {"graphsage", "graphsage_edge_classifier"}:
+        st.caption(
+            "GraphSAGE is a research comparator. Its saved sigmoid score is uncalibrated and is "
+            "not the primary operational ranking."
+        )
+
+
+def _display_transactions(case: dict[str, Any]) -> pd.DataFrame:
+    transactions = case.get("transactions")
+    if not isinstance(transactions, list) or not transactions:
+        return pd.DataFrame()
+    frame = pd.DataFrame(transactions)
+    aliases = {
+        "transaction_id": "Transaction ID",
+        "timestamp": "Timestamp",
+        "from_node_id": "Sender",
+        "source": "Sender",
+        "to_node_id": "Receiver",
+        "target": "Receiver",
+        "amount": "Amount",
+        "amount_paid": "Amount Paid",
+        "amount_received": "Amount Received",
+        "payment_currency": "Payment Currency",
+        "receiving_currency": "Receiving Currency",
+        "payment_format": "Payment Format",
+        "is_focal": "Focal Transaction",
+    }
+    columns: list[str] = []
+    used_labels: set[str] = set()
+    for source, label in aliases.items():
+        if source in frame and label not in used_labels:
+            columns.append(source)
+            used_labels.add(label)
+    displayed = frame[columns].copy()
+    if "timestamp" in displayed:
+        timestamps = pd.to_datetime(displayed["timestamp"], errors="coerce", utc=True)
+        displayed["timestamp"] = timestamps.dt.strftime("%Y-%m-%d %H:%M:%S UTC").fillna("N/A")
+    displayed.rename(columns=aliases, inplace=True)
+    return displayed
 
 
 def render_case_investigator(artifacts: DashboardArtifacts) -> None:
@@ -389,11 +625,17 @@ def render_case_investigator(artifacts: DashboardArtifacts) -> None:
     selected_case_id = st.selectbox("Case", case_ids)
     case = artifacts.cases[selected_case_id]
     queue_row = queue.loc[queue["case_id"].astype(str).eq(selected_case_id)].iloc[0]
+    case_model = _case_model_name(case)
+    research_case = _canonical_model_name(case_model) in {
+        "graphsage",
+        "graphsage_edge_classifier",
+    }
 
     accounts, transaction_count = _case_counts(case, queue_row)
     metrics = st.columns(5)
-    metrics[0].metric("Priority", _case_priority(case, queue_row).title())
-    metrics[1].metric("Uncalibrated score", _format_metric(_case_risk(case, queue_row)))
+    metrics[0].metric("Priority", _humanize(_case_priority(case, queue_row)))
+    score_label = "Research score" if research_case else "Priority score"
+    metrics[1].metric(score_label, _format_metric(_case_risk(case, queue_row)))
     metrics[2].metric("Accounts", _format_count(accounts))
     metrics[3].metric("Transactions", _format_count(transaction_count))
     metrics[4].metric(
@@ -401,9 +643,15 @@ def render_case_investigator(artifacts: DashboardArtifacts) -> None:
         _format_money(_case_value(case, queue_row, "total_flow"), case.get("currency")),
     )
     st.caption(
-        f"Case {selected_case_id} · Status: {case.get('status', 'pending_human_review')} · "
-        f"Seed transaction: {case.get('transaction_id', case.get('seed_transaction_id', 'N/A'))}"
+        f"Case {selected_case_id} · Status: "
+        f"{_humanize(case.get('status', 'pending_human_review'))} · Focal transaction: "
+        f"{case.get('transaction_id', case.get('seed_transaction_id', 'N/A'))}"
     )
+    if research_case:
+        st.info(
+            "This saved case was ranked by the GraphSAGE research comparator. "
+            "Graph-enhanced LightGBM is the primary operational model."
+        )
 
     network_figure = build_network_figure(case)
     if network_figure is None:
@@ -427,22 +675,22 @@ def render_case_investigator(artifacts: DashboardArtifacts) -> None:
     with right:
         pattern = _case_value(case, queue_row, "major_pattern")
         st.subheader("Case context")
-        st.write(f"**Major pattern:** {pattern or 'N/A'}")
+        st.write(f"**Primary pattern:** {_display_pattern(pattern)}")
         note = case.get("analyst_note", case.get("case_note"))
         if isinstance(note, dict):
-            st.write(note.get("text", "No saved analyst note."))
-            st.caption(f"Note mode: {note.get('mode', 'unspecified')}")
+            st.write(_display_case_note(case, note.get("text", "No saved analyst note.")))
         elif note:
-            st.write(str(note))
+            st.write(_display_case_note(case, note))
         else:
-            st.caption("No saved case note. The application does not call an LLM on page load.")
+            st.caption("No saved case note is available.")
+        st.caption("Case notes summarize saved evidence and require analyst verification.")
         st.info("Human review is required. No automatic adverse action is authorized.")
 
     _render_model_evidence(case)
-    transactions = case.get("transactions")
-    if isinstance(transactions, list) and transactions:
+    transactions = _display_transactions(case)
+    if not transactions.empty:
         st.subheader("Transactions in this saved case")
-        st.dataframe(pd.DataFrame(transactions), width="stretch", hide_index=True)
+        st.dataframe(transactions, width="stretch", hide_index=True)
 
 
 def _render_top_k(top_k: pd.DataFrame, *, partition_label: str = "Validation") -> None:
@@ -455,11 +703,12 @@ def _render_top_k(top_k: pd.DataFrame, *, partition_label: str = "Validation") -
     figure = go.Figure()
     for model, frame in top_k.groupby("model", sort=False):
         ordered = frame.sort_values("k", kind="mergesort")
+        label = _display_model_name(model)
         figure.add_trace(
             go.Scatter(
                 x=ordered["k"],
                 y=ordered["recall_at_k"],
-                name=f"{model} recall",
+                name=f"{label} recall",
                 mode="lines+markers",
             )
         )
@@ -467,7 +716,7 @@ def _render_top_k(top_k: pd.DataFrame, *, partition_label: str = "Validation") -
             go.Scatter(
                 x=ordered["k"],
                 y=ordered["precision_at_k"],
-                name=f"{model} precision",
+                name=f"{label} precision",
                 mode="lines+markers",
                 line={"dash": "dot"},
             )
@@ -486,12 +735,14 @@ def _render_top_k(top_k: pd.DataFrame, *, partition_label: str = "Validation") -
 
 def _render_ablation(ablation: pd.DataFrame) -> None:
     if ablation.empty:
-        st.info("No saved feature-family ablation artifact is available in Sprint 4.")
+        st.info("No saved feature-family ablation is available.")
         return
+    displayed = ablation.copy()
+    displayed["feature_family"] = displayed["feature_family"].map(_humanize)
     figure = go.Figure(
         go.Bar(
-            x=ablation["feature_family"].astype(str),
-            y=ablation["pr_auc"],
+            x=displayed["feature_family"].astype(str),
+            y=displayed["pr_auc"],
             marker_color="#0f766e",
         )
     )
@@ -505,7 +756,11 @@ def _render_ablation(ablation: pd.DataFrame) -> None:
         plot_bgcolor="rgba(0,0,0,0)",
     )
     st.plotly_chart(figure, width="stretch", key="model-ablation")
-    st.dataframe(ablation, width="stretch", hide_index=True)
+    st.dataframe(
+        displayed.rename(columns={"feature_family": "Feature Set", "pr_auc": "PR-AUC"}),
+        width="stretch",
+        hide_index=True,
+    )
 
 
 def _final_summary_value(summary: dict[str, Any], key: str) -> Any:
@@ -523,20 +778,20 @@ def _render_final_evaluation(artifacts: DashboardArtifacts) -> None:
     if final is None:
         st.divider()
         st.info(
-            "No Sprint 5 final-test payload is attached. The validation comparison, queue, and "
-            "cases above remain fully usable from the Sprint 4 artifact set."
+            "Final-test results are not included in the loaded artifact set. Validation model "
+            "evidence and saved cases remain available."
         )
         return
 
     st.divider()
     st.markdown(
-        '<div class="argus-eyebrow">FROZEN ONE-SHOT FINAL TEST</div>',
+        '<div class="argus-eyebrow">FINAL MODEL EVIDENCE</div>',
         unsafe_allow_html=True,
     )
-    st.header("Final evaluation — reporting only")
+    st.header("Final evaluation")
     st.success(
-        "Pre-frozen champion: graph_enhanced_lightgbm. It was selected on validation before "
-        "the single test access; test metrics did not select or tune the model."
+        "Primary operational model: Graph-enhanced LightGBM. It was selected on validation "
+        "before the single final-test evaluation; test metrics did not select or tune the model."
     )
 
     summary = final.summary
@@ -557,35 +812,10 @@ def _render_final_evaluation(artifacts: DashboardArtifacts) -> None:
         "base-rate shift; the shift was not corrected by changing the model or threshold."
     )
 
-    comparison = final.model_comparison.copy()
-    comparison.insert(
-        0,
-        "frozen_status",
-        comparison["is_frozen_champion"].map(
-            lambda selected: "PRE-FROZEN CHAMPION" if selected else "comparator only"
-        ),
-    )
-    preferred = [
-        "frozen_status",
-        "model",
-        "version",
-        "pr_auc",
-        "roc_auc",
-        "precision",
-        "recall",
-        "f1",
-        "fpr",
-        "recall_at_k",
-        "precision_at_k",
-        "alerts",
-        "row_count",
-        "positive_count",
-        "evaluation_partition",
-    ]
-    columns = [column for column in preferred if column in comparison]
-    st.dataframe(comparison[columns], width="stretch", hide_index=True)
+    comparison = _ordered_models(final.model_comparison)
+    st.dataframe(_display_model_table(comparison, final=True), width="stretch", hide_index=True)
     st.plotly_chart(
-        build_model_metric_figure(final.model_comparison, partition_label="Final test"),
+        build_model_metric_figure(comparison, partition_label="Final test"),
         width="stretch",
         key="final-model-comparison-bars",
     )
@@ -599,42 +829,27 @@ def _render_final_evaluation(artifacts: DashboardArtifacts) -> None:
     with right:
         _render_top_k(final.top_k, partition_label="Final test")
     st.warning(
-        "The final test has been consumed exactly once. These artifacts are immutable evaluation "
-        "evidence; no post-test tuning or champion reselection is permitted."
+        "The final test was evaluated once after the model, feature set, and threshold were "
+        "frozen. No post-test tuning or model reselection was performed."
     )
-    with st.expander("Final-test artifact provenance"):
-        st.caption("Every displayed final value is loaded from these saved artifact paths.")
-        for label, path in sorted(final.provenance.items()):
-            st.markdown(f"**{label.replace('_', ' ').title()}**")
-            st.code(path, language=None)
 
 
 def render_model_comparison(artifacts: DashboardArtifacts) -> None:
     _page_heading(
-        "FROZEN VALIDATION + FINAL EVIDENCE",
-        "Model Comparison",
-        "Pre-test model selection and one-shot final evidence remain visibly separated.",
+        "VALIDATION AND FINAL RESULTS",
+        "Model Evidence",
+        "Compare the primary operational model with transaction-only and GraphSAGE research "
+        "baselines.",
     )
     _render_final_evaluation(artifacts)
     st.divider()
-    st.subheader("Frozen validation reference")
-    comparison = artifacts.model_comparison
-    preferred = [
-        "version",
-        "model",
-        "feature_family",
-        "scope",
-        "pr_auc",
-        "recall_at_k",
-        "precision_at_k",
-        "f1",
-        "fpr",
-        "alerts",
-        "roc_auc",
-        "evaluation_partition",
-    ]
-    columns = [column for column in preferred if column in comparison]
-    st.dataframe(comparison[columns], width="stretch", hide_index=True)
+    st.subheader("Validation evidence")
+    comparison = _ordered_models(artifacts.model_comparison)
+    st.dataframe(_display_model_table(comparison), width="stretch", hide_index=True)
+    st.caption(
+        "Graph-enhanced LightGBM is the operational ranking model. GraphSAGE is retained as a "
+        "research comparator and did not outperform the graph-enhanced tabular model."
+    )
     st.plotly_chart(
         build_model_metric_figure(comparison), width="stretch", key="model-comparison-bars"
     )
@@ -677,39 +892,38 @@ def main() -> None:
     st.set_page_config(page_title="ARGUS Network Investigator", page_icon="◈", layout="wide")
     _inject_style()
     st.sidebar.markdown("## ARGUS")
-    st.sidebar.caption("Network Investigator · Saved artifacts only")
+    st.sidebar.caption("Financial Crime Network Investigator")
     requested_page = st.query_params.get("page")
     page_index = _PAGES.index(requested_page) if requested_page in _PAGES else 0
     page = st.sidebar.radio("Workspace", _PAGES, index=page_index)
     artifact_root = configured_artifact_root()
     st.sidebar.divider()
-    st.sidebar.caption("Artifact source")
-    st.sidebar.caption(str(artifact_root))
-    st.sidebar.caption("No model training or inference on page load")
+    st.sidebar.caption("Saved results · No live model execution")
 
     try:
         artifacts = _cached_load(str(artifact_root))
     except ArtifactLoadError as exc:
-        st.error("Saved Sprint 4 artifacts are not ready.")
-        st.code(str(exc), language=None)
+        st.error("Saved analysis artifacts are unavailable.")
         st.info(
-            "The application never trains a model at page load. Run the offline Sprint 4 pipeline "
-            "to create the required queue, cases, and validation model-comparison artifacts."
+            "Create the required saved queue, case, and model-comparison artifacts before "
+            "starting the application. The application does not train or score models on page load."
         )
+        with st.expander("Technical details"):
+            st.code(str(exc), language=None)
         st.stop()
         return
 
     if artifacts.final_evaluation is None:
-        st.sidebar.caption("Sprint 4 validation · Final test unopened")
+        st.sidebar.caption("Validation evidence loaded")
     else:
-        st.sidebar.caption("Sprint 5 · Frozen one-shot final test")
-        st.sidebar.caption("Pre-frozen champion: graph_enhanced_lightgbm")
+        st.sidebar.caption("Final evaluation loaded")
+        st.sidebar.caption("Primary model: Graph-enhanced LightGBM")
 
     renderers = {
-        "Executive Dashboard": render_executive_dashboard,
-        "Investigation Queue": render_investigation_queue,
+        "Overview": render_executive_dashboard,
+        "Investigations": render_investigation_queue,
         "Case Investigator": render_case_investigator,
-        "Model Comparison": render_model_comparison,
+        "Model Evidence": render_model_comparison,
     }
     renderers[page](artifacts)
     st.divider()

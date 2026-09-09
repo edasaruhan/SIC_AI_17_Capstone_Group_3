@@ -1,9 +1,8 @@
 # Data: IBM AML HI-Small
 
-Sprint 1 uses the user-supplied IBM AML HI-Small transaction file and its companion
-accounts table. These are synthetic research data, but they are still large source
-assets with a separate dataset license. They are local inputs, not repository
-content.
+ARGUS uses the IBM AML HI-Small transaction file and its companion accounts table.
+The data is synthetic, distributed under a separate dataset license and kept as a
+local input rather than repository content.
 
 ## Required placement
 
@@ -30,9 +29,8 @@ Only `.gitkeep` placeholders are eligible for version control. Do not use
 
 ## Provenance and integrity
 
-The project uses IBM Research AML-Data, HI-Small, supplied directly by the user.
-The existing project documents identify this as the primary dataset; PaySim is not
-part of Sprint 1.
+IBM Research AML-Data HI-Small is the primary experimental dataset. PaySim is
+outside the final experimental scope.
 
 Upstream context:
 
@@ -43,8 +41,8 @@ Upstream context:
 These links establish project provenance; the local hashes below define the exact
 snapshot audited here. Do not assume a later upstream archive is byte-identical.
 
-The following values came from a read-only, full-file audit on 2026-09-06. They are
-not inferred from a quick sample.
+The following values come from a read-only full-file audit and are not inferred
+from a quick sample.
 
 | File | Bytes | Data rows | SHA-256 |
 | --- | ---: | ---: | --- |
@@ -162,31 +160,23 @@ timestamp repeats. Repeated edges carry behavioral information. The pipeline mus
 3. keep the default handling decision explicit in the run manifest;
 4. avoid changing label counts silently.
 
-## Full audit versus quick artifacts
+## Full audit and execution scopes
 
-The initial audit above streamed every row independently of the project pipeline.
-It used binary reads with a 1 MiB buffer, exact record-byte sets for duplicates,
-strict timestamp parsing, finite-number checks, counters, and composite-key
-membership checks. Duplicate groups were independently checked with:
-
-```powershell
-& 'C:\Program Files\Git\bin\bash.exe' -lc "LC_ALL=C sort '/c/Users/MONSTER/Downloads/HI-Small_Trans.csv' | uniq -d"
-```
-
-The project audit command subsequently passed and saved the matching full-source
-evidence at `artifacts/full/raw_data_audit.json`:
+The audit streams every row and applies strict timestamp parsing, finite-number
+checks, duplicate counters and composite-key membership checks. It writes the
+full-source evidence to `artifacts/full/raw_data_audit.json`:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts/audit_raw_data.py
 ```
 
-By contrast, `configs/quick.yaml` limits feature and EDA work to the first 10,000
+`configs/quick.yaml` limits feature and EDA work to the first 10,000
 transactions in chronological source order. The verified quick pipeline generated
 52-column features and EDA under `artifacts/quick/`, including 13 PNG figures and
 12 CSV EDA tables. Those sampled outputs cannot be used to restate full-file facts.
 
-The out-of-core full Sprint 1 pipeline subsequently processed all 5,078,345 rows
-without feature sampling. It wrote 52-column feature and chronological split
+The out-of-core full pipeline processed all 5,078,345 rows without feature
+sampling. It wrote 52-column feature and chronological split
 Parquet outputs under `artifacts/full/` in 304.93406899999536 seconds. DuckDB used a
 bounded `2GB` limit and one thread. Full-exact EDA tables cover every row; plots use
 a target-independent deterministic 100,000-row edge sample and NetworkX is capped

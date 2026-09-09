@@ -61,7 +61,7 @@ def _deterministic_text(bundle: EvidenceBundle) -> str:
         f"Transaction {bundle.transaction_id} was prioritized by {model.model_name} with "
         f"{model.score_name}={model.score:.8g}.{threshold_context}{rank_context} "
         f"Observed context: {observations} The score and any feature attribution are model "
-        "evidence only and do not establish wrongdoing. The supplied context may be "
+        "evidence only and do not establish wrongdoing. The saved case context may be "
         "incomplete and requires verification through trained analyst review. No automatic "
         "account action is authorized."
     )

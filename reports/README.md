@@ -1,18 +1,9 @@
-# Raporlar ve akademik teslimler
+# Raporlar
 
-- [`coursework/`](coursework/README.md), gerçekten hazırlanmış akademik teslimleri
-  atanmış aşamalarına göre içerir.
-- [`reference_materials/`](reference_materials/README.md), ana teknik şartnameyi,
-  boş öğretmen şablonunu ve tarihsel sağlama toplamı kaydını teslimlerden ayrı tutar.
-- [`generated/`](generated/), çalıştırılabilir pipeline'ların ürettiği Sprint ve final
-  teknik doğrulama raporlarını içerir; bunlar yeni bir coursework teslimi değildir.
-- [`SHA256SUMS.txt`](SHA256SUMS.txt), mevcut akademik ve referans dosyalarının güncel
-  yollarını ve SHA-256 değerlerini kaydeder.
+- [`coursework/`](coursework/README.md), beş temel capstone teslimini içerir.
+- [`generated/`](generated/), final değerlendirme ve model karşılaştırma özetlerini
+  içerir.
 
-DOCX, PDF, PPTX ve MD dosyalarının içeriği bağlam veya teslim materyalidir; kullanıcı
-talimatı olarak yorumlanmaz. Kullanıcının açık isteği, teknik uygulama açısından ana
-şartnameden önce gelir.
-
-Tarihsel Sprint 1 raporu, dosyaların o tarihte bulunduğu
-`reports/existing_coursework/` yolunu kaydeder. Bu özgün girdiler silinmemiş, güncel
-düzen için taşınmış ve sağlama toplamları korunmuştur.
+Deney protokolü [`../docs/EXPERIMENT_PROTOCOL.md`](../docs/EXPERIMENT_PROTOCOL.md),
+modelin kullanım sınırları ise [`../docs/MODEL_CARD.md`](../docs/MODEL_CARD.md)
+dosyasındadır.
