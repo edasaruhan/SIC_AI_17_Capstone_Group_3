@@ -38,6 +38,10 @@ _MODEL_LABELS = {
     "graphsage_edge_classifier": "GraphSAGE",
     "graphsage": "GraphSAGE",
 }
+_SAVED_RESEARCH_CASE_NOTICE = (
+    "Graph-enhanced LightGBM is the primary ranking model. The current saved case examples "
+    "are drawn from the GraphSAGE research-comparator artifact set."
+)
 
 
 def _canonical_model_name(value: Any) -> str:
@@ -324,11 +328,7 @@ def render_executive_dashboard(artifacts: DashboardArtifacts) -> None:
             "The primary Graph-enhanced LightGBM result is not present in this artifact set."
         )
     if _queue_uses_graphsage(artifacts):
-        st.info(
-            "The saved case examples were produced by the GraphSAGE research comparator. "
-            "They are presented as evidence-led case examples and are not relabeled or rescored "
-            "as outputs of the primary LightGBM model."
-        )
+        st.info(_SAVED_RESEARCH_CASE_NOTICE)
 
     st.subheader("Model evidence at a glance")
     ordered_comparison = _ordered_models(artifacts.model_comparison)
@@ -414,10 +414,7 @@ def render_investigation_queue(artifacts: DashboardArtifacts) -> None:
         "an accusation.",
     )
     if research_queue:
-        st.info(
-            "These saved case examples use the GraphSAGE research-comparator ranking. "
-            "Graph-enhanced LightGBM remains the primary operational model."
-        )
+        st.info(_SAVED_RESEARCH_CASE_NOTICE)
     filtered = _filter_queue(artifacts.queue, score_label=score_label)
     if filtered.empty:
         st.warning("No saved cases match the current filters.")
@@ -648,10 +645,7 @@ def render_case_investigator(artifacts: DashboardArtifacts) -> None:
         f"{case.get('transaction_id', case.get('seed_transaction_id', 'N/A'))}"
     )
     if research_case:
-        st.info(
-            "This saved case was ranked by the GraphSAGE research comparator. "
-            "Graph-enhanced LightGBM is the primary operational model."
-        )
+        st.info(_SAVED_RESEARCH_CASE_NOTICE)
 
     network_figure = build_network_figure(case)
     if network_figure is None:

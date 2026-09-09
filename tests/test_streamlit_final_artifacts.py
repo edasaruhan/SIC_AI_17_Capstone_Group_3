@@ -413,13 +413,22 @@ def test_streamlit_labels_final_test_as_frozen_reporting_only(
     ]
     assert any("Frozen final evaluation" in item.value for item in app.subheader)
     assert any("reporting-only" in item.value for item in app.caption)
-    assert any("GraphSAGE research comparator" in item.value for item in app.info)
+    case_provenance = (
+        "Graph-enhanced LightGBM is the primary ranking model. The current saved case examples "
+        "are drawn from the GraphSAGE research-comparator artifact set."
+    )
+    assert any(case_provenance in item.value for item in app.info)
 
     app.sidebar.radio[0].set_value("Investigations")
     app.run(timeout=20)
     assert not app.exception
-    assert any("GraphSAGE research-comparator ranking" in item.value for item in app.info)
+    assert any(case_provenance in item.value for item in app.info)
     assert all("uncalibrated_ranking_score" not in str(item.value) for item in app.dataframe)
+
+    app.sidebar.radio[0].set_value("Case Investigator")
+    app.run(timeout=20)
+    assert not app.exception
+    assert any(case_provenance in item.value for item in app.info)
 
     app.sidebar.radio[0].set_value("Model Evidence")
     app.run(timeout=20)

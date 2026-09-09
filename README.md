@@ -27,8 +27,10 @@ Sistem otomatik yaptırım uygulamaz. Üretilen skorlar yalnızca inceleme önce
 3. İşlem, zaman, geçmiş ve yönlü graf özellikleri yalnız geçmiş olaylardan üretilir.
 4. Transaction LightGBM, graph-enhanced LightGBM ve GraphSAGE aynı kronolojik
    protokolde karşılaştırılır.
-5. Donmuş graph-enhanced LightGBM skoru inceleme kuyruğunu oluşturur.
-6. Vaka ekranı gözlenen kanıtı model açıklamasından ayrı gösterir.
+5. Graph-enhanced LightGBM birincil sıralama modeli olarak kullanılır.
+6. Mevcut kayıtlı vaka örnekleri GraphSAGE araştırma karşılaştırmasına ait artifact
+   setinden alınır.
+7. Vaka ekranı gözlenen kanıtı model açıklamasından ayrı gösterir.
 
 ## Veri
 
@@ -113,10 +115,12 @@ karşılaştırması olarak tutulur.
 ## Analist ürünü
 
 Streamlit uygulaması kayıtlı artifact'ları okur ve açılışta model eğitmez. Dört ana
-görünüm bulunur:
+görünüm bulunur. Graph-enhanced LightGBM birincil sıralama modelidir. Uygulamadaki
+mevcut kayıtlı vaka örnekleri GraphSAGE araştırma karşılaştırmasına ait artifact setinden
+alınır.
 
 - **Overview:** veri kapsamı, final model ve temel operasyonel sonuçlar;
-- **Investigations:** graph-enhanced LightGBM ile önceliklendirilmiş vakalar;
+- **Investigations:** kayıtlı GraphSAGE araştırma vaka örnekleri;
 - **Case Investigator:** yönlü hesap ağı, odak işlem, gözlenen kanıt ve model açıklaması;
 - **Model Evidence:** final model, transaction baseline ve GraphSAGE karşılaştırması.
 
@@ -135,10 +139,13 @@ flowchart LR
     D --> F
     E --> F
     B --> G[GraphSAGE araştırma deneyi]
-    F --> H[Vaka ve kanıt motoru]
-    G --> I[Model karşılaştırması]
+    F --> H[Birincil model sonuçları]
+    G --> I[Kayıtlı araştırma vaka örnekleri]
+    F --> K[Model karşılaştırması]
+    G --> K
     H --> J[Streamlit]
     I --> J
+    K --> J
 ```
 
 Ana bileşenler:
