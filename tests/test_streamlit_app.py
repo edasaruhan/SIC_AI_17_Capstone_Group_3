@@ -9,6 +9,19 @@ from streamlit.testing.v1 import AppTest
 from argus.app.dashboard import _metric_value
 
 
+def _button(app: AppTest, label: str):
+    return next(button for button in app.button if button.label == label)
+
+
+def _login(app: AppTest) -> AppTest:
+    _button(app, "Corporate Login").click()
+    app.run(timeout=20)
+    app.text_input[0].set_value("analyst@bank.example")
+    app.text_input[1].set_value("prototype-access")
+    _button(app, "Sign in").click()
+    return app.run(timeout=20)
+
+
 def _write_bundle(root: Path) -> None:
     case = {
         "case_id": "ARG-0001",
@@ -88,9 +101,15 @@ def test_streamlit_all_required_screens_render_from_saved_artifacts(
 ) -> None:
     _write_bundle(tmp_path)
     monkeypatch.setenv("ARGUS_SPRINT4_ARTIFACT_DIR", str(tmp_path))
+    monkeypatch.delenv("ARGUS_DEMO_EMAIL", raising=False)
+    monkeypatch.delenv("ARGUS_DEMO_PASSWORD", raising=False)
     app_path = Path(__file__).resolve().parents[1] / "app.py"
 
     app = AppTest.from_file(str(app_path)).run(timeout=20)
+    assert not app.exception
+    assert _button(app, "Corporate Login")
+
+    app = _login(app)
     assert not app.exception
     assert app.title[0].value == "Overview"
     assert all(metric.label != "GraphSAGE queue alerts" for metric in app.metric)
@@ -101,16 +120,44 @@ def test_streamlit_all_required_screens_render_from_saved_artifacts(
         assert not app.exception
         assert app.title[0].value == page
 
+    app.sidebar.radio[0].set_value("Investigations")
+    app.run(timeout=20)
+    _button(app, "View selected case").click()
+    app.run(timeout=20)
+    assert not app.exception
+    assert app.title[0].value == "Case Investigator"
+    assert app.sidebar.radio[0].value == "Case Investigator"
+
+    _button(app, "Log out").click()
+    app.run(timeout=20)
+    assert not app.exception
+    assert _button(app, "Corporate Login")
+
 
 def test_streamlit_missing_artifacts_shows_actionable_error(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("ARGUS_SPRINT4_ARTIFACT_DIR", str(tmp_path))
+    monkeypatch.delenv("ARGUS_DEMO_EMAIL", raising=False)
+    monkeypatch.delenv("ARGUS_DEMO_PASSWORD", raising=False)
     app_path = Path(__file__).resolve().parents[1] / "app.py"
 
     app = AppTest.from_file(str(app_path)).run(timeout=20)
+    assert not app.exception
+    assert _button(app, "Corporate Login")
+
+    app = _login(app)
 
     assert not app.exception
-    assert app.error[0].value == "Saved analysis artifacts are unavailable."
-    assert any("investigation_queue.csv" in element.value for element in app.code)
+    assert app.title[0].value == "Investigation workspace unavailable"
+    assert app.error[0].value == (
+        "The saved investigation package could not be loaded in this environment."
+    )
+    visible_text = " ".join(
+        str(element.value)
+        for group in (app.error, app.info, app.markdown, app.caption)
+        for element in group
+    )
+    assert str(tmp_path) not in visible_text
+    assert "investigation_queue.csv" not in visible_text
 
 
 def test_executive_metrics_do_not_mix_queue_and_validation_leader_models() -> None:

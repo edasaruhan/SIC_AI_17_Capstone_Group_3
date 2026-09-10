@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 import math
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -36,6 +36,7 @@ class DashboardArtifacts:
     ablation: pd.DataFrame
     provenance: dict[str, str]
     final_evaluation: FinalEvaluationArtifacts | None = None
+    primary_explanations: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -81,6 +82,11 @@ _ABLATION_CANDIDATES = (
     "feature_family_ablation.csv",
 )
 _SUMMARY_CANDIDATES = ("product/dashboard_summary.json", "dashboard_summary.json")
+_PRIMARY_EXPLANATION_CANDIDATES = (
+    "product/tree_shap_explanations.json",
+    "explanations/tree_shap_explanations.json",
+    "tree_shap_explanations.json",
+)
 _VALIDATION_REFERENCE_CANDIDATES = (
     "product/validation_artifact_reference.json",
     "product/sprint4_artifact_reference.json",
@@ -322,6 +328,67 @@ def _normalise_ablation(frame: pd.DataFrame) -> pd.DataFrame:
 
 def _canonical_model_name(value: Any) -> str:
     return "_".join(str(value).strip().lower().replace("-", " ").split())
+
+
+def _load_primary_explanations(
+    root: Path, cases: dict[str, dict[str, Any]]
+) -> tuple[dict[str, dict[str, Any]], str | None]:
+    """Load optional frozen LightGBM TreeSHAP records for the displayed case IDs."""
+
+    path = _first_existing(root, _PRIMARY_EXPLANATION_CANDIDATES)
+    if path is None:
+        return {}, None
+    payload = _read_json(path)
+    if not isinstance(payload, dict):
+        raise ArtifactLoadError("Primary-model explanation artifact must be a JSON object.")
+    if _canonical_model_name(payload.get("model")) != _FROZEN_FINAL_CHAMPION:
+        raise ArtifactLoadError("Primary-model explanations must identify graph-enhanced LightGBM.")
+    if str(payload.get("partition", "")).strip().lower() != "validation":
+        raise ArtifactLoadError("Primary-model explanations must come from validation cases.")
+    if _truthy(payload.get("test_rows_used", False)):
+        raise ArtifactLoadError("Primary-model explanations may not use final-test rows.")
+    method = str(payload.get("method", "")).strip().lower()
+    if "treeshap" not in method or "lightgbm" not in method:
+        raise ArtifactLoadError("Primary-model explanations must use saved LightGBM TreeSHAP.")
+    records = payload.get("explanations")
+    if not isinstance(records, list):
+        raise ArtifactLoadError("Primary-model explanations must contain an explanations list.")
+
+    explanations: dict[str, dict[str, Any]] = {}
+    for record in records:
+        if not isinstance(record, dict):
+            raise ArtifactLoadError("Every primary-model explanation must be a JSON object.")
+        case_id = str(record.get("case_id", "")).strip()
+        if not case_id:
+            raise ArtifactLoadError("Every primary-model explanation needs a case_id.")
+        if case_id in explanations:
+            raise ArtifactLoadError(f"Duplicate primary-model explanation for case {case_id}.")
+        if _canonical_model_name(record.get("model")) != _FROZEN_FINAL_CHAMPION:
+            raise ArtifactLoadError(
+                f"Primary-model explanation for case {case_id} has an unexpected model."
+            )
+        if _truthy(record.get("causal_claim", False)):
+            raise ArtifactLoadError(
+                f"Primary-model explanation for case {case_id} may not make a causal claim."
+            )
+        contributions = record.get("top_contributions")
+        if not isinstance(contributions, list):
+            raise ArtifactLoadError(
+                f"Primary-model explanation for case {case_id} needs top_contributions."
+            )
+        if case_id in cases:
+            explanation_transaction = str(record.get("transaction_id", "")).strip()
+            case_transaction = str(cases[case_id].get("transaction_id", "")).strip()
+            if (
+                explanation_transaction
+                and case_transaction
+                and explanation_transaction != case_transaction
+            ):
+                raise ArtifactLoadError(
+                    f"Primary-model explanation transaction does not match case {case_id}."
+                )
+            explanations[case_id] = dict(record)
+    return explanations, str(path)
 
 
 def _truthy(value: Any) -> bool:
@@ -960,6 +1027,9 @@ def load_dashboard_artifacts(root: str | Path) -> DashboardArtifacts:
     if unknown_case_ids:
         preview = ", ".join(unknown_case_ids[:5])
         raise ArtifactLoadError(f"Queue references case IDs absent from cases artifact: {preview}")
+    primary_explanations, explanation_source = _load_primary_explanations(artifact_root, cases)
+    if explanation_source:
+        provenance["primary_explanations"] = explanation_source
 
     comparison_value = bundle.get("model_comparison")
     comparison_frame, comparison_source = _optional_frame(
@@ -1028,4 +1098,5 @@ def load_dashboard_artifacts(root: str | Path) -> DashboardArtifacts:
         ablation=_normalise_ablation(ablation_raw),
         provenance=provenance,
         final_evaluation=final_evaluation,
+        primary_explanations=primary_explanations,
     )

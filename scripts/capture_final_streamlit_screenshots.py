@@ -6,6 +6,7 @@ import argparse
 import base64
 import json
 import os
+import secrets
 import shutil
 import socket
 import subprocess
@@ -197,85 +198,114 @@ class _DevToolsClient:
             return result
 
 
+def _evaluate(client: _DevToolsClient, session_id: str, expression: str) -> Any:
+    evaluated = client.command(
+        "Runtime.evaluate",
+        {"expression": expression, "returnByValue": True},
+        session_id=session_id,
+    )
+    return evaluated.get("result", {}).get("value")
+
+
+def _wait_for_text(
+    client: _DevToolsClient,
+    session_id: str,
+    expected: str,
+    *,
+    timeout_seconds: float = 40.0,
+) -> None:
+    quoted = json.dumps(expected)
+    expression = (
+        "(() => {"
+        "const text=(document.body && document.body.innerText)||'';"
+        "const skeletons=document.querySelectorAll('[data-testid=stSkeleton]').length;"
+        f"return {{ready:text.includes({quoted})&&skeletons===0,"
+        "text:text.slice(0,500),skeletons:skeletons};"
+        "})()"
+    )
+    deadline = time.monotonic() + timeout_seconds
+    observed: Any = None
+    while time.monotonic() < deadline:
+        observed = _evaluate(client, session_id, expression)
+        if isinstance(observed, dict) and observed.get("ready") is True:
+            time.sleep(1.0)
+            return
+        time.sleep(0.4)
+    raise TimeoutError(f"Streamlit page did not fully render: {expected}; {observed}")
+
+
+def _click_text(client: _DevToolsClient, session_id: str, selector: str, label: str) -> None:
+    expression = (
+        "(() => {"
+        f"const nodes=Array.from(document.querySelectorAll({json.dumps(selector)}));"
+        f"const target=nodes.find(node=>(node.innerText||node.textContent||'').trim()==="
+        f"{json.dumps(label)});"
+        "if(!target){return false;}target.click();return true;"
+        "})()"
+    )
+    if _evaluate(client, session_id, expression) is not True:
+        raise RuntimeError(f"Could not click {label!r}")
+
+
+def _fill_input(client: _DevToolsClient, session_id: str, label: str, value: str) -> None:
+    expression = (
+        "(() => {"
+        "const input=Array.from(document.querySelectorAll('input')).find("
+        f"node=>node.getAttribute('aria-label')==={json.dumps(label)});"
+        "if(!input){return false;}"
+        "const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;"
+        f"setter.call(input,{json.dumps(value)});"
+        "input.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText'}));"
+        "input.dispatchEvent(new Event('change',{bubbles:true}));"
+        "return true;})()"
+    )
+    if _evaluate(client, session_id, expression) is not True:
+        raise RuntimeError(f"Could not fill {label!r}")
+    time.sleep(0.5)
+
+
 def _capture_rendered_page(
     client: _DevToolsClient,
-    url: str,
+    session_id: str,
     page_title: str,
     destination: Path,
 ) -> None:
-    created = client.command("Target.createTarget", {"url": "about:blank"})
-    target_id = str(created["targetId"])
+    _wait_for_text(client, session_id, page_title)
+    _evaluate(
+        client,
+        session_id,
+        "document.querySelector('[data-testid=\"stMain\"]')?.scrollTo(0,0)",
+    )
+    time.sleep(0.5)
+    layout = client.command("Page.getLayoutMetrics", session_id=session_id)
+    content_size = layout.get("cssContentSize", {})
+    content_width = max(1440.0, float(content_size.get("width", 1440.0)))
+    content_height = max(1400.0, min(float(content_size.get("height", 1400.0)), 6000.0))
+    captured = client.command(
+        "Page.captureScreenshot",
+        {
+            "format": "png",
+            "fromSurface": True,
+            "captureBeyondViewport": True,
+            "clip": {
+                "x": 0,
+                "y": 0,
+                "width": content_width,
+                "height": content_height,
+                "scale": 1,
+            },
+        },
+        session_id=session_id,
+    )
+    image_data = captured.get("data")
+    if not isinstance(image_data, str) or not image_data:
+        raise RuntimeError(f"DevTools did not return a screenshot for {page_title}")
+    temporary = destination.with_name(f".{destination.name}.tmp")
     try:
-        attached = client.command("Target.attachToTarget", {"targetId": target_id, "flatten": True})
-        session_id = str(attached["sessionId"])
-        client.command("Page.enable", session_id=session_id)
-        client.command("Runtime.enable", session_id=session_id)
-        client.command(
-            "Emulation.setDeviceMetricsOverride",
-            {
-                "width": 1440,
-                "height": 1400,
-                "deviceScaleFactor": 1,
-                "mobile": False,
-            },
-            session_id=session_id,
-        )
-        client.command("Page.navigate", {"url": url}, session_id=session_id)
-        quoted_title = json.dumps(page_title)
-        expression = (
-            "(() => {"
-            "const text=(document.body && document.body.innerText)||'';"
-            "const skeletons=document.querySelectorAll('[data-testid=stSkeleton]').length;"
-            f"return {{ready:text.includes({quoted_title})&&text.includes('ARGUS')"
-            "&&text.length>100&&skeletons===0,text:text.slice(0,500),skeletons:skeletons};"
-            "})()"
-        )
-        deadline = time.monotonic() + 40.0
-        observed: Any = None
-        while time.monotonic() < deadline:
-            evaluated = client.command(
-                "Runtime.evaluate",
-                {"expression": expression, "returnByValue": True},
-                session_id=session_id,
-            )
-            observed = evaluated.get("result", {}).get("value")
-            if isinstance(observed, dict) and observed.get("ready") is True:
-                time.sleep(1.0)
-                break
-            time.sleep(0.4)
-        else:
-            raise TimeoutError(f"Streamlit page did not fully render: {page_title}; {observed}")
-        layout = client.command("Page.getLayoutMetrics", session_id=session_id)
-        content_size = layout.get("cssContentSize", {})
-        content_width = max(1440.0, float(content_size.get("width", 1440.0)))
-        content_height = max(1400.0, min(float(content_size.get("height", 1400.0)), 6000.0))
-        captured = client.command(
-            "Page.captureScreenshot",
-            {
-                "format": "png",
-                "fromSurface": True,
-                "captureBeyondViewport": True,
-                "clip": {
-                    "x": 0,
-                    "y": 0,
-                    "width": content_width,
-                    "height": content_height,
-                    "scale": 1,
-                },
-            },
-            session_id=session_id,
-        )
-        image_data = captured.get("data")
-        if not isinstance(image_data, str) or not image_data:
-            raise RuntimeError(f"DevTools did not return a screenshot for {page_title}")
-        temporary = destination.with_name(f".{destination.name}.tmp")
-        try:
-            temporary.write_bytes(base64.b64decode(image_data, validate=True))
-            os.replace(temporary, destination)
-        finally:
-            temporary.unlink(missing_ok=True)
+        temporary.write_bytes(base64.b64decode(image_data, validate=True))
+        os.replace(temporary, destination)
     finally:
-        client.command("Target.closeTarget", {"targetId": target_id})
+        temporary.unlink(missing_ok=True)
 
 
 def main() -> int:
@@ -292,7 +322,11 @@ def main() -> int:
 
     port = _free_port()
     environment = os.environ.copy()
+    demo_email = f"screenshots-{secrets.token_hex(4)}@argus.example"
+    demo_password = secrets.token_urlsafe(16)
     environment["ARGUS_ARTIFACT_DIR"] = str(artifact_root)
+    environment["ARGUS_DEMO_EMAIL"] = demo_email
+    environment["ARGUS_DEMO_PASSWORD"] = demo_password
     environment["STREAMLIT_BROWSER_GATHER_USAGE_STATS"] = "false"
     command = [
         sys.executable,
@@ -324,7 +358,9 @@ def main() -> int:
     try:
         base_url = f"http://127.0.0.1:{port}"
         _wait_for_server(base_url)
-        with tempfile.TemporaryDirectory(prefix="argus_s5_browser_") as browser_profile:
+        with tempfile.TemporaryDirectory(
+            prefix="argus_s5_browser_", ignore_cleanup_errors=True
+        ) as browser_profile:
             debugger_port = _free_port()
             browser_process = subprocess.Popen(
                 [
@@ -346,14 +382,44 @@ def main() -> int:
                 creationflags=creation_flags,
             )
             client: _DevToolsClient | None = None
+            target_id: str | None = None
             try:
                 client = _DevToolsClient(_wait_for_debugger(debugger_port))
+                created_target = client.command("Target.createTarget", {"url": "about:blank"})
+                target_id = str(created_target["targetId"])
+                attached = client.command(
+                    "Target.attachToTarget", {"targetId": target_id, "flatten": True}
+                )
+                session_id = str(attached["sessionId"])
+                client.command("Page.enable", session_id=session_id)
+                client.command("Runtime.enable", session_id=session_id)
+                client.command(
+                    "Emulation.setDeviceMetricsOverride",
+                    {
+                        "width": 1440,
+                        "height": 1400,
+                        "deviceScaleFactor": 1,
+                        "mobile": False,
+                    },
+                    session_id=session_id,
+                )
+                client.command(
+                    "Page.navigate", {"url": f"{base_url}/?view=login"}, session_id=session_id
+                )
+                _wait_for_text(client, session_id, "Corporate Login")
+                _fill_input(client, session_id, "Corporate email", demo_email)
+                _fill_input(client, session_id, "Password", demo_password)
+                _click_text(client, session_id, "button", "Sign in")
+                _wait_for_text(client, session_id, "Overview")
                 for slug, page in pages.items():
+                    if page != "Overview":
+                        _click_text(client, session_id, "label", page)
                     destination = (output_dir / f"{slug}.png").resolve()
-                    url = f"{base_url}/?{urllib.parse.urlencode({'page': page})}"
-                    _capture_rendered_page(client, url, page, destination)
+                    _capture_rendered_page(client, session_id, page, destination)
                     created.append(destination)
             finally:
+                if client is not None and target_id is not None:
+                    client.command("Target.closeTarget", {"targetId": target_id})
                 if client is not None:
                     client.close()
                 browser_process.terminate()

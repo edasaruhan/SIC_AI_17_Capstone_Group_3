@@ -12,6 +12,19 @@ from argus.app.artifacts import ArtifactLoadError, load_dashboard_artifacts
 from argus.app.dashboard import _comparison_focus
 
 
+def _button(app: AppTest, label: str):
+    return next(button for button in app.button if button.label == label)
+
+
+def _login(app: AppTest) -> AppTest:
+    _button(app, "Corporate Login").click()
+    app.run(timeout=20)
+    app.text_input[0].set_value("analyst@bank.example")
+    app.text_input[1].set_value("prototype-access")
+    _button(app, "Sign in").click()
+    return app.run(timeout=20)
+
+
 def _case() -> dict[str, object]:
     return {
         "case_id": "ARG-0001",
@@ -374,12 +387,8 @@ def test_rejects_model_row_that_reports_test_informed_tuning(sprint5_root: Path)
 
 def test_streamlit_modules_have_presentation_only_argus_imports() -> None:
     project_root = Path(__file__).resolve().parents[1]
-    sources = [
-        project_root / "app.py",
-        project_root / "src" / "argus" / "app" / "artifacts.py",
-        project_root / "src" / "argus" / "app" / "dashboard.py",
-        project_root / "src" / "argus" / "app" / "figures.py",
-    ]
+    sources = [project_root / "app.py"]
+    sources.extend(sorted((project_root / "src" / "argus" / "app").glob("*.py")))
     imported_argus_modules: set[str] = set()
     for source in sources:
         tree = ast.parse(source.read_text(encoding="utf-8"))
@@ -400,9 +409,13 @@ def test_streamlit_labels_final_test_as_frozen_reporting_only(
 ) -> None:
     monkeypatch.setenv("ARGUS_ARTIFACT_DIR", str(sprint5_root))
     monkeypatch.delenv("ARGUS_SPRINT4_ARTIFACT_DIR", raising=False)
+    monkeypatch.delenv("ARGUS_DEMO_EMAIL", raising=False)
+    monkeypatch.delenv("ARGUS_DEMO_PASSWORD", raising=False)
     app_path = Path(__file__).resolve().parents[1] / "app.py"
 
     app = AppTest.from_file(str(app_path)).run(timeout=20)
+    assert not app.exception
+    app = _login(app)
     assert not app.exception
     assert app.title[0].value == "Overview"
     assert app.sidebar.radio[0].options == [
@@ -411,8 +424,6 @@ def test_streamlit_labels_final_test_as_frozen_reporting_only(
         "Case Investigator",
         "Model Evidence",
     ]
-    assert any("Frozen final evaluation" in item.value for item in app.subheader)
-    assert any("reporting-only" in item.value for item in app.caption)
     case_provenance = (
         "Graph-enhanced LightGBM is the primary ranking model. The current saved case examples "
         "are drawn from the GraphSAGE research-comparator artifact set."
@@ -433,10 +444,7 @@ def test_streamlit_labels_final_test_as_frozen_reporting_only(
     app.sidebar.radio[0].set_value("Model Evidence")
     app.run(timeout=20)
     assert not app.exception
-    assert any("Final evaluation" in item.value for item in app.header)
-    assert any("Primary operational model" in item.value for item in app.success)
-    assert any("test metrics did not select" in item.value for item in app.success)
-    assert any("no post-test tuning" in item.value.lower() for item in app.warning)
-    assert any(
-        "GraphSAGE is retained as a research comparator" in item.value for item in app.caption
-    )
+    assert app.title[0].value == "Model Evidence"
+    assert any("Frozen primary model" in item.value for item in app.markdown)
+    assert any("Graph-enhanced LightGBM" in item.value for item in app.markdown)
+    assert any("final test was used once" in item.value.lower() for item in app.warning)

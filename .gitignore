@@ -23,6 +23,8 @@ artifacts/*/*
 
 # Local configuration and editors
 .env
+.env.*
+!.env.example
 .idea/
 .vscode/
 *.egg-info/

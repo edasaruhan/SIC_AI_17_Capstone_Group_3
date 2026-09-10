@@ -112,18 +112,21 @@ karşılaştırması olarak tutulur.
 
 ## Analist ürünü
 
-Streamlit uygulaması kayıtlı artifact'ları okur ve açılışta model eğitmez. Dört ana
-görünüm bulunur. Graph-enhanced LightGBM birincil sıralama modelidir. Uygulamadaki
-mevcut kayıtlı vaka örnekleri GraphSAGE araştırma karşılaştırmasına ait artifact setinden
-alınır.
+Ürün akışı **Public Website → Corporate Login → Analyst Portal** şeklindedir. Kurumsal giriş,
+üretim kimlik sağlayıcısına bağlı olmayan güvenli bir demo oturumudur. Streamlit uygulaması
+kayıtlı artifact'ları salt okunur biçimde kullanır ve sayfa açılışında model eğitmez.
+Graph-enhanced LightGBM birincil sıralama modelidir. Uygulamadaki mevcut kayıtlı vaka
+örnekleri GraphSAGE araştırma karşılaştırmasına ait artifact setinden alınır.
 
-- **Overview:** veri kapsamı, final model ve temel operasyonel sonuçlar;
-- **Investigations:** kayıtlı GraphSAGE araştırma vaka örnekleri;
-- **Case Investigator:** yönlü hesap ağı, odak işlem, gözlenen kanıt ve model açıklaması;
-- **Model Evidence:** final model, transaction baseline ve GraphSAGE karşılaştırması.
+- **Overview:** inceleme bekleyen vakalar, öncelik dağılımı ve oturum etkinliği;
+- **Investigations:** aranabilir, filtrelenebilir ve sıralanabilir vaka çalışma listesi;
+- **Case Investigator:** yönlü hesap ağı, işlem zaman çizelgesi, gözlenen kanıtlar ve
+  oturuma özel analist aksiyonları;
+- **Model Evidence:** dondurulmuş final model, transaction baseline ve GraphSAGE
+  karşılaştırması.
 
-Vaka notları harici bir LLM olmadan deterministik biçimde üretilebilir. LLM
-etkinleştirildiğinde yalnız mevcut kanıtları metne dönüştürür.
+Kurumsal giriş bilgileri ve vaka aksiyonları kalıcı olarak saklanmaz; çıkış yapıldığında demo
+oturumu temizlenir.
 
 ## Mimari
 
