@@ -152,7 +152,7 @@ def validate_credentials(
     return AuthResult(
         accepted=True,
         mode="prototype_form_demo",
-        message="Prototype session started. No production identity provider is connected.",
+        message="Demo session started. No production identity provider is connected.",
         email=normalized_email,
     )
 

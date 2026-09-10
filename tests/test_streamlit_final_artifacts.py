@@ -424,22 +424,26 @@ def test_streamlit_labels_final_test_as_frozen_reporting_only(
         "Case Investigator",
         "Model Evidence",
     ]
-    case_provenance = (
-        "Graph-enhanced LightGBM is the primary ranking model. The current saved case examples "
-        "are drawn from the GraphSAGE research-comparator artifact set."
-    )
-    assert any(case_provenance in item.value for item in app.info)
+    case_provenance = "Graph-enhanced LightGBM is the primary ranking model"
+    assert not any(case_provenance in item.value for item in app.info)
 
     app.sidebar.radio[0].set_value("Investigations")
     app.run(timeout=20)
     assert not app.exception
-    assert any(case_provenance in item.value for item in app.info)
+    investigations_copy = " ".join(str(item.value) for item in app.markdown)
+    assert "Research case set" in investigations_copy
+    assert "Graph-enhanced LightGBM remains the primary model" in investigations_copy
+    assert not any(case_provenance in item.value for item in app.info)
     assert all("uncalibrated_ranking_score" not in str(item.value) for item in app.dataframe)
 
     app.sidebar.radio[0].set_value("Case Investigator")
     app.run(timeout=20)
     assert not app.exception
-    assert any(case_provenance in item.value for item in app.info)
+    case_copy = " ".join(str(item.value) for group in (app.markdown, app.caption) for item in group)
+    assert "Research case selection" in case_copy
+    assert "Selected by GraphSAGE research comparator." in case_copy
+    assert "Graph-enhanced LightGBM remains the primary model." in case_copy
+    assert not any(case_provenance in item.value for item in app.info)
 
     app.sidebar.radio[0].set_value("Model Evidence")
     app.run(timeout=20)

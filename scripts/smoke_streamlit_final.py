@@ -1,9 +1,10 @@
-"""Render all four Streamlit screens from saved final-evaluation artifacts only."""
+"""Exercise the ARGUS product journey from immutable final-evaluation artifacts."""
 
 from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import os
 import secrets
 from pathlib import Path
@@ -15,13 +16,56 @@ def _button(app: AppTest, label: str):
     return next(button for button in app.button if button.label == label)
 
 
-def _hash_tree(root: Path) -> dict[str, str]:
-    result: dict[str, str] = {}
+def _element(elements, label: str):
+    return next(element for element in elements if element.label == label)
+
+
+def _snapshot_tree(root: Path) -> dict[str, tuple[int, int, str]]:
+    result: dict[str, tuple[int, int, str]] = {}
     if not root.is_dir():
         return result
     for path in sorted(candidate for candidate in root.rglob("*") if candidate.is_file()):
-        result[str(path.relative_to(root))] = hashlib.sha256(path.read_bytes()).hexdigest()
+        metadata = path.stat()
+        result[str(path.relative_to(root))] = (
+            metadata.st_size,
+            metadata.st_mtime_ns,
+            hashlib.sha256(path.read_bytes()).hexdigest(),
+        )
     return result
+
+
+def _validation_root(artifact_root: Path) -> Path | None:
+    reference = artifact_root / "product" / "validation_artifact_reference.json"
+    if not reference.is_file():
+        return None
+    payload = json.loads(reference.read_text(encoding="utf-8"))
+    configured = payload.get("validation_artifact_root")
+    if not isinstance(configured, str) or not configured.strip():
+        return None
+    return (artifact_root / configured).resolve()
+
+
+def _exercise_demo_request(app: AppTest) -> AppTest:
+    _button(app, "Request a Demo").click()
+    app.run(timeout=30)
+    values = {
+        "First name": "ARGUS",
+        "Last name": "Smoke",
+        "Work email": "smoke@institution.example",
+        "Company / Bank": "Example Institution",
+    }
+    for label, value in values.items():
+        _element(app.text_input, label).set_value(value)
+    _element(app.selectbox, "Job role").set_value("Financial Crime / AML")
+    _element(app.text_area, "Message or use case").set_value("Review the investigation workflow.")
+    consent_label = "I agree that these details may be used to respond to this demo request."
+    _element(app.checkbox, consent_label).check()
+    _button(app, "Request a Demo").click()
+    app.run(timeout=30)
+    if app.exception or not any("Thank you, ARGUS" in item.value for item in app.success):
+        raise RuntimeError("Demo request flow did not complete")
+    _button(app, "Return to Site").click()
+    return app.run(timeout=30)
 
 
 def _login(app: AppTest) -> AppTest:
@@ -35,6 +79,58 @@ def _login(app: AppTest) -> AppTest:
     app.text_input[1].set_value(password)
     _button(app, "Sign in").click()
     return app.run(timeout=30)
+
+
+def _open_case_from_worklist(app: AppTest) -> AppTest:
+    app.sidebar.radio[0].set_value("Investigations")
+    app.run(timeout=30)
+    _element(app.text_input, "Search").set_value("no-such-argus-case")
+    app.run(timeout=30)
+    visible = " ".join(str(item.value) for item in app.markdown)
+    if "No matching cases" not in visible:
+        raise RuntimeError("Investigation empty-filter state did not render")
+    _button(app, "Reset filters").click()
+    app.run(timeout=30)
+    if app.exception or not app.dataframe:
+        raise RuntimeError("Investigation worklist did not render")
+    _button(app, "Open case").click()
+    return app.run(timeout=30)
+
+
+def _select_case(app: AppTest, index: int) -> AppTest:
+    selector = _element(app.selectbox, "Case")
+    if len(selector.options) <= index:
+        raise RuntimeError("Not enough cases to exercise workflow actions")
+    selector.set_value(selector.options[index])
+    return app.run(timeout=30)
+
+
+def _confirm_action(app: AppTest, label: str) -> AppTest:
+    _button(app, label).click()
+    app.run(timeout=30)
+    _button(app, "Confirm").click()
+    return app.run(timeout=30)
+
+
+def _exercise_case_workflow(app: AppTest) -> AppTest:
+    if app.exception or not app.title or app.title[0].value != "Case Investigator":
+        raise RuntimeError("Case Investigator did not open")
+
+    _button(app, "Start Review").click()
+    app.run(timeout=30)
+    _element(app.text_area, "Add a note").set_value("Smoke-test review note.")
+    _button(app, "Save note").click()
+    app.run(timeout=30)
+    if not any("Smoke-test review note." in str(item.value) for item in app.markdown):
+        raise RuntimeError("Analyst note was not reflected in the session")
+    app = _confirm_action(app, "Escalate")
+
+    app = _select_case(app, 1)
+    app = _confirm_action(app, "Mark False Positive")
+
+    app = _select_case(app, 2)
+    app = _confirm_action(app, "Close Case")
+    return app
 
 
 def main() -> int:
@@ -60,38 +156,35 @@ def main() -> int:
     os.environ["ARGUS_ARTIFACT_DIR"] = str(artifact_root)
     os.environ.pop("ARGUS_SPRINT4_ARTIFACT_DIR", None)
     protected_roots = [artifact_root]
-    sibling_validation = artifact_root.parent / "sprint4"
-    if sibling_validation.is_dir():
-        protected_roots.append(sibling_validation)
-    before_hashes = {str(root): _hash_tree(root) for root in protected_roots}
-    pages = (
-        "Overview",
-        "Investigations",
-        "Case Investigator",
-        "Model Evidence",
-    )
+    validation_root = _validation_root(artifact_root)
+    if validation_root is not None and validation_root.is_dir():
+        protected_roots.append(validation_root)
+    before_snapshot = {str(root): _snapshot_tree(root) for root in protected_roots}
     app = AppTest.from_file(str(project_root / "app.py")).run(timeout=30)
     if app.exception or not any(button.label == "Corporate Login" for button in app.button):
         print("Final Streamlit artifact smoke status: FAIL (public site)")
         return 1
+    try:
+        app = _exercise_demo_request(app)
+    except RuntimeError as error:
+        print(f"Final Streamlit artifact smoke status: FAIL ({error})")
+        return 1
     app = _login(app)
-    rendered: list[str] = []
-    for page in pages:
-        if page != pages[0]:
-            if not app.sidebar.radio:
-                print(f"Final Streamlit artifact smoke status: FAIL ({page} navigation)")
-                return 1
-            app.sidebar.radio[0].set_value(page)
-            app.run(timeout=30)
-        if app.exception:
-            print(f"Final Streamlit artifact smoke status: FAIL ({page})")
-            for exception in app.exception:
-                print(exception.value)
-            return 1
-        if not app.title or app.title[0].value != page:
-            print(f"Final Streamlit artifact smoke status: FAIL ({page} title)")
-            return 1
-        rendered.append(page)
+    if app.exception or not app.title or app.title[0].value != "Overview":
+        print("Final Streamlit artifact smoke status: FAIL (Overview)")
+        return 1
+    try:
+        app = _open_case_from_worklist(app)
+        app = _exercise_case_workflow(app)
+    except RuntimeError as error:
+        print(f"Final Streamlit artifact smoke status: FAIL ({error})")
+        return 1
+
+    app.sidebar.radio[0].set_value("Model Evidence")
+    app.run(timeout=30)
+    if app.exception or not app.title or app.title[0].value != "Model Evidence":
+        print("Final Streamlit artifact smoke status: FAIL (Model Evidence)")
+        return 1
 
     final_copy = [str(item.value) for item in app.markdown]
     if not any("Frozen primary model" in value for value in final_copy):
@@ -103,14 +196,15 @@ def main() -> int:
     if app.exception or not any(button.label == "Corporate Login" for button in app.button):
         print("Final Streamlit artifact smoke status: FAIL (logout)")
         return 1
-    after_hashes = {str(root): _hash_tree(root) for root in protected_roots}
-    if before_hashes != after_hashes:
+    after_snapshot = {str(root): _snapshot_tree(root) for root in protected_roots}
+    if before_snapshot != after_snapshot:
         print("Final Streamlit artifact smoke status: FAIL (artifact files changed)")
         return 1
 
     print("Final Streamlit artifact smoke status: PASS")
     print(f"Artifact root: {artifact_root}")
-    print(f"Rendered screens: {', '.join(rendered)}")
+    print("Rendered flow: Public site, Demo request, Login, Overview, Investigations, ")
+    print("Case Investigator actions, Model Evidence, Logout")
     print("Artifact read-only check: PASS")
     return 0
 

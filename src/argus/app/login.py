@@ -1,4 +1,4 @@
-"""Visually separate prototype corporate-login experience."""
+"""Visually separate analyst-access experience."""
 
 from __future__ import annotations
 
@@ -32,15 +32,15 @@ def render_login(navigate: Navigate) -> None:
         st.markdown(
             """
             <div class="login-context">
-              <div class="argus-eyebrow light">SECURE-STYLE ANALYST ACCESS</div>
+              <div class="argus-eyebrow light">ANALYST ACCESS</div>
               <h1>Enter the investigation workspace.</h1>
               <p>
-                Review prioritized cases, follow directed transaction networks, and record
-                session-only analyst decisions in a focused workspace.
+                Review prioritized cases, follow directed transaction networks, and document
+                investigation decisions in one focused workspace.
               </p>
               <div class="login-boundary">
-                <strong>Prototype access</strong>
-                <span>This demonstration is not connected to a bank identity provider.</span>
+                <strong>Demo Environment</strong>
+                <span>Demo actions are not persisted after sign-out.</span>
               </div>
             </div>
             """,
@@ -48,8 +48,7 @@ def render_login(navigate: Navigate) -> None:
         )
     with form_column:
         st.markdown("## Corporate Login")
-        st.caption("Use a work email to start a local demonstration session.")
-        show_password = st.checkbox("Show password", key="login_show_password")
+        st.caption("Sign in with your institutional account.")
         with st.form("corporate_login_form", clear_on_submit=False):
             email = st.text_input(
                 "Corporate email",
@@ -58,7 +57,7 @@ def render_login(navigate: Navigate) -> None:
             )
             password = st.text_input(
                 "Password",
-                type="default" if show_password else "password",
+                type="password",
                 autocomplete="current-password",
             )
             submitted = st.form_submit_button("Sign in", type="primary", width="stretch")
@@ -77,10 +76,7 @@ def render_login(navigate: Navigate) -> None:
             st.session_state["argus_sso_notice"] = True
         if st.session_state.get("argus_sso_notice"):
             st.info(
-                "Corporate SSO is shown as a product option but is not connected in this "
-                "prototype. Use the demo sign-in form above."
+                "Corporate SSO is not connected in this demo environment. Use the sign-in "
+                "form above."
             )
-        st.caption(
-            "Credentials are used only to establish the current demo session and are not "
-            "stored by ARGUS."
-        )
+        st.caption("Demo Environment · Credentials establish this session only and are not stored.")

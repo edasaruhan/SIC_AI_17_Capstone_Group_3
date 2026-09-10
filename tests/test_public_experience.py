@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import tomllib
 from pathlib import Path
 
 from streamlit.testing.v1 import AppTest
 
-from argus.app.public_site import validate_demo_request
+from argus.app.public_site import _preview_figure, validate_demo_request
 
 
 def _button(app: AppTest, label: str):
@@ -53,9 +54,9 @@ def test_public_navigation_anchors_have_matching_sections() -> None:
 
 def test_public_resource_and_legal_routes_render() -> None:
     routes = {
-        "Explore Project Resources": "Review the evidence behind the ARGUS prototype.",
-        "Privacy": "Prototype privacy notice",
-        "Terms": "Prototype terms",
+        "View Model Evidence": "Review the evidence behind the ARGUS project.",
+        "Privacy": "Privacy notice",
+        "Terms": "Terms of use",
     }
 
     for button_label, expected_copy in routes.items():
@@ -124,7 +125,10 @@ def test_demo_request_form_completes_as_session_only_flow() -> None:
 
     assert not app.exception
     assert any("Thank you, Gizem" in item.value for item in app.success)
-    assert any("No message was sent" in item.value for item in app.markdown)
+    confirmation = " ".join(str(item.value) for item in app.markdown)
+    assert "Demo environment" in confirmation
+    assert "No external CRM submission is connected" in confirmation
+    assert "No message was sent" in confirmation
 
 
 def test_demo_request_form_shows_helpful_inline_errors() -> None:
@@ -140,3 +144,57 @@ def test_demo_request_form_shows_helpful_inline_errors() -> None:
     assert "Enter your first name." in visible
     assert "Enter your work email." in visible
     assert "Confirm that ARGUS may use these details" in visible
+
+
+def test_login_uses_enterprise_copy_and_reveals_sso_limit_only_after_click() -> None:
+    app = _app()
+    _button(app, "Corporate Login").click()
+    app.run(timeout=20)
+
+    visible = " ".join(str(item.value) for group in (app.markdown, app.caption) for item in group)
+    assert "ANALYST ACCESS" in visible
+    assert "Sign in with your institutional account." in visible
+    assert "Demo Environment" in visible
+    assert "Demo actions are not persisted after sign-out." in visible
+    assert "SECURE-STYLE ANALYST ACCESS" not in visible
+    assert "Prototype access" not in visible
+    assert not app.info
+
+    _button(app, "Corporate SSO").click()
+    app.run(timeout=20)
+    assert any("Corporate SSO is not connected" in item.value for item in app.info)
+
+
+def test_public_network_preview_expands_context_without_scientific_claims() -> None:
+    single = _preview_figure(False)
+    expanded = _preview_figure(True)
+
+    assert len(single.data[-1].x) == 2
+    assert len(expanded.data[-1].x) == 6
+    assert len(single.data) == 2
+    assert len(expanded.data) == 8
+    assert single.data[0].line.color == "#B7791F"
+    assert single.data[0].line.width > expanded.data[1].line.width
+    assert single.layout.height == 270
+    assert expanded.layout.height == 338
+    assert "scaleanchor" not in single.layout.yaxis.to_plotly_json()
+    assert all("Account" in str(label) for label in expanded.data[-1].text)
+
+
+def test_public_network_preview_control_switches_to_expanded_context() -> None:
+    app = _app()
+
+    app.radio[0].set_value("Explore network")
+    app.run(timeout=20)
+
+    assert not app.exception
+    assert app.radio[0].value == "Explore network"
+    assert any("6 accounts" in str(item.value) for item in app.markdown)
+
+
+def test_streamlit_product_chrome_uses_supported_minimal_configuration() -> None:
+    config_path = Path(__file__).resolve().parents[1] / ".streamlit" / "config.toml"
+    config = tomllib.loads(config_path.read_text(encoding="utf-8"))
+
+    assert config["client"]["toolbarMode"] == "minimal"
+    assert config["client"]["showSidebarNavigation"] is False

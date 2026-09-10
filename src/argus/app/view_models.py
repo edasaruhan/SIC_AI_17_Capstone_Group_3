@@ -82,8 +82,26 @@ def display_priority(value: Any) -> str:
 
 def display_pattern(value: Any) -> str:
     if canonical_token(value) == "high_graphsage_transaction_score":
-        return "Elevated ranking"
+        return "Elevated network ranking"
     return humanize(value)
+
+
+def _compact_amount(value: Any) -> str:
+    numeric = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
+    if pd.isna(numeric):
+        return "Not available"
+    absolute = abs(float(numeric))
+    for scale, suffix in ((1e12, "T"), (1e9, "B"), (1e6, "M"), (1e3, "K")):
+        if absolute >= scale:
+            return f"{float(numeric) / scale:,.2f}{suffix}"
+    return f"{float(numeric):,.2f}"
+
+
+def _display_total_flow(value: Any, currency: str) -> str:
+    if currency == "Mixed currencies":
+        return currency
+    compact = _compact_amount(value)
+    return f"{compact} · {currency}" if compact != "Not available" else compact
 
 
 def _case_transactions(case: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -217,20 +235,17 @@ def display_queue(frame: pd.DataFrame) -> pd.DataFrame:
     displayed = pd.DataFrame(index=frame.index)
     displayed["Priority"] = frame["priority_label"]
     displayed["Case ID"] = frame["case_id"]
-    displayed["Primary Pattern"] = frame["pattern_label"]
+    displayed["Review Signal"] = frame["pattern_label"]
     displayed["Accounts"] = pd.to_numeric(frame["account_count"], errors="coerce").astype("Int64")
     displayed["Transfers"] = pd.to_numeric(frame["transaction_count"], errors="coerce").astype(
         "Int64"
     )
-    totals = pd.to_numeric(frame["total_flow"], errors="coerce")
     displayed["Total Flow"] = [
-        f"{value:,.2f} · {currency}" if pd.notna(value) else "Not available"
-        for value, currency in zip(totals, frame["currency_context"], strict=False)
+        _display_total_flow(value, currency)
+        for value, currency in zip(frame["total_flow"], frame["currency_context"], strict=False)
     ]
     timestamps = pd.to_datetime(frame["last_activity"], errors="coerce", utc=True)
-    displayed["Last Activity"] = timestamps.dt.strftime("%d %b %Y · %H:%M UTC").fillna(
-        "Not available"
-    )
+    displayed["Last Activity"] = timestamps.dt.strftime("%d %b %y · %H:%M").fillna("Not available")
     displayed["Status"] = frame["status_label"]
     return displayed.reset_index(drop=True)
 

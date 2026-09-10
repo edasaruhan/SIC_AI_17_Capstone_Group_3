@@ -7,6 +7,7 @@ import pandas as pd
 from streamlit.testing.v1 import AppTest
 
 from argus.app.dashboard import _metric_value
+from argus.app.portal import _selected_dataframe_rows
 
 
 def _button(app: AppTest, label: str):
@@ -113,6 +114,12 @@ def test_streamlit_all_required_screens_render_from_saved_artifacts(
     assert not app.exception
     assert app.title[0].value == "Overview"
     assert all(metric.label != "GraphSAGE queue alerts" for metric in app.metric)
+    assert [metric.label for metric in app.metric[:4]] == [
+        "Open cases",
+        "In review",
+        "Prior context",
+        "Analyst actions",
+    ]
 
     for page in ("Investigations", "Case Investigator", "Model Evidence"):
         app.sidebar.radio[0].set_value(page)
@@ -122,7 +129,7 @@ def test_streamlit_all_required_screens_render_from_saved_artifacts(
 
     app.sidebar.radio[0].set_value("Investigations")
     app.run(timeout=20)
-    _button(app, "View selected case").click()
+    _button(app, "Open case").click()
     app.run(timeout=20)
     assert not app.exception
     assert app.title[0].value == "Case Investigator"
@@ -174,3 +181,10 @@ def test_executive_metrics_do_not_mix_queue_and_validation_leader_models() -> No
     assert _metric_value(summary, validation_leader, "recall_at_k") == 0.6
     assert _metric_value(summary, validation_leader, "fpr") == 0.05
     assert _metric_value(summary, validation_leader, "alerts") == 333
+
+
+def test_dataframe_selection_rows_are_read_defensively() -> None:
+    assert _selected_dataframe_rows({"selection": {"rows": [2]}}) == (2,)
+    assert _selected_dataframe_rows({"selection": {"rows": [-1, "bad", 1]}}) == (1,)
+    assert _selected_dataframe_rows({"selection": {"rows": None}}) == ()
+    assert _selected_dataframe_rows({}) == ()

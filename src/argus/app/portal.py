@@ -223,6 +223,57 @@ def _page_heading(eyebrow: str, title: str, description: str) -> None:
     st.caption(description)
 
 
+def _render_empty_state(title: str, copy: str) -> None:
+    st.markdown(
+        '<div class="argus-empty-state">'
+        '<svg viewBox="0 0 64 64" aria-hidden="true">'
+        '<circle cx="28" cy="28" r="17"></circle>'
+        '<path d="M40 40l12 12M20 28h16M28 20v16"></path>'
+        "</svg>"
+        f"<div><strong>{html.escape(title)}</strong><span>{html.escape(copy)}</span></div>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def _render_research_case_indicator(*, selection: bool = False) -> None:
+    label = "Research case selection" if selection else "Research case set"
+    detail = (
+        "These case examples were selected using the GraphSAGE research comparator. "
+        "Graph-enhanced LightGBM remains the primary model."
+    )
+    st.markdown(
+        '<div class="argus-provenance-line">'
+        f'<span class="argus-provenance-badge" tabindex="0" title="{html.escape(detail)}">'
+        f'{html.escape(label)} <span aria-hidden="true">ⓘ</span></span>'
+        f'<span class="argus-provenance-detail">{html.escape(detail)}</span>'
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def _selected_dataframe_rows(event: Any) -> tuple[int, ...]:
+    """Read Streamlit's supported dataframe selection event defensively."""
+
+    selection = getattr(event, "selection", None)
+    if selection is None and isinstance(event, Mapping):
+        selection = event.get("selection")
+    rows = getattr(selection, "rows", None)
+    if rows is None and isinstance(selection, Mapping):
+        rows = selection.get("rows", [])
+    if not isinstance(rows, (list, tuple)):
+        return ()
+    selected: list[int] = []
+    for row in rows:
+        try:
+            index = int(row)
+        except (TypeError, ValueError):
+            continue
+        if index >= 0:
+            selected.append(index)
+    return tuple(selected)
+
+
 def _workflow_store() -> Mapping[str, Mapping[str, Any]]:
     value = st.session_state.get(WORKFLOW_SESSION_KEY, {})
     return value if isinstance(value, Mapping) else {}
@@ -248,29 +299,28 @@ def render_overview(artifacts: DashboardArtifacts, *, open_case: Callable[[str],
     _page_heading(
         "ANALYST WORKSPACE",
         "Overview",
-        "A focused view of the saved cases that require attention in this demo session.",
+        "Open investigations, case context and current review activity in one operational view.",
     )
     worklist = _queue_view(artifacts)
     active_statuses = {"pending_human_review", "pending_review", "in_review", "escalated"}
-    terminal_statuses = {"false_positive", "closed"}
-    high_priority = int(worklist["priority_rank"].le(1).sum())
     active = int(worklist["status"].map(canonical_token).isin(active_statuses).sum())
-    pending = int(
-        worklist["status"]
-        .map(canonical_token)
-        .isin({"pending_human_review", "pending_review"})
-        .sum()
+    in_progress = int(
+        worklist["status"].map(canonical_token).isin({"in_review", "escalated"}).sum()
     )
-    completed = int(worklist["status"].map(canonical_token).isin(terminal_statuses).sum())
+    cases_with_context = int(
+        pd.to_numeric(worklist["transaction_count"], errors="coerce").fillna(0).gt(1).sum()
+    )
+    activity = _activity_records()
 
     metrics = st.columns(4)
-    metrics[0].metric("Saved cases", _format_count(len(worklist)))
-    metrics[1].metric("Elevated priority", _format_count(high_priority))
-    metrics[2].metric("Pending review", _format_count(pending))
-    metrics[3].metric("Resolved this session", _format_count(completed))
-    st.caption(
-        "Primary ranking model: Graph-enhanced LightGBM · Case actions below are session-only."
+    metrics[0].metric("Open cases", _format_count(active))
+    metrics[1].metric("In review", _format_count(in_progress))
+    metrics[2].metric(
+        "Prior context",
+        _format_count(cases_with_context),
+        help="Cases containing more than one transaction in the available case context.",
     )
+    metrics[3].metric("Analyst actions", _format_count(len(activity)))
 
     left, right = st.columns([1.45, 1], gap="large")
     with left:
@@ -279,7 +329,10 @@ def render_overview(artifacts: DashboardArtifacts, *, open_case: Callable[[str],
             worklist["status"].map(canonical_token).isin(active_statuses)
         ].sort_values(["priority_rank", "last_activity"], ascending=[True, False])
         if attention.empty:
-            st.success("No saved cases currently require attention in this session.")
+            _render_empty_state(
+                "No cases require attention",
+                "Cases that enter review or escalation will appear here.",
+            )
         else:
             for row in attention.head(5).to_dict(orient="records"):
                 case_id = str(row["case_id"])
@@ -297,39 +350,64 @@ def render_overview(artifacts: DashboardArtifacts, *, open_case: Callable[[str],
                     ):
                         open_case(case_id)
     with right:
-        st.subheader("Priority distribution")
+        priority_bands = worklist["priority_label"].dropna().nunique()
         priority_counts = (
             worklist["priority_label"]
             .value_counts()
             .rename_axis("Priority")
             .reset_index(name="Cases")
         )
+        if priority_bands > 1:
+            st.subheader("Priority distribution")
+            chart_x = priority_counts["Cases"]
+            chart_y = priority_counts["Priority"]
+            x_title = "Cases"
+            y_title = None
+            orientation = "h"
+        else:
+            st.subheader("Case composition")
+            transfer_counts = (
+                pd.to_numeric(worklist["transaction_count"], errors="coerce")
+                .fillna(0)
+                .astype(int)
+                .value_counts()
+                .sort_index()
+                .rename_axis("Transfers")
+                .reset_index(name="Cases")
+            )
+            chart_x = transfer_counts["Transfers"]
+            chart_y = transfer_counts["Cases"]
+            x_title = "Transfers in case context"
+            y_title = "Cases"
+            orientation = "v"
         figure = go.Figure(
             go.Bar(
-                x=priority_counts["Cases"],
-                y=priority_counts["Priority"],
-                orientation="h",
+                x=chart_x,
+                y=chart_y,
+                orientation=orientation,
                 marker_color="#0F6B66",
-                text=priority_counts["Cases"],
+                text=priority_counts["Cases"] if priority_bands > 1 else chart_y,
                 textposition="auto",
             )
         )
         figure.update_layout(
             height=250,
             margin={"l": 8, "r": 8, "t": 12, "b": 22},
-            xaxis_title="Saved cases",
-            yaxis_title=None,
+            xaxis_title=x_title,
+            yaxis_title=y_title,
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
             showlegend=False,
         )
         st.plotly_chart(figure, width="stretch", config={"displayModeBar": False})
-        st.caption(f"{active:,} active case(s) in the current session view.")
+        st.caption("Composition is derived from the transaction context stored with each case.")
 
     st.subheader("Recent activity")
-    activity = _activity_records()
     if not activity:
-        st.info("No analyst actions have been recorded in this session.")
+        _render_empty_state(
+            "No recent activity",
+            "Start a review or add a note to build the activity trail.",
+        )
     else:
         activity_frame = pd.DataFrame(activity[:8])
         displayed = activity_frame[["timestamp", "case_id", "label", "analyst"]].rename(
@@ -341,13 +419,7 @@ def render_overview(artifacts: DashboardArtifacts, *, open_case: Callable[[str],
             }
         )
         st.dataframe(displayed, width="stretch", hide_index=True)
-        st.caption("Activity is stored only for this browser session; it is not a permanent log.")
-
-    if all(
-        _canonical_model_name(name) in {"graphsage", "graphsage_edge_classifier"}
-        for name in _queue_model_names(artifacts)
-    ):
-        st.info(SAVED_RESEARCH_CASE_NOTICE)
+    st.caption("Demo actions reset after sign-out.")
 
 
 def _queue_model_names(artifacts: DashboardArtifacts) -> tuple[str, ...]:
@@ -366,6 +438,8 @@ def _reset_queue_filters() -> None:
         "queue_statuses",
         "queue_patterns",
         "queue_sort",
+        "investigation_worklist_table",
+        "investigation_selected_case_id",
     ):
         st.session_state.pop(key, None)
 
@@ -376,20 +450,27 @@ def render_investigations(
     _page_heading(
         "INVESTIGATION WORKLIST",
         "Investigations",
-        "Search, filter and prioritize saved case examples for human review.",
+        "Search, filter and open investigation cases for human review.",
     )
-    st.info(SAVED_RESEARCH_CASE_NOTICE)
+    if all(
+        _canonical_model_name(name) in {"graphsage", "graphsage_edge_classifier"}
+        for name in _queue_model_names(artifacts)
+    ):
+        _render_research_case_indicator()
     worklist = _queue_view(artifacts)
     if worklist.empty:
-        st.info("No saved investigation cases are available.")
+        _render_empty_state(
+            "No investigation cases",
+            "The current artifact package does not contain a case worklist.",
+        )
         return
 
     search_col, sort_col, reset_col = st.columns([2, 1, 0.65])
     query = search_col.text_input(
         "Search",
         key="queue_search",
-        placeholder="Case ID, account or pattern",
-        help="Searches only identifiers and context saved with these cases.",
+        placeholder="Case ID, account or review signal",
+        help="Searches identifiers and the context available with these cases.",
     )
     sort_label = sort_col.selectbox(
         "Sort by",
@@ -412,7 +493,7 @@ def render_investigations(
         "Status", status_values, default=status_values, key="queue_statuses"
     )
     patterns = filter_columns[2].multiselect(
-        "Pattern", pattern_values, default=pattern_values, key="queue_patterns"
+        "Review signal", pattern_values, default=pattern_values, key="queue_patterns"
     )
     filtered = filter_queue_view(
         worklist,
@@ -423,33 +504,63 @@ def render_investigations(
     )
     filtered = sort_queue_view(filtered, sort_label)
     if filtered.empty:
-        st.warning("No cases match these filters.")
+        _render_empty_state(
+            "No matching cases",
+            "Adjust the filters or reset the worklist to continue.",
+        )
         if st.button("Reset filters", key="queue_empty_reset"):
             _reset_queue_filters()
             st.rerun()
         return
 
-    st.dataframe(
+    table_event = st.dataframe(
         display_queue(filtered),
         width="stretch",
         hide_index=True,
         height=min(650, 86 + 35 * len(filtered)),
+        key="investigation_worklist_table",
+        on_select="rerun",
+        selection_mode="single-row",
+        column_config={
+            "Priority": st.column_config.TextColumn(width="small"),
+            "Case ID": st.column_config.TextColumn(
+                width="small", help="The full case ID is shown in the selected-case action panel."
+            ),
+            "Review Signal": st.column_config.TextColumn(width="medium"),
+            "Accounts": st.column_config.NumberColumn(width="small", format="%d"),
+            "Transfers": st.column_config.NumberColumn(width="small", format="%d"),
+            "Total Flow": st.column_config.TextColumn(width="small"),
+            "Last Activity": st.column_config.TextColumn(width="small", help="Displayed in UTC."),
+            "Status": st.column_config.TextColumn(width="small"),
+        },
     )
     st.caption(
-        f"Showing {len(filtered):,} of {len(worklist):,} saved cases. Recorded total-flow "
-        "values are shown as saved; mixed-currency rows do not imply currency conversion."
+        f"Showing {len(filtered):,} of {len(worklist):,} investigation cases. Total-flow values "
+        "preserve their recorded currency context; mixed-currency rows are not converted."
     )
-    open_columns = st.columns([2, 1])
-    selected = open_columns[0].selectbox(
-        "Selected case",
-        filtered["case_id"].tolist(),
-        key="investigation_case_select",
-        help="Select from the filtered worklist; no Case ID copying is required.",
-    )
-    if open_columns[1].button(
-        "View selected case", type="primary", key="investigation_open_case", width="stretch"
-    ):
-        open_case(str(selected))
+    selected_rows = _selected_dataframe_rows(table_event)
+    available_ids = filtered["case_id"].astype(str).tolist()
+    if selected_rows and selected_rows[0] < len(available_ids):
+        st.session_state["investigation_selected_case_id"] = available_ids[selected_rows[0]]
+    selected = str(st.session_state.get("investigation_selected_case_id", available_ids[0]))
+    if selected not in available_ids:
+        selected = available_ids[0]
+        st.session_state["investigation_selected_case_id"] = selected
+    selected_row = filtered.loc[filtered["case_id"].astype(str).eq(selected)].iloc[0]
+    with st.container(key="investigation_action_panel"):
+        detail, action = st.columns([4, 1], vertical_alignment="center")
+        detail.markdown(f"**{html.escape(selected)}**")
+        detail.caption(
+            f"{selected_row['priority_label']} priority · {selected_row['pattern_label']} · "
+            f"{selected_row['status_label']}"
+        )
+        if action.button(
+            "Open case",
+            type="primary",
+            key="investigation_open_case",
+            width="stretch",
+        ):
+            open_case(selected)
 
 
 def _case_counts(case: Mapping[str, Any], queue_row: Mapping[str, Any]) -> tuple[int, int]:
@@ -466,8 +577,8 @@ def _case_counts(case: Mapping[str, Any], queue_row: Mapping[str, Any]) -> tuple
 def _display_evidence_statement(value: Any) -> str:
     return (
         str(value)
-        .replace("the supplied neighborhood", "the saved case context")
-        .replace("The supplied neighborhood", "The saved case context")
+        .replace("the supplied neighborhood", "the earlier case context")
+        .replace("The supplied neighborhood", "The earlier case context")
         .replace("transfer(s)", "transfers")
         .replace("transaction(s)", "transactions")
     )
@@ -475,10 +586,10 @@ def _display_evidence_statement(value: Any) -> str:
 
 def _render_observed_evidence(case: Mapping[str, Any]) -> None:
     st.markdown('<div class="section-kicker">OBSERVED EVIDENCE</div>', unsafe_allow_html=True)
-    st.subheader("What the saved records show")
+    st.subheader("What the records show")
     evidence = case.get("observed_evidence", [])
     if not isinstance(evidence, list) or not evidence:
-        st.info("No observed evidence was saved for this case.")
+        st.info("No observed evidence is available for this case.")
         return
     visible_evidence = [
         item
@@ -489,11 +600,11 @@ def _render_observed_evidence(case: Mapping[str, Any]) -> None:
         )
     ]
     if not visible_evidence:
-        st.info("No analyst-facing observed evidence was saved for this case.")
+        st.info("No analyst-facing observed evidence is available for this case.")
         return
     if len(visible_evidence) < 3:
         st.warning(
-            f"Only {len(visible_evidence)} observed evidence item(s) were saved for this case."
+            f"Only {len(visible_evidence)} observed evidence item(s) are available for this case."
         )
     for item in visible_evidence:
         if not isinstance(item, dict) or not item.get("statement"):
@@ -597,23 +708,24 @@ def _render_model_evidence(
 ) -> None:
     st.markdown('<div class="section-kicker model">MODEL EVIDENCE</div>', unsafe_allow_html=True)
     st.subheader("How models inform this review")
+    _render_research_case_indicator(selection=True)
     saved = case.get("model_evidence", {})
     if not isinstance(saved, dict) or not saved:
-        st.info("No saved model evidence is available for this case.")
+        st.info("No model evidence is available for this case.")
     else:
         model_name = saved.get("model_name", "GraphSAGE")
         with st.container(border=True):
-            st.markdown("#### Saved case selection")
-            st.caption("Research comparator · Saved research case example")
+            st.markdown("#### Research comparator perspective")
+            st.caption("Selected by GraphSAGE research comparator.")
             metrics = st.columns(3)
             metrics[0].metric("Model", _display_model_name(model_name))
             metrics[1].metric(
                 "Research ranking score", _format_metric(saved.get("score"), digits=6)
             )
-            metrics[2].metric("Saved queue rank", _format_count(saved.get("rank")))
+            metrics[2].metric("Case-set rank", _format_count(saved.get("rank")))
             st.write(
-                "This saved GraphSAGE research score ranked the example. It is not "
-                "a probability of wrongdoing and is not the primary operational ranking model."
+                "The GraphSAGE score selected this research case example. It is not a "
+                "probability of wrongdoing. Graph-enhanced LightGBM remains the primary model."
             )
             _render_contributions(
                 saved.get("feature_contributions", case.get("feature_contributions")),
@@ -627,8 +739,8 @@ def _render_model_evidence(
             st.markdown("#### Primary model perspective")
             st.caption("Graph-enhanced LightGBM · Native TreeSHAP · Validation case")
             st.write(
-                "This saved TreeSHAP explanation shows how the primary model evaluated the same "
-                "transaction. It did not generate or rank this research-case queue."
+                "TreeSHAP shows how the primary model evaluated the same transaction. It did not "
+                "generate or rank this research case set."
             )
             _render_contributions(
                 primary.get("top_contributions"),
@@ -636,13 +748,11 @@ def _render_model_evidence(
                 key=f"lightgbm-contributions-{case_id}",
             )
             with st.expander("Primary model score details"):
-                st.write(f"Saved raw score: {_format_metric(primary.get('raw_score'), digits=6)}")
-                st.write(
-                    f"Saved baseline value: {_format_metric(primary.get('base_value'), digits=6)}"
-                )
+                st.write(f"Raw score: {_format_metric(primary.get('raw_score'), digits=6)}")
+                st.write(f"Baseline value: {_format_metric(primary.get('base_value'), digits=6)}")
                 st.caption("Raw model scores are technical values, not calibrated probabilities.")
     else:
-        st.caption("No compatible saved primary-model explanation exists for this case.")
+        st.caption("No compatible primary-model explanation exists for this case.")
     st.warning(
         "Model evidence supports prioritization only. It does not establish wrongdoing or "
         "authorize an automatic account action."
@@ -751,37 +861,58 @@ def _apply_action(case_id: str, case: Mapping[str, Any], action: str, **kwargs: 
 
 def _render_action_bar(case_id: str, case: Mapping[str, Any], status: str) -> None:
     terminal = canonical_token(status) in {"false_positive", "closed"}
-    actions = st.columns(4)
-    if actions[0].button(
-        "Start review",
-        type="primary",
-        key=f"start-review-{case_id}",
-        disabled=canonical_token(status) not in {"pending_review", "pending_human_review"},
-    ):
-        _apply_action(case_id, case, START_REVIEW)
-        st.rerun()
-    if actions[1].button(
-        "Escalate",
-        key=f"escalate-{case_id}",
-        disabled=terminal or canonical_token(status) == "escalated",
-    ):
-        st.session_state["argus_pending_case_action"] = ESCALATE
-    if actions[2].button(
-        "Mark false positive",
-        key=f"false-positive-{case_id}",
-        disabled=terminal,
-    ):
-        st.session_state["argus_pending_case_action"] = MARK_FALSE_POSITIVE
-    if actions[3].button("Close case", key=f"close-{case_id}", disabled=terminal):
-        st.session_state["argus_pending_case_action"] = CLOSE_CASE
+    with st.container(key="case_action_bar"):
+        st.markdown("#### Case actions")
+        st.caption("Demo actions reset after sign-out.")
+        actions = st.columns([1.15, 1, 1.35, 1, 2.2])
+        if actions[0].button(
+            "Start Review",
+            type="primary",
+            key=f"start-review-{case_id}",
+            disabled=canonical_token(status) not in {"pending_review", "pending_human_review"},
+            width="stretch",
+        ):
+            _apply_action(case_id, case, START_REVIEW)
+            st.rerun()
+        if actions[1].button(
+            "Escalate",
+            key=f"escalate-{case_id}",
+            disabled=terminal or canonical_token(status) == "escalated",
+            width="stretch",
+        ):
+            st.session_state["argus_pending_case_action"] = {
+                "case_id": case_id,
+                "action": ESCALATE,
+            }
+        if actions[2].button(
+            "Mark False Positive",
+            key=f"false-positive-{case_id}",
+            disabled=terminal,
+            width="stretch",
+        ):
+            st.session_state["argus_pending_case_action"] = {
+                "case_id": case_id,
+                "action": MARK_FALSE_POSITIVE,
+            }
+        if actions[3].button(
+            "Close Case", key=f"close-{case_id}", disabled=terminal, width="stretch"
+        ):
+            st.session_state["argus_pending_case_action"] = {
+                "case_id": case_id,
+                "action": CLOSE_CASE,
+            }
+        actions[4].empty()
 
-    pending = st.session_state.get("argus_pending_case_action")
+    pending_state = st.session_state.get("argus_pending_case_action")
+    if not isinstance(pending_state, Mapping) or pending_state.get("case_id") != case_id:
+        return
+    pending = pending_state.get("action")
     if pending not in {ESCALATE, MARK_FALSE_POSITIVE, CLOSE_CASE}:
         return
     labels = {
         ESCALATE: "Escalate this case for further review?",
-        MARK_FALSE_POSITIVE: "Mark this case as a false positive for this demo session?",
-        CLOSE_CASE: "Close this case for this demo session?",
+        MARK_FALSE_POSITIVE: "Mark this case as a false positive?",
+        CLOSE_CASE: "Close this case?",
     }
     st.warning(labels[str(pending)])
     confirm, cancel, _ = st.columns([1, 1, 3])
@@ -822,18 +953,17 @@ def _render_notes_and_activity(case_id: str, case: Mapping[str, Any]) -> None:
                 st.error(result.message)
         notes = overlay.get("notes", [])
         if not notes:
-            st.caption("No notes have been added in this session.")
+            st.caption("No analyst notes yet.")
         for item in reversed(notes):
             st.markdown(f"**{item['analyst']}** · {item['timestamp']}  \n{item['text']}")
-        st.caption("Notes are session-only and are not written to scientific artifacts.")
     with right:
         st.subheader("Activity log")
         activity = overlay.get("activity", [])
         if not activity:
-            st.caption("No activity has been recorded in this session.")
+            st.caption("No case activity yet.")
         for item in reversed(activity):
             st.markdown(f"**{item['label']}**  \n{item['timestamp']} · {item['analyst']}")
-        st.caption("This is a temporary demo-session history, not permanent audit storage.")
+    st.caption("Demo notes and actions reset after sign-out.")
 
 
 def render_case_investigator(artifacts: DashboardArtifacts) -> None:
@@ -845,21 +975,34 @@ def render_case_investigator(artifacts: DashboardArtifacts) -> None:
     queue = artifacts.queue
     case_ids = queue["case_id"].astype(str).tolist()
     if not case_ids:
-        st.info("No saved cases are available for investigation.")
+        _render_empty_state(
+            "No cases to investigate",
+            "Open a case from the investigation worklist when one becomes available.",
+        )
         return
     requested = str(st.session_state.get("argus_selected_case_id", case_ids[0]))
     if requested not in artifacts.cases:
         st.warning(
-            "The selected case is unavailable. The first saved case has been opened instead."
+            "The selected case is unavailable. The first investigation case is shown instead."
         )
         requested = case_ids[0]
         st.session_state["argus_selected_case_id"] = requested
     index = case_ids.index(requested) if requested in case_ids else 0
-    selected_case_id = st.selectbox("Case", case_ids, index=index, key="case_investigator_select")
+    widget_value = st.session_state.get("case_investigator_select")
+    selected_case_id = st.selectbox(
+        "Case",
+        case_ids,
+        index=None if widget_value in case_ids else index,
+        key="case_investigator_select",
+    )
+    if selected_case_id is None:
+        selected_case_id = requested
+    if selected_case_id != requested:
+        st.session_state.pop("argus_pending_case_action", None)
     st.session_state["argus_selected_case_id"] = selected_case_id
     source_case = artifacts.cases.get(selected_case_id)
     if not isinstance(source_case, dict):
-        st.error("This saved case cannot be displayed.")
+        st.error("This case cannot be displayed.")
         return
     queue_rows = queue.loc[queue["case_id"].astype(str).eq(selected_case_id)]
     if queue_rows.empty:
@@ -879,9 +1022,8 @@ def render_case_investigator(artifacts: DashboardArtifacts) -> None:
     with title_left:
         st.markdown(f"### {selected_case_id}")
         st.write(
-            f"This saved case connects **{accounts:,} account(s)** across "
-            f"**{transfer_count:,} transfer(s)**. Review the directed network and evidence "
-            "before taking a session-only action."
+            f"Review **{accounts:,} account(s)** across **{transfer_count:,} transfer(s)**, "
+            "then document the appropriate investigation decision."
         )
     with title_right:
         st.markdown(
@@ -890,21 +1032,26 @@ def render_case_investigator(artifacts: DashboardArtifacts) -> None:
             unsafe_allow_html=True,
         )
     summary = st.columns(4)
-    _case_summary_card(summary[0], "Primary pattern", display_pattern(pattern))
+    _case_summary_card(summary[0], "Review signal", display_pattern(pattern))
     _case_summary_card(summary[1], "Accounts", _format_count(accounts))
     _case_summary_card(summary[2], "Transfers", _format_count(transfer_count))
     total_flow = queue_row.get("total_flow")
+    currency_context = case_currency_context(case)
+    displayed_flow = (
+        "Mixed currencies"
+        if currency_context == "Mixed currencies"
+        else _format_compact_amount(total_flow)
+    )
     _case_summary_card(
         summary[3],
         "Recorded total flow",
-        _format_compact_amount(total_flow),
-        detail=_format_money(total_flow),
+        displayed_flow,
+        detail="" if currency_context == "Mixed currencies" else _format_money(total_flow),
     )
     st.caption(
-        f"Currency context: {case_currency_context(case)}. Mixed-currency totals are displayed "
-        "as saved and do not imply currency conversion."
+        f"Currency context: {currency_context}. Mixed-currency case values are not summed or "
+        "converted in this view."
     )
-    st.info(SAVED_RESEARCH_CASE_NOTICE)
     _flash_message()
     error_message = st.session_state.pop("argus_workflow_error", None)
     if error_message:
@@ -931,7 +1078,7 @@ def render_case_investigator(artifacts: DashboardArtifacts) -> None:
             )
             st.caption(
                 "Arrows show sender to receiver. Amber identifies the focal transfer; use hover, "
-                "zoom, pan or the reset control to inspect the saved context."
+                "zoom, pan or the reset control to inspect the case context."
             )
     with details:
         _render_network_inspector(case)
@@ -956,7 +1103,7 @@ def render_case_investigator(artifacts: DashboardArtifacts) -> None:
 
     transactions = _transactions_frame(case)
     if not transactions.empty:
-        st.subheader("Transactions in this saved case")
+        st.subheader("Transactions in this case")
         st.dataframe(transactions, width="stretch", hide_index=True)
     st.divider()
     _render_notes_and_activity(selected_case_id, source_case)
@@ -1080,15 +1227,24 @@ def render_model_evidence(artifacts: DashboardArtifacts) -> None:
                 "**Graph-enhanced LightGBM** was selected using validation evidence before the "
                 "single final-test evaluation."
             )
-            metrics = st.columns(4)
+            metrics = st.columns(2)
             metrics[0].metric("Final PR-AUC", _format_metric(champion.get("pr_auc"), digits=6))
             metrics[1].metric("Final ROC-AUC", _format_metric(champion.get("roc_auc"), digits=6))
-            metrics[2].metric("Precision", _format_metric(champion.get("precision"), digits=6))
-            metrics[3].metric("Recall", _format_metric(champion.get("recall"), digits=6))
-            metrics_2 = st.columns(3)
-            metrics_2[0].metric("F1", _format_metric(champion.get("f1"), digits=6))
-            metrics_2[1].metric("FPR", _format_metric(champion.get("fpr"), digits=6))
-            metrics_2[2].metric("Alerts", _format_count(champion.get("alerts")))
+            threshold_values = (
+                ("Precision", _format_metric(champion.get("precision"), digits=6)),
+                ("Recall", _format_metric(champion.get("recall"), digits=6)),
+                ("F1", _format_metric(champion.get("f1"), digits=6)),
+                ("FPR", _format_metric(champion.get("fpr"), digits=6)),
+                ("Alert volume", _format_count(champion.get("alerts"))),
+            )
+            items = "".join(
+                f"<div><span>{html.escape(label)}</span><strong>{html.escape(value)}</strong></div>"
+                for label, value in threshold_values
+            )
+            st.markdown(
+                f'<div class="model-threshold-strip">{items}</div>',
+                unsafe_allow_html=True,
+            )
         st.subheader("Final model comparison")
         st.dataframe(_display_model_table(comparison, final=True), width="stretch", hide_index=True)
         st.plotly_chart(

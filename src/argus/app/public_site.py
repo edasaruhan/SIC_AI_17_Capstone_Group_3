@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import re
 from collections.abc import Callable, Mapping
 from typing import Any
@@ -149,57 +150,77 @@ def _render_hero(navigate: Navigate) -> None:
             """
             <div class="argus-hero-visual">
               <div class="argus-visual-header">
-                <span>Investigation context</span>
-                <span class="argus-visual-status">Human review</span>
+                <span>Network investigation</span>
+                <span class="argus-visual-status">Review ready</span>
+              </div>
+              <div class="argus-visual-toolbar" aria-hidden="true">
+                <span class="active">Account network</span><span>Transfer history</span>
+                <span class="argus-visual-case">ILLUSTRATIVE CASE · A-2048</span>
               </div>
               <div class="argus-visual-path">
-                <svg viewBox="0 0 520 285" role="img"
-                     aria-label="An illustrative transfer expanding into an account network">
+                <svg viewBox="0 0 560 330" role="img"
+                     aria-label="Illustrative directed account network with a selected transfer">
                   <defs>
+                    <pattern id="argus-grid" width="28" height="28" patternUnits="userSpaceOnUse">
+                      <path d="M28 0H0V28" fill="none" stroke="#17384b" stroke-width="1"/>
+                    </pattern>
                     <marker id="argus-arrow" viewBox="0 0 10 10" refX="8" refY="5"
-                            markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
                       <path d="M 0 0 L 10 5 L 0 10 z" fill="#b7791f"></path>
                     </marker>
                     <marker id="argus-context-arrow" viewBox="0 0 10 10" refX="8" refY="5"
                             markerWidth="5" markerHeight="5" orient="auto-start-reverse">
-                      <path d="M 0 0 L 10 5 L 0 10 z" fill="#668390"></path>
+                      <path d="M 0 0 L 10 5 L 0 10 z" fill="#72909b"></path>
                     </marker>
                   </defs>
-                  <g stroke="#668390" stroke-width="2" fill="none"
+                  <rect x="0" y="0" width="560" height="330" rx="12" fill="url(#argus-grid)"/>
+                  <g stroke="#668390" stroke-width="2" fill="none" opacity=".86"
                      marker-end="url(#argus-context-arrow)">
-                    <path d="M88 72 L231 129"></path>
-                    <path d="M270 137 L411 78"></path>
-                    <path d="M270 151 L416 216"></path>
-                    <path d="M99 224 L230 157"></path>
+                    <path d="M92 74 C158 74 184 118 240 145"></path>
+                    <path d="M302 146 C362 120 386 72 454 72"></path>
+                    <path d="M302 170 C364 192 397 250 466 250"></path>
+                    <path d="M95 258 C160 250 194 202 243 177"></path>
+                    <path d="M464 88 C491 132 492 190 472 229"></path>
                   </g>
-                  <path d="M93 145 L222 145" stroke="#b7791f" stroke-width="5"
+                  <path d="M99 164 C148 164 188 164 238 164" stroke="#b7791f" stroke-width="5"
+                        fill="none"
                         marker-end="url(#argus-arrow)"></path>
-                  <g fill="#147d76" stroke="#edf7f5" stroke-width="4">
-                    <circle cx="70" cy="63" r="20"></circle>
-                    <circle cx="70" cy="145" r="27"></circle>
-                    <circle cx="76" cy="235" r="20"></circle>
-                    <circle cx="250" cy="145" r="31" fill="#123149"></circle>
-                    <circle cx="435" cy="67" r="22"></circle>
-                    <circle cx="440" cy="228" r="22"></circle>
+                  <rect x="116" y="136" width="104" height="22" rx="11" fill="#4b3415"/>
+                  <text x="168" y="151" fill="#f4c57b" text-anchor="middle"
+                        font-family="Segoe UI, sans-serif" font-size="11">SELECTED TRANSFER</text>
+                  <g fill="#147d76" stroke="#d9f0ed" stroke-width="4">
+                    <circle cx="76" cy="69" r="21"></circle>
+                    <circle cx="72" cy="164" r="29" fill="#0f6b66"></circle>
+                    <circle cx="78" cy="264" r="21"></circle>
+                    <circle cx="272" cy="164" r="34" fill="#123149" stroke="#79c9c1"></circle>
+                    <circle cx="476" cy="69" r="23"></circle>
+                    <circle cx="484" cy="254" r="23"></circle>
                   </g>
-                  <g fill="#d8e8e8" font-family="Segoe UI, sans-serif" font-size="13">
-                    <text x="42" y="34">History</text>
-                    <text x="24" y="188">Transfer</text>
-                    <text x="224" y="197">Account</text>
-                    <text x="396" y="34">Network</text>
-                    <text x="399" y="271">Context</text>
+                  <g font-family="Segoe UI, sans-serif" text-anchor="middle">
+                    <g fill="#ffffff" font-size="13" font-weight="600">
+                      <text x="76" y="73">A-1047</text><text x="72" y="168">A-2048</text>
+                      <text x="78" y="268">A-4472</text><text x="272" y="168">A-3382</text>
+                      <text x="476" y="73">A-5821</text><text x="484" y="258">A-7714</text>
+                    </g>
+                    <g fill="#b4c8ce" font-size="12">
+                      <text x="76" y="108">prior sender</text><text x="72" y="210">sender</text>
+                      <text x="78" y="302">prior receiver</text>
+                      <text x="272" y="218">receiver</text>
+                      <text x="476" y="111">connected</text><text x="484" y="296">connected</text>
+                    </g>
                   </g>
                 </svg>
               </div>
-              <div class="argus-visual-caption">Transaction → network → investigation</div>
               <div class="argus-evidence-lanes">
                 <div class="argus-evidence-lane">
+                  <span class="argus-lane-icon" aria-hidden="true">01</span>
                   <strong>Observed evidence</strong>
                   <span>Direction, timing, transfer history</span>
                 </div>
                 <div class="argus-evidence-lane">
+                  <span class="argus-lane-icon" aria-hidden="true">02</span>
                   <strong>Model evidence</strong>
-                  <span>Review priority, explained separately</span>
+                  <span>Priority and contributions, kept separate</span>
                 </div>
               </div>
             </div>
@@ -211,11 +232,12 @@ def _render_hero(navigate: Navigate) -> None:
 def _preview_figure(expanded: bool) -> go.Figure:
     if expanded:
         positions = {
-            "Account 1047": (-1.25, 0.05),
-            "Account 3382": (0.0, 0.05),
-            "Account 5821": (1.2, 0.85),
-            "Account 7714": (1.35, -0.75),
-            "Account 9206": (0.0, -1.0),
+            "Account 1047": (-1.35, 0.0),
+            "Account 3382": (0.0, 0.0),
+            "Account 5821": (1.25, 0.78),
+            "Account 7714": (1.35, -0.72),
+            "Account 9206": (-0.2, -0.95),
+            "Account 6630": (-0.72, 0.92),
         }
         edges = (
             ("Account 1047", "Account 3382", True),
@@ -223,10 +245,16 @@ def _preview_figure(expanded: bool) -> go.Figure:
             ("Account 3382", "Account 7714", False),
             ("Account 9206", "Account 3382", False),
             ("Account 5821", "Account 7714", False),
+            ("Account 6630", "Account 3382", False),
+            ("Account 1047", "Account 6630", False),
         )
+        x_range = [-1.9, 1.78]
+        y_range = [-1.45, 1.32]
     else:
-        positions = {"Account 1047": (-0.9, 0.0), "Account 3382": (0.9, 0.0)}
+        positions = {"Account 1047": (-0.78, 0.0), "Account 3382": (0.78, 0.0)}
         edges = (("Account 1047", "Account 3382", True),)
+        x_range = [-1.05, 1.05]
+        y_range = [-0.48, 0.55]
 
     figure = go.Figure()
     annotations: list[dict[str, Any]] = []
@@ -266,6 +294,18 @@ def _preview_figure(expanded: bool) -> go.Figure:
         )
 
     ordered_nodes = list(positions)
+    text_positions = (
+        [
+            "bottom center",
+            "bottom center",
+            "middle left",
+            "top center",
+            "bottom center",
+            "bottom center",
+        ]
+        if expanded
+        else "bottom center"
+    )
     node_colors = [
         COLORS["navy_950"] if node == "Account 3382" else COLORS["teal_600"]
         for node in ordered_nodes
@@ -276,26 +316,42 @@ def _preview_figure(expanded: bool) -> go.Figure:
             y=[positions[node][1] for node in ordered_nodes],
             mode="markers+text",
             text=ordered_nodes,
-            textposition="bottom center",
+            textposition=text_positions,
             hovertext=[f"Illustrative account: {node}" for node in ordered_nodes],
             hoverinfo="text",
             marker={
-                "size": 25,
+                "size": 38 if expanded else 44,
                 "color": node_colors,
-                "line": {"width": 2, "color": COLORS["white"]},
+                "line": {"width": 2.5, "color": COLORS["white"]},
             },
             showlegend=False,
         )
     )
+    focal_source, focal_target, _ = edges[0]
+    focal_x = (positions[focal_source][0] + positions[focal_target][0]) / 2
+    focal_y = (positions[focal_source][1] + positions[focal_target][1]) / 2
+    annotations.append(
+        {
+            "x": focal_x,
+            "y": focal_y + 0.14,
+            "text": "Selected transfer",
+            "showarrow": False,
+            "font": {"size": 11, "color": "#7A4D10"},
+            "bgcolor": "#FFF3DB",
+            "bordercolor": "#E8C98F",
+            "borderpad": 4,
+        }
+    )
     figure.update_layout(
         annotations=annotations,
-        height=390,
-        margin={"l": 12, "r": 12, "t": 20, "b": 18},
+        height=338 if expanded else 270,
+        margin={"l": 18, "r": 18, "t": 22, "b": 28},
         paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        xaxis={"visible": False, "range": [-1.7, 1.75]},
-        yaxis={"visible": False, "range": [-1.35, 1.25], "scaleanchor": "x"},
+        plot_bgcolor="#F8FBFA",
+        xaxis={"visible": False, "range": x_range, "fixedrange": True},
+        yaxis={"visible": False, "range": y_range, "fixedrange": True},
         hoverlabel={"bgcolor": COLORS["navy_950"], "font_color": COLORS["white"]},
+        uirevision="argus-public-preview",
     )
     return figure
 
@@ -312,7 +368,7 @@ def _render_product_preview() -> None:
     with left:
         st.markdown(
             """
-            <div class="argus-card">
+            <div class="argus-preview-copy">
               <span class="argus-card-label">A clearer starting point</span>
               <h3>One transaction rarely tells the whole story.</h3>
               <p>
@@ -323,125 +379,114 @@ def _render_product_preview() -> None:
             """,
             unsafe_allow_html=True,
         )
+        requested_preview = st.query_params.get("preview")
+        if isinstance(requested_preview, list):
+            requested_preview = requested_preview[-1] if requested_preview else None
+        preview_key = (
+            "public_network_preview_expanded"
+            if requested_preview == "network"
+            else "public_network_preview"
+        )
         preview = st.radio(
             "Preview perspective",
             ("Single transaction", "Explore network"),
+            index=1 if requested_preview == "network" else 0,
             horizontal=True,
-            key="public_network_preview",
+            key=preview_key,
         )
-        preview_note = " · ".join(
-            ("Illustrative product preview", "Generic accounts", "No model performance claim")
-        )
-        st.caption(preview_note)
+        st.caption("Illustrative network · Demo accounts · Not a scored case")
     with right:
-        st.plotly_chart(
-            _preview_figure(preview == "Explore network"),
-            width="stretch",
-            config={"displayModeBar": False, "responsive": True},
-            key=f"public_preview_{preview.casefold().replace(' ', '_')}",
-        )
+        with st.container(key="public_preview_canvas"):
+            state_copy = (
+                "6 accounts · 7 directed relationships"
+                if preview == "Explore network"
+                else "2 accounts · 1 directed relationship"
+            )
+            st.markdown(
+                '<div class="argus-preview-header"><span>Investigation view</span>'
+                f"<strong>{state_copy}</strong></div>",
+                unsafe_allow_html=True,
+            )
+            st.plotly_chart(
+                _preview_figure(preview == "Explore network"),
+                width="stretch",
+                config={"displayModeBar": False, "responsive": True},
+                key="public_network_preview_chart",
+            )
 
 
 def _render_problem_and_value() -> None:
-    st.divider()
-    section_heading(
-        "The investigation challenge",
-        "Alert volume grows faster than analyst attention.",
-        "A transfer can look ordinary on its own while its timing, history, or surrounding "
-        "account relationships deserve closer review.",
-    )
-    problem, response = st.columns(2, gap="large")
-    with problem:
-        st.markdown(
-            """
-            <div class="argus-card">
-              <span class="argus-card-label">Operational pressure</span>
-              <h3>Too many signals, too little context</h3>
-              <p>
-                Investigation teams need to decide where to look first without losing the
-                transaction trail or the network surrounding it.
-              </p>
+    st.markdown(
+        """
+        <section class="argus-value-section">
+          <div class="argus-value-intro">
+            <div>
+              <div class="argus-eyebrow">The investigation challenge</div>
+              <h2>Alert volume grows faster than analyst attention.</h2>
+              <p>A transfer can look ordinary on its own while timing, history, and surrounding
+              relationships reveal where a closer review should begin.</p>
             </div>
-            """,
-            unsafe_allow_html=True,
-        )
-    with response:
-        st.markdown(
-            """
-            <div class="argus-card">
-              <span class="argus-card-label">ARGUS response</span>
-              <h3>Priority with evidence attached</h3>
-              <p>
-                ARGUS links a review priority to directed transfers, historical behavior,
-                observed evidence, and a separate model explanation.
-              </p>
+            <div class="argus-context-stack" aria-label="From fragmented signals to context">
+              <div><span>01</span><strong>Isolated alert</strong>
+              <small>Limited context</small></div>
+              <svg viewBox="0 0 36 22" aria-hidden="true"><path d="M2 11h28m-7-7 7 7-7 7"/></svg>
+              <div class="active"><span>02</span><strong>ARGUS review</strong>
+              <small>Network and evidence together</small></div>
             </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
-    columns = st.columns(3, gap="medium")
-    concepts = (
-        (
-            "Prioritize",
-            "Which cases deserve attention first?",
-            "Turn a saved ranking into a focused investigation worklist.",
-        ),
-        (
-            "Connect",
-            "How are the accounts and transfers related?",
-            "Follow direction, timing, and the account network around a case.",
-        ),
-        (
-            "Explain",
-            "What supports the review?",
-            "Keep directly observed facts separate from model-based evidence.",
-        ),
+          </div>
+          <div class="argus-pillars" aria-label="ARGUS product pillars">
+            <article>
+              <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M6 8h20M6 16h13M6 24h8"/>
+              <circle cx="24" cy="20" r="4"/><path d="m27 23 3 3"/></svg>
+              <span>Prioritize</span><strong class="argus-pillar-title">Focus attention</strong>
+              <p>Turn ranking evidence into a focused investigation worklist.</p>
+            </article>
+            <article>
+              <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="7" cy="16" r="4"/>
+              <circle cx="25" cy="8" r="4"/><circle cx="25" cy="24" r="4"/>
+              <path d="m11 15 10-5m-10 7 10 5"/></svg>
+              <span>Connect</span><strong class="argus-pillar-title">See relationships</strong>
+              <p>Follow direction, timing, and the account network around a case.</p>
+            </article>
+            <article>
+              <svg viewBox="0 0 32 32" aria-hidden="true">
+              <path d="M6 5h20v22H6zM11 11h10M11 16h10M11 21h6"/>
+              <circle cx="24" cy="23" r="5"/></svg>
+              <span>Explain</span><strong class="argus-pillar-title">Review with clarity</strong>
+              <p>Keep observed facts visibly separate from model-based evidence.</p>
+            </article>
+          </div>
+        </section>
+        """,
+        unsafe_allow_html=True,
     )
-    for column, (label, title, copy) in zip(columns, concepts, strict=True):
-        with column:
-            st.markdown(
-                f"""
-                <div class="argus-card">
-                  <span class="argus-card-label">{label}</span>
-                  <h3>{title}</h3>
-                  <p>{copy}</p>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
 
 
 def _render_how_it_works() -> None:
     anchor("how-it-works")
-    st.divider()
     section_heading(
         "How it works",
         "A disciplined path from transaction data to analyst review.",
         "The operational journey stays simple even when the underlying evidence includes time "
         "and network context.",
     )
-    steps = (
-        ("01", "Transaction data", "Read the recorded transfer and its attributes."),
-        ("02", "Historical context", "Look only at activity available before the transfer."),
-        ("03", "Account network", "Trace directed relationships around the sender and receiver."),
-        ("04", "Risk prioritization", "Rank what deserves limited analyst attention first."),
-        ("05", "Investigation", "Review evidence and make a human decision."),
+    st.markdown(
+        """
+        <ol class="argus-process" aria-label="ARGUS investigation process">
+          <li><span class="argus-process-node">01</span><div><strong>Transaction data</strong>
+          <p>Read the recorded transfer and its attributes.</p></div></li>
+          <li><span class="argus-process-node">02</span><div><strong>Historical context</strong>
+          <p>Use activity available before the transfer.</p></div></li>
+          <li><span class="argus-process-node">03</span><div><strong>Account network</strong>
+          <p>Trace directed sender and receiver relationships.</p></div></li>
+          <li><span class="argus-process-node">04</span><div><strong>Risk prioritization</strong>
+          <p>Focus limited analyst attention.</p></div></li>
+          <li><span class="argus-process-node">05</span><div><strong>Investigation</strong>
+          <p>Review evidence and make a human decision.</p></div></li>
+        </ol>
+        """,
+        unsafe_allow_html=True,
     )
-    columns = st.columns(5, gap="small")
-    for column, (number, title, copy) in zip(columns, steps, strict=True):
-        with column:
-            st.markdown(
-                f"""
-                <div class="argus-flow-step">
-                  <span class="argus-flow-number">{number}</span>
-                  <h3>{title}</h3>
-                  <p>{copy}</p>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
     with st.expander("Technical model roles"):
         st.markdown(
             "**Graph-enhanced LightGBM** is the primary scientific and operational ranking "
@@ -451,102 +496,132 @@ def _render_how_it_works() -> None:
 
 
 def _render_outcomes() -> None:
-    st.divider()
-    section_heading(
-        "Operational value",
-        "Give investigators context they can act on.",
-        "ARGUS is designed to support prioritization and review—not to replace professional "
-        "judgment or claim an investigation outcome.",
+    st.markdown(
+        """
+        <section class="argus-outcome-band">
+          <div class="argus-outcome-visual" aria-hidden="true">
+            <svg viewBox="0 0 220 150">
+              <path class="route" d="M26 34h72c24 0 24 38 48 38h48"/>
+              <path class="route" d="M26 76h52c30 0 31 42 61 42h55"/>
+              <path class="focal" d="M26 118h36c35 0 45-18 76-18h56"/>
+              <circle cx="26" cy="34" r="7"/><circle cx="26" cy="76" r="7"/>
+              <circle cx="26" cy="118" r="9" class="hot"/>
+              <rect x="152" y="22" width="42" height="24" rx="6"/>
+              <rect x="152" y="60" width="42" height="24" rx="6"/>
+              <rect x="152" y="106" width="42" height="24" rx="6" class="selected"/>
+            </svg>
+            <span>Signals become a review path</span>
+          </div>
+          <div class="argus-outcome-copy">
+            <div class="argus-eyebrow light">Operational value</div>
+            <h2>Give investigators context they can act on.</h2>
+            <div class="argus-outcome-list">
+              <span>Prioritize limited analyst attention</span>
+              <span>Expose directed account-network context</span>
+              <span>Move directly from worklist to investigation</span>
+              <span>Separate observed and model evidence</span>
+              <span>Preserve human review</span>
+            </div>
+          </div>
+        </section>
+        """,
+        unsafe_allow_html=True,
     )
-    left, right = st.columns(2, gap="large")
-    with left:
-        st.markdown(
-            """
-            - Prioritize a constrained investigation workload
-            - Surface directed account-network context
-            - Move from a queue entry into the relevant case directly
-            """
-        )
-    with right:
-        st.markdown(
-            """
-            - Separate observed facts from model reasoning
-            - Support evidence-led analyst decisions
-            - Preserve human review before any adverse action
-            """
-        )
 
 
 def _render_analyst_experience() -> None:
     anchor("analyst-experience")
-    st.divider()
     section_heading(
         "Analyst experience",
         "A direct path from workload to decision.",
-        "The secure-style portal is organized around the questions an investigator needs to "
-        "answer—not around a machine-learning pipeline.",
+        "The workspace is organized around the questions an investigator needs to answer—not "
+        "around a machine-learning pipeline.",
     )
-    journey = (
-        ("Overview", "See what requires attention and return to active work."),
-        ("Investigations", "Search, filter, sort, and open the saved case worklist."),
-        ("Case Investigator", "Inspect the network, timeline, and observed evidence."),
-        ("Analyst Decision", "Record session-only notes, escalation, or case status."),
-    )
-    columns = st.columns(4, gap="small")
-    for index, (title, copy) in enumerate(journey, start=1):
-        with columns[index - 1]:
-            st.markdown(
-                f"""
-                <div class="argus-card">
-                  <span class="argus-card-label">Step {index}</span>
-                  <h3>{title}</h3>
-                  <p>{copy}</p>
+    st.markdown(
+        """
+        <section class="argus-analyst-journey">
+          <ol class="argus-journey-rail">
+            <li><span>01</span><div><strong>Overview</strong>
+            <small>See active work</small></div></li>
+            <li><span>02</span><div><strong>Investigations</strong>
+            <small>Find and open a case</small></div></li>
+            <li><span>03</span><div><strong>Case Investigator</strong>
+            <small>Review network and evidence</small></div></li>
+            <li><span>04</span><div><strong>Analyst Decision</strong>
+            <small>Document the next action</small></div></li>
+          </ol>
+          <div class="argus-workspace-preview" aria-label="Illustrative analyst workspace">
+            <div class="argus-preview-sidebar"><b>ARGUS</b><i></i><i></i>
+            <i class="active"></i><i></i></div>
+            <div class="argus-preview-main">
+              <div class="argus-preview-top"><span>ILLUSTRATIVE · A-2048</span>
+              <em>IN REVIEW</em></div>
+              <div class="argus-preview-grid">
+                <div class="argus-mini-network">
+                  <svg viewBox="0 0 280 185" aria-hidden="true">
+                    <path d="M45 42L137 91M45 142L137 91M151 91L235 46M151 91L235 139"/>
+                    <path class="focal" d="M50 91h76"/>
+                    <circle cx="40" cy="42" r="12"/><circle cx="40" cy="91" r="17"/>
+                    <circle cx="40" cy="142" r="12"/><circle cx="140" cy="91" r="20" class="core"/>
+                    <circle cx="240" cy="42" r="13"/><circle cx="240" cy="142" r="13"/>
+                  </svg>
                 </div>
-                """,
-                unsafe_allow_html=True,
-            )
+                <div class="argus-mini-evidence"><strong>Observed evidence</strong>
+                  <i></i><i></i><i class="short"></i><strong>Model evidence</strong>
+                  <i></i><i class="short"></i>
+                </div>
+              </div>
+              <div class="argus-preview-actions"><span>Start review</span>
+              <span class="secondary">Escalate</span>
+              <span class="muted">Close case</span></div>
+            </div>
+          </div>
+        </section>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def _render_responsible_ai() -> None:
     anchor("responsible-ai")
-    st.divider()
     section_heading(
         "Security & Responsible AI",
         "Decision support with clear boundaries.",
         "ARGUS keeps model evidence in context and leaves investigation decisions with trained "
         "professionals.",
     )
-    principles, deployment = st.columns(2, gap="large")
-    with principles:
-        st.markdown(
-            """
-            <div class="argus-card">
-              <span class="argus-card-label">Review safeguards</span>
-              <h3>Human review remains mandatory</h3>
-              <p>
-                A model score is not proof of wrongdoing. ARGUS does not autonomously accuse a
-                person, block an account, or authorize enforcement action. Observed evidence and
-                model evidence remain visibly separate.
-              </p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-    with deployment:
-        st.markdown(
-            """
-            <div class="argus-card">
-              <span class="argus-card-label">Deployment boundary</span>
-              <h3>Prototype evidence, not a production certification</h3>
-              <p>
-                A live-bank deployment would require the bank's own identity, access, security,
-                data-governance, validation, monitoring, and integration controls. No external
-                certification or regulatory approval is claimed.
-              </p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+    st.markdown(
+        """
+        <div class="argus-trust-grid">
+          <article><span class="argus-trust-icon">
+            <svg viewBox="0 0 32 32" aria-hidden="true">
+            <path d="M16 3 27 8v8c0 7-4.7 11.2-11 13-6.3-1.8-11-6-11-13V8z"/>
+            <path d="m10.5 16 3.5 3.5 7.5-8"/></svg></span>
+            <div><strong>Human decision remains final</strong>
+            <p>A model score supports review; it does not establish wrongdoing or authorize
+            action.</p></div>
+          </article>
+          <article><span class="argus-trust-icon">
+            <svg viewBox="0 0 32 32" aria-hidden="true">
+            <rect x="3" y="6" width="11" height="20" rx="3"/>
+            <rect x="18" y="6" width="11" height="20" rx="3"/>
+            <path d="M8 12h2M8 17h2M23 12h2M23 17h2"/></svg></span>
+            <div><strong>Evidence types stay separate</strong>
+            <p>Observed transaction facts remain distinct from model reasoning throughout
+            review.</p></div>
+          </article>
+          <article><span class="argus-trust-icon">
+            <svg viewBox="0 0 32 32" aria-hidden="true">
+            <path d="M5 28V12h22v16M9 12V7h14v5M11 18h3M18 18h3M11 23h3M18 23h3"/>
+            </svg></span>
+            <div><strong>Deployment requires institution controls</strong>
+            <p>Production use requires identity, security, governance, validation, and
+            monitoring.</p></div>
+          </article>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def _truthy_series(frame: Any, column: str) -> Any:
@@ -564,13 +639,12 @@ def _scientific_evidence(artifacts: Any | None) -> list[tuple[str, str]]:
         return []
     champion = champion_rows.iloc[0]
     evidence: list[tuple[str, str]] = []
-    for column, label in (("pr_auc", "Final test PR-AUC"), ("roc_auc", "Final test ROC-AUC")):
-        value = champion.get(column)
-        if value is not None:
-            try:
-                evidence.append((label, f"{float(value):.6f}"))
-            except (TypeError, ValueError):
-                pass
+    value = champion.get("pr_auc")
+    if value is not None:
+        try:
+            evidence.append(("Final PR-AUC", f"{float(value):.3f}"))
+        except (TypeError, ValueError):
+            pass
 
     top_k = artifacts.final_evaluation.top_k
     if not top_k.empty and {"model", "k", "precision_at_k"}.issubset(top_k.columns):
@@ -586,91 +660,83 @@ def _scientific_evidence(artifacts: Any | None) -> list[tuple[str, str]]:
 
 def _render_scientific_credibility(artifacts: Any | None, navigate: Navigate) -> None:
     anchor("resources")
-    st.divider()
-    section_heading(
-        "Scientific credibility",
-        "Frozen evaluation evidence, presented with its limits.",
-        "Graph-enhanced LightGBM was selected before the final test. Results come from the "
-        "synthetic IBM AML HI-Small project dataset and are not live-bank validation.",
-    )
     evidence = _scientific_evidence(artifacts)
     if evidence:
-        columns = st.columns(len(evidence), gap="medium")
-        for column, (label, value) in zip(columns, evidence, strict=True):
-            with column:
-                st.markdown(
-                    f"""
-                    <div class="argus-card">
-                      <div class="argus-proof-value">{value}</div>
-                      <div class="argus-proof-label">{label} · Project dataset</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-    else:
-        st.info(
-            "The public experience is available without local scientific artifacts. "
-            "Verified metrics appear when the saved final-evaluation bundle is loaded."
+        values = dict(evidence)
+        st.markdown(
+            f"""
+            <section class="argus-credibility-strip">
+              <div class="argus-credibility-label"><span>Project evaluation</span>
+              <strong>IBM AML HI-Small</strong></div>
+              <div><strong>5.08M</strong><span>transaction project dataset</span></div>
+              <div><strong>Graph-enhanced LightGBM</strong><span>primary model</span></div>
+              <div><strong>{html.escape(values.get("Final PR-AUC", "—"))}</strong>
+              <span>Final PR-AUC</span></div>
+              <div><strong>{html.escape(values.get("Precision@100", "—"))}</strong>
+              <span>Precision@100</span></div>
+            </section>
+            """,
+            unsafe_allow_html=True,
         )
-    st.caption(
-        "The final test was used once after the model, feature set, and threshold were frozen. "
-        "Model output does not establish wrongdoing."
-    )
-    st.button(
-        "Explore Project Resources",
+    else:
+        st.info("Project evidence becomes available when the verified evaluation bundle is loaded.")
+    link, note = st.columns([1.2, 4.8], vertical_alignment="center")
+    link.button(
+        "View Model Evidence",
         key="public_resources",
         on_click=navigate,
         args=("resources",),
+        width="stretch",
     )
+    note.caption("Synthetic project evaluation · Not live-bank validation")
 
 
 def _render_contact(navigate: Navigate) -> None:
     anchor("contact")
-    st.markdown("<div style='height:2.5rem'></div>", unsafe_allow_html=True)
-    st.markdown(
-        """
-        <div class="argus-callout">
-          <div class="argus-eyebrow" style="color:#7fd0c8">Request a demonstration</div>
-          <h2>See how a network-aware investigation can fit your review workflow.</h2>
-          <p>
-            Share your use case through the prototype request flow. No email or CRM submission
-            occurs without a connected service.
-          </p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    left, remainder = st.columns([1.35, 4.65])
-    with left:
-        st.button(
-            "Request a Demo",
-            key="contact_demo",
-            type="primary",
-            width="stretch",
-            on_click=navigate,
-            args=("demo",),
-        )
-    remainder.empty()
+    with st.container(key="contact_callout"):
+        copy, action = st.columns([4.4, 1.2], gap="large", vertical_alignment="center")
+        with copy:
+            st.markdown(
+                """
+                <div class="argus-eyebrow light">Request a demonstration</div>
+                <h2>Bring network context into your investigation workflow.</h2>
+                <p>Tell us about your investigation workflow and explore how ARGUS could fit
+                your review process.</p>
+                """,
+                unsafe_allow_html=True,
+            )
+        with action:
+            st.button(
+                "Request a Demo",
+                key="contact_demo",
+                type="primary",
+                width="stretch",
+                on_click=navigate,
+                args=("demo",),
+            )
 
 
 def _render_footer(navigate: Navigate) -> None:
-    st.markdown(
-        """
-        <footer class="argus-footer">
-          <strong style="color:#071c2c;letter-spacing:.12em">ARGUS</strong><br>
-          Financial-crime investigation and account-network intelligence prototype.
-        </footer>
-        """,
-        unsafe_allow_html=True,
-    )
-    product, resources, contact, privacy, terms, login = st.columns(6)
-    product.button("Product", key="footer_product", on_click=navigate, args=("home",))
-    resources.button("Resources", key="footer_resources", on_click=navigate, args=("resources",))
-    contact.button("Contact", key="footer_contact", on_click=navigate, args=("demo",))
-    privacy.button("Privacy", key="footer_privacy", on_click=navigate, args=("privacy",))
-    terms.button("Terms", key="footer_terms", on_click=navigate, args=("terms",))
-    login.button("Login", key="footer_login", on_click=navigate, args=("login",))
-    st.caption("ARGUS · Academic decision-support prototype · MIT-licensed source code")
+    with st.container(key="public_footer"):
+        st.markdown(
+            """
+            <footer class="argus-footer">
+              <strong>ARGUS</strong>
+              <span>Financial Crime Investigation &amp; Account Network Intelligence</span>
+            </footer>
+            """,
+            unsafe_allow_html=True,
+        )
+        product, resources, contact, privacy, terms, login = st.columns(6)
+        product.button("Product", key="footer_product", on_click=navigate, args=("home",))
+        resources.button(
+            "Resources", key="footer_resources", on_click=navigate, args=("resources",)
+        )
+        contact.button("Contact", key="footer_contact", on_click=navigate, args=("demo",))
+        privacy.button("Privacy", key="footer_privacy", on_click=navigate, args=("privacy",))
+        terms.button("Terms", key="footer_terms", on_click=navigate, args=("terms",))
+        login.button("Login", key="footer_login", on_click=navigate, args=("login",))
+        st.caption("Project experience · Human review required · MIT-licensed source code")
 
 
 def render_public_home(navigate: Navigate, artifacts: Any | None = None) -> None:
@@ -722,16 +788,15 @@ def render_demo_request(navigate: Navigate) -> None:
     section_heading(
         "Request a demo",
         "Start a conversation about your investigation workflow.",
-        "This prototype validates your request locally. It is not connected to email, a CRM, "
-        "or another submission service.",
+        "Tell us where network context and evidence-led review could support your team.",
     )
 
     if st.session_state.get("argus_demo_request_submitted"):
         name = st.session_state.get("argus_demo_request_name", "there")
         st.success(f"Thank you, {name}. Your request is ready for this demo session.")
         st.markdown(
-            '<div class="argus-prototype-note">No message was sent. This confirmation exists '
-            "only in the current application session.</div>",
+            '<div class="argus-prototype-note"><strong>Demo environment</strong> · No external '
+            "CRM submission is connected. No message was sent.</div>",
             unsafe_allow_html=True,
         )
         first, second, remainder = st.columns([1.2, 1.2, 3.6])
@@ -835,7 +900,7 @@ def render_public_information(route: str, navigate: Navigate) -> None:
     if route == "resources":
         section_heading(
             "Resources",
-            "Review the evidence behind the ARGUS prototype.",
+            "Review the evidence behind the ARGUS project.",
             "Project documentation separates scientific evaluation, model limitations, and "
             "the analyst-facing product experience.",
         )
@@ -871,9 +936,9 @@ def render_public_information(route: str, navigate: Navigate) -> None:
         )
     elif route == "privacy":
         section_heading(
-            "Prototype privacy notice",
-            "Session data stays within the running demonstration.",
-            "ARGUS is an academic prototype and does not present this page as a corporate "
+            "Privacy notice",
+            "Demo data stays within the running session.",
+            "This project notice describes the demonstration environment and is not a corporate "
             "privacy policy.",
         )
         st.markdown(
@@ -888,7 +953,7 @@ def render_public_information(route: str, navigate: Navigate) -> None:
         )
     else:
         section_heading(
-            "Prototype terms",
+            "Terms of use",
             "Use ARGUS as decision-support research, not as an enforcement system.",
             "The public demonstration communicates the intended analyst workflow and the limits "
             "of the completed project evaluation.",

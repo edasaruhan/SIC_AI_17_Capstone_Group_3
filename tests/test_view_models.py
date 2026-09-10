@@ -6,6 +6,7 @@ import pandas as pd
 
 from argus.app.view_models import (
     build_queue_view,
+    display_pattern,
     display_queue,
     filter_queue_view,
     sort_queue_view,
@@ -99,6 +100,8 @@ def test_queue_projection_uses_session_status_and_honest_currency_context() -> N
     assert first["currency_context"] == "USD"
     assert second["currency_context"] == "Mixed currencies"
     assert "Mixed currencies" in display_queue(view).loc[0, "Total Flow"]
+    assert "Review Signal" in display_queue(view).columns
+    assert "Primary Pattern" not in display_queue(view).columns
 
 
 def test_queue_sorting_and_filters_are_stable() -> None:
@@ -117,3 +120,8 @@ def test_empty_queue_projection_keeps_display_contract() -> None:
 
     assert view.empty
     assert display_queue(view).empty
+
+
+def test_graphsage_score_label_is_a_review_signal_not_a_behavioral_pattern() -> None:
+    assert display_pattern("high_graphsage_transaction_score") == "Elevated network ranking"
+    assert display_pattern("fan_out") == "Fan Out"

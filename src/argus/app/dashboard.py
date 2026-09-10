@@ -1,4 +1,4 @@
-"""Route the ARGUS public site, prototype login, and saved-artifact analyst portal."""
+"""Route the ARGUS public site, analyst access, and artifact-backed workspace."""
 
 from __future__ import annotations
 
@@ -43,7 +43,8 @@ _PUBLIC_ROUTES = {"home", "demo", "login", "resources", "privacy", "terms"}
 _VALID_ROUTES = _PUBLIC_ROUTES | {"portal"}
 _PORTAL_WIDGET_KEYS = {
     "case_investigator_select",
-    "investigation_case_select",
+    "investigation_selected_case_id",
+    "investigation_worklist_table",
     "investigation_open_case",
     "overview_case_select",
     "overview_open_case",
@@ -167,7 +168,9 @@ def _sync_portal_route(page: str) -> None:
 
 def _open_case(case_id: str) -> None:
     st.session_state["argus_selected_case_id"] = case_id
+    st.session_state["case_investigator_select"] = case_id
     st.session_state["argus_nav_override"] = "Case Investigator"
+    st.session_state.pop("argus_pending_case_action", None)
     _sync_portal_route("Case Investigator")
     st.rerun()
 
@@ -194,7 +197,7 @@ def _render_portal_sidebar(page: str) -> str:
     st.sidebar.caption("Financial Crime Investigation")
     analyst = html.escape(str(st.session_state.get(ANALYST_EMAIL_KEY) or "Demo analyst"))
     st.sidebar.markdown(
-        '<div class="portal-identity"><strong>ARGUS Demo Workspace</strong>'
+        '<div class="portal-identity"><strong>ARGUS Investigation Workspace</strong>'
         f"<span>{analyst}</span></div>",
         unsafe_allow_html=True,
     )
@@ -210,12 +213,19 @@ def _render_portal_sidebar(page: str) -> str:
     if selected != page:
         _sync_portal_route(selected)
     st.sidebar.divider()
-    st.sidebar.caption("Primary model · Graph-enhanced LightGBM")
-    st.sidebar.caption("Saved results · No live model execution")
+    st.sidebar.markdown(
+        """
+        <div class="portal-status-grid">
+          <span>Model</span><strong>Graph-enhanced LightGBM</strong>
+          <span>Environment</span><strong>Demo</strong>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     with st.sidebar.expander("Help"):
         st.write(
-            "Start in Investigations, select a saved case, then review observed evidence before "
-            "model evidence. Session actions are cleared when you log out."
+            "Start in Investigations, select a case, then review observed evidence before model "
+            "evidence. Demo actions reset after sign-out."
         )
     if st.sidebar.button("Log out", key="portal_logout", width="stretch"):
         _logout()
@@ -272,7 +282,7 @@ def _render_portal() -> None:
     login_notice = st.session_state.pop("argus_login_notice", None)
     if login_notice:
         st.success(str(login_notice))
-    with st.spinner("Loading the saved investigation workspace…"):
+    with st.spinner("Loading the investigation workspace…"):
         try:
             artifacts = _cached_load(str(configured_artifact_root()))
         except ArtifactLoadError:
@@ -281,8 +291,8 @@ def _render_portal() -> None:
     render_page(page, artifacts, open_case=_open_case)
     st.divider()
     st.caption(
-        "ARGUS is a research decision-support prototype. Human review remains mandatory; model "
-        "output is not a legal conclusion or an automatic enforcement decision."
+        "Decision support only · Human review remains mandatory · Model output is not an "
+        "automatic enforcement decision."
     )
 
 

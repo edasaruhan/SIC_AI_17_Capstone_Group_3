@@ -1,9 +1,10 @@
-"""Capture four real headless-browser screenshots from saved Sprint 5 artifacts."""
+"""Capture the public site, login, and portal from immutable Sprint 5 artifacts."""
 
 from __future__ import annotations
 
 import argparse
 import base64
+import hashlib
 import json
 import os
 import secrets
@@ -17,6 +18,26 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Any
+
+
+def _snapshot_tree(root: Path) -> dict[str, tuple[int, int, str]]:
+    result: dict[str, tuple[int, int, str]] = {}
+    for path in sorted(candidate for candidate in root.rglob("*") if candidate.is_file()):
+        metadata = path.stat()
+        result[str(path.relative_to(root))] = (
+            metadata.st_size,
+            metadata.st_mtime_ns,
+            hashlib.sha256(path.read_bytes()).hexdigest(),
+        )
+    return result
+
+
+def _inside(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+    except ValueError:
+        return False
+    return True
 
 
 def _browser() -> Path:
@@ -214,13 +235,14 @@ def _wait_for_text(
     *,
     timeout_seconds: float = 40.0,
 ) -> None:
-    quoted = json.dumps(expected)
+    quoted = json.dumps(expected.casefold())
     expression = (
         "(() => {"
         "const text=(document.body && document.body.innerText)||'';"
         "const skeletons=document.querySelectorAll('[data-testid=stSkeleton]').length;"
-        f"return {{ready:text.includes({quoted})&&skeletons===0,"
-        "text:text.slice(0,500),skeletons:skeletons};"
+        f"return {{ready:text.toLowerCase().includes({quoted})&&skeletons===0,"
+        "text:text.slice(0,500),skeletons:skeletons,url:location.href,"
+        "preview:document.querySelector('.argus-preview-header')?.innerText||''};"
         "})()"
     )
     deadline = time.monotonic() + timeout_seconds
@@ -240,11 +262,158 @@ def _click_text(client: _DevToolsClient, session_id: str, selector: str, label: 
         f"const nodes=Array.from(document.querySelectorAll({json.dumps(selector)}));"
         f"const target=nodes.find(node=>(node.innerText||node.textContent||'').trim()==="
         f"{json.dumps(label)});"
-        "if(!target){return false;}target.click();return true;"
+        "if(!target){return null;}"
+        "target.scrollIntoView({block:'center',inline:'nearest'});"
+        "const box=target.getBoundingClientRect();"
+        "return {x:box.left+(box.width/2),y:box.top+(box.height/2)};"
         "})()"
     )
-    if _evaluate(client, session_id, expression) is not True:
+    point = _evaluate(client, session_id, expression)
+    if not isinstance(point, dict):
         raise RuntimeError(f"Could not click {label!r}")
+    x = float(point["x"])
+    y = float(point["y"])
+    client.command(
+        "Input.dispatchMouseEvent",
+        {"type": "mouseMoved", "x": x, "y": y},
+        session_id=session_id,
+    )
+    client.command(
+        "Input.dispatchMouseEvent",
+        {"type": "mousePressed", "x": x, "y": y, "button": "left", "clickCount": 1},
+        session_id=session_id,
+    )
+    client.command(
+        "Input.dispatchMouseEvent",
+        {"type": "mouseReleased", "x": x, "y": y, "button": "left", "clickCount": 1},
+        session_id=session_id,
+    )
+
+
+def _wait_for_selector_text_change(
+    client: _DevToolsClient,
+    session_id: str,
+    selector: str,
+    previous: str,
+    *,
+    timeout_seconds: float = 30.0,
+) -> str:
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        current = _evaluate(
+            client,
+            session_id,
+            "(() => {"
+            f"const node=document.querySelector({json.dumps(selector)});"
+            "return node ? (node.innerText || '').trim() : '';})()",
+        )
+        if isinstance(current, str) and current and current != previous:
+            time.sleep(0.8)
+            return current
+        time.sleep(0.3)
+    raise TimeoutError(f"Selection did not update {selector!r}")
+
+
+def _click_dataframe_row(
+    client: _DevToolsClient,
+    session_id: str,
+    *,
+    row_index: int,
+) -> None:
+    """Select a visible Glide dataframe row through its supported selection checkbox."""
+
+    geometry = _evaluate(
+        client,
+        session_id,
+        """
+        (() => {
+          const frame = document.querySelector('[data-testid="stDataFrame"]');
+          const canvas = frame && frame.querySelector('canvas');
+          if (!canvas) return null;
+          canvas.scrollIntoView({block: 'center', inline: 'nearest'});
+          const box = canvas.getBoundingClientRect();
+          return {left: box.left, top: box.top, width: box.width, height: box.height};
+        })()
+        """,
+    )
+    if not isinstance(geometry, dict):
+        raise RuntimeError("Could not locate the investigation dataframe canvas")
+    x = float(geometry["left"]) + 18.0
+    y = float(geometry["top"]) + 52.0 + (35.0 * row_index)
+    if y >= float(geometry["top"]) + float(geometry["height"]):
+        raise RuntimeError(f"Dataframe row {row_index} is outside the visible table")
+    client.command(
+        "Input.dispatchMouseEvent",
+        {"type": "mouseMoved", "x": x, "y": y},
+        session_id=session_id,
+    )
+    client.command(
+        "Input.dispatchMouseEvent",
+        {"type": "mousePressed", "x": x, "y": y, "button": "left", "clickCount": 1},
+        session_id=session_id,
+    )
+    client.command(
+        "Input.dispatchMouseEvent",
+        {"type": "mouseReleased", "x": x, "y": y, "button": "left", "clickCount": 1},
+        session_id=session_id,
+    )
+
+
+def _assert_portal_layout(client: _DevToolsClient, session_id: str) -> None:
+    result = _evaluate(
+        client,
+        session_id,
+        """
+        (() => {
+          const sidebar = document.querySelector('[data-testid="stSidebar"]');
+          const content = document.querySelector('[data-testid="stSidebarContent"]');
+          const user = document.querySelector('[data-testid="stSidebarUserContent"]');
+          if (!sidebar || !content || !user) return null;
+          const compact = node => {
+            const box = node.getBoundingClientRect();
+            const style = getComputedStyle(node);
+            return {left: box.left, right: box.right, width: box.width,
+                    transform: style.transform, overflow: style.overflow};
+          };
+          return {sidebar: compact(sidebar), content: compact(content), user: compact(user)};
+        })()
+        """,
+    )
+    if not isinstance(result, dict):
+        raise RuntimeError("Portal sidebar did not render")
+    for key in ("sidebar", "content", "user"):
+        item = result.get(key)
+        if not isinstance(item, dict) or float(item.get("left", -2)) < -1:
+            raise RuntimeError(f"Portal sidebar content is clipped: {result}")
+
+
+def _assert_product_chrome(client: _DevToolsClient, session_id: str) -> None:
+    result = _evaluate(
+        client,
+        session_id,
+        """
+        (() => {
+          const visible = node => {
+            if (!node) return false;
+            const style = getComputedStyle(node);
+            const box = node.getBoundingClientRect();
+            return style.display !== 'none' && style.visibility !== 'hidden' &&
+                   box.width > 0 && box.height > 0;
+          };
+          const deploy = document.querySelector('[data-testid="stAppDeployButton"]');
+          const deployText = Array.from(document.querySelectorAll('button')).find(
+            node => (node.innerText || '').trim() === 'Deploy'
+          );
+          return {deployVisible: visible(deploy) || visible(deployText),
+                  overflow: document.documentElement.scrollWidth >
+                            document.documentElement.clientWidth + 1};
+        })()
+        """,
+    )
+    if not isinstance(result, dict) or result.get("deployVisible"):
+        raise RuntimeError("Streamlit Deploy control remains visible")
+    if result.get("overflow"):
+        raise RuntimeError("Page has horizontal viewport overflow")
 
 
 def _fill_input(client: _DevToolsClient, session_id: str, label: str, value: str) -> None:
@@ -279,8 +448,8 @@ def _capture_rendered_page(
     time.sleep(0.5)
     layout = client.command("Page.getLayoutMetrics", session_id=session_id)
     content_size = layout.get("cssContentSize", {})
-    content_width = max(1440.0, float(content_size.get("width", 1440.0)))
-    content_height = max(1400.0, min(float(content_size.get("height", 1400.0)), 6000.0))
+    content_width = max(1.0, float(content_size.get("width", 1440.0)))
+    content_height = max(1.0, min(float(content_size.get("height", 1400.0)), 9000.0))
     captured = client.command(
         "Page.captureScreenshot",
         {
@@ -308,16 +477,221 @@ def _capture_rendered_page(
         temporary.unlink(missing_ok=True)
 
 
+def _capture_element(
+    client: _DevToolsClient,
+    session_id: str,
+    selector: str,
+    destination: Path,
+    *,
+    padding: int = 24,
+) -> None:
+    """Capture a section itself so nearby page scroll limits cannot duplicate screenshots."""
+
+    geometry = _evaluate(
+        client,
+        session_id,
+        "(() => {"
+        f"const node=document.querySelector({json.dumps(selector)});"
+        "if(!node){return null;}"
+        "node.scrollIntoView({block:'center',inline:'nearest'});"
+        "const box=node.getBoundingClientRect();"
+        "return {left:box.left,top:box.top,width:box.width,height:box.height,"
+        "viewportWidth:window.innerWidth,viewportHeight:window.innerHeight};})()",
+    )
+    if not isinstance(geometry, dict):
+        raise RuntimeError(f"Could not locate visual QA section: {selector}")
+    time.sleep(0.6)
+    geometry = _evaluate(
+        client,
+        session_id,
+        "(() => {"
+        f"const node=document.querySelector({json.dumps(selector)});"
+        "if(!node){return null;}const box=node.getBoundingClientRect();"
+        "return {left:box.left,top:box.top,width:box.width,height:box.height,"
+        "viewportWidth:window.innerWidth,viewportHeight:window.innerHeight};})()",
+    )
+    if not isinstance(geometry, dict):
+        raise RuntimeError(f"Visual QA section disappeared: {selector}")
+    viewport_width = float(geometry["viewportWidth"])
+    viewport_height = float(geometry["viewportHeight"])
+    x = max(0.0, float(geometry["left"]) - padding)
+    y = max(0.0, float(geometry["top"]) - padding)
+    width = min(viewport_width - x, float(geometry["width"]) + (2 * padding))
+    height = min(viewport_height - y, float(geometry["height"]) + (2 * padding))
+    if width <= 0 or height <= 0:
+        raise RuntimeError(f"Visual QA section is outside the viewport: {selector}; {geometry}")
+    captured = client.command(
+        "Page.captureScreenshot",
+        {
+            "format": "png",
+            "fromSurface": True,
+            "captureBeyondViewport": False,
+            "clip": {"x": x, "y": y, "width": width, "height": height, "scale": 1},
+        },
+        session_id=session_id,
+    )
+    image_data = captured.get("data")
+    if not isinstance(image_data, str) or not image_data:
+        raise RuntimeError(f"DevTools did not return a screenshot for {selector}")
+    destination.write_bytes(base64.b64decode(image_data, validate=True))
+
+
+def _capture_viewport_at_text(
+    client: _DevToolsClient,
+    session_id: str,
+    selector: str,
+    label: str,
+    destination: Path,
+    *,
+    block: str = "start",
+) -> None:
+    if block not in {"start", "center"}:
+        raise ValueError(f"Unsupported scroll position: {block}")
+    located = _evaluate(
+        client,
+        session_id,
+        "(() => {"
+        f"const nodes=Array.from(document.querySelectorAll({json.dumps(selector)}));"
+        f"const target=nodes.find(node=>(node.innerText||'').trim()==={json.dumps(label)});"
+        "if(!target){return false;}"
+        f"target.scrollIntoView({{block:{json.dumps(block)},inline:'nearest'}});return true;}})()",
+    )
+    if located is not True:
+        raise RuntimeError(f"Could not locate visual QA heading: {label}")
+    time.sleep(0.7)
+    captured = client.command(
+        "Page.captureScreenshot",
+        {"format": "png", "fromSurface": True, "captureBeyondViewport": False},
+        session_id=session_id,
+    )
+    image_data = captured.get("data")
+    if not isinstance(image_data, str) or not image_data:
+        raise RuntimeError(f"DevTools did not return a screenshot for {label}")
+    destination.write_bytes(base64.b64decode(image_data, validate=True))
+
+
+def _capture_portal_pages(
+    client: _DevToolsClient,
+    session_id: str,
+    output_dir: Path,
+    *,
+    demo_email: str,
+    demo_password: str,
+) -> list[Path]:
+    created: list[Path] = []
+    _fill_input(client, session_id, "Corporate email", demo_email)
+    _fill_input(client, session_id, "Password", demo_password)
+    _click_text(client, session_id, "button", "Sign in")
+    _wait_for_text(client, session_id, "Overview")
+    _assert_product_chrome(client, session_id)
+    _assert_portal_layout(client, session_id)
+    overview_destination = (output_dir / "executive_dashboard.png").resolve()
+    _capture_rendered_page(client, session_id, "Overview", overview_destination)
+    created.append(overview_destination)
+
+    _click_text(client, session_id, "label", "Investigations")
+    _wait_for_text(client, session_id, "Search, filter and open investigation cases")
+    _assert_portal_layout(client, session_id)
+    queue_destination = (output_dir / "investigation_queue.png").resolve()
+    _capture_rendered_page(client, session_id, "Investigations", queue_destination)
+    created.append(queue_destination)
+    panel_selector = ".st-key-investigation_action_panel"
+    panel_before = str(
+        _evaluate(
+            client,
+            session_id,
+            "(() => {const node=document.querySelector("
+            + json.dumps(panel_selector)
+            + ");return node ? (node.innerText || '').trim() : '';})()",
+        )
+        or ""
+    )
+    _click_dataframe_row(client, session_id, row_index=1)
+    selected_panel = _wait_for_selector_text_change(
+        client, session_id, panel_selector, panel_before
+    )
+    selected_destination = (output_dir / "investigation_queue_selected.png").resolve()
+    _capture_rendered_page(client, session_id, "Investigations", selected_destination)
+    created.append(selected_destination)
+    panel_destination = (output_dir / "investigation_open_case_action.png").resolve()
+    _capture_element(client, session_id, panel_selector, panel_destination)
+    created.append(panel_destination)
+
+    _click_dataframe_row(client, session_id, row_index=0)
+    opened_panel = _wait_for_selector_text_change(
+        client, session_id, panel_selector, selected_panel
+    )
+    selected_case_id = opened_panel.splitlines()[0].strip()
+    if not selected_case_id.startswith("ARGUS-"):
+        raise RuntimeError(f"Unexpected selected case panel: {opened_panel!r}")
+    _click_text(client, session_id, "button", "Open case")
+    _wait_for_text(client, session_id, selected_case_id)
+    _wait_for_text(client, session_id, "Case Investigator")
+    _assert_portal_layout(client, session_id)
+    case_destination = (output_dir / "case_investigator.png").resolve()
+    _capture_rendered_page(client, session_id, "Case Investigator", case_destination)
+    created.append(case_destination)
+
+    _click_text(client, session_id, "button", "Escalate")
+    confirmation = "Escalate this case for further review?"
+    _wait_for_text(client, session_id, confirmation)
+    confirmation_destination = (output_dir / "case_action_confirmation.png").resolve()
+    _capture_viewport_at_text(
+        client,
+        session_id,
+        "[data-testid='stAlert']",
+        confirmation,
+        confirmation_destination,
+        block="center",
+    )
+    created.append(confirmation_destination)
+    _click_text(client, session_id, "button", "Cancel")
+    _wait_for_text(client, session_id, "Account network")
+
+    case_sections = {
+        "case_network": "Account network",
+        "case_observed_evidence": "What the records show",
+        "case_model_evidence": "How models inform this review",
+        "case_notes_activity": "Analyst notes",
+    }
+    for slug, heading in case_sections.items():
+        destination = (output_dir / f"{slug}.png").resolve()
+        _capture_viewport_at_text(client, session_id, "h2,h3", heading, destination)
+        _assert_product_chrome(client, session_id)
+        created.append(destination)
+
+    _click_text(client, session_id, "label", "Model Evidence")
+    _wait_for_text(client, session_id, "Frozen primary model")
+    _assert_portal_layout(client, session_id)
+    model_destination = (output_dir / "model_comparison.png").resolve()
+    _capture_rendered_page(client, session_id, "Model Evidence", model_destination)
+    created.append(model_destination)
+    return created
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--artifact-root", type=Path, default=Path("artifacts/sprint5"))
-    parser.add_argument("--output-dir", type=Path, default=Path("artifacts/sprint5/screenshots"))
+    parser.add_argument("--output-dir", type=Path, default=Path("artifacts/ux_v2_visual_qa"))
+    parser.add_argument("--viewport-width", type=int, default=1440)
+    parser.add_argument("--viewport-height", type=int, default=900)
+    parser.add_argument(
+        "--public-only",
+        action="store_true",
+        help="Capture public and login surfaces without entering the analyst portal.",
+    )
     arguments = parser.parse_args()
     project_root = Path(__file__).resolve().parents[1]
     artifact_root = (project_root / arguments.artifact_root).resolve()
     output_dir = (project_root / arguments.output_dir).resolve()
     if not (artifact_root / "product" / "final_test_summary.json").is_file():
         raise FileNotFoundError("Verified Sprint 5 product artifacts are required")
+    protected_roots = [artifact_root, (artifact_root.parent / "sprint4").resolve()]
+    if any(_inside(output_dir, root) for root in protected_roots):
+        raise ValueError("Screenshot output must remain outside Sprint 4/5 artifact roots")
+    if arguments.viewport_width < 360 or arguments.viewport_height < 640:
+        raise ValueError("Viewport must be at least 360x640")
+    before_snapshot = {str(root): _snapshot_tree(root) for root in protected_roots}
     output_dir.mkdir(parents=True, exist_ok=True)
 
     port = _free_port()
@@ -348,12 +722,6 @@ def main() -> int:
         creationflags=creation_flags,
     )
     browser = _browser()
-    pages = {
-        "executive_dashboard": "Overview",
-        "investigation_queue": "Investigations",
-        "case_investigator": "Case Investigator",
-        "model_comparison": "Model Evidence",
-    }
     created: list[Path] = []
     try:
         base_url = f"http://127.0.0.1:{port}"
@@ -368,12 +736,11 @@ def main() -> int:
                     "--headless=new",
                     "--disable-gpu",
                     "--disable-extensions",
-                    "--hide-scrollbars",
                     "--no-first-run",
                     "--remote-allow-origins=*",
                     f"--remote-debugging-port={debugger_port}",
                     f"--user-data-dir={browser_profile}",
-                    "--window-size=1440,1400",
+                    f"--window-size={arguments.viewport_width},{arguments.viewport_height}",
                     "about:blank",
                 ],
                 cwd=project_root,
@@ -396,27 +763,99 @@ def main() -> int:
                 client.command(
                     "Emulation.setDeviceMetricsOverride",
                     {
-                        "width": 1440,
-                        "height": 1400,
+                        "width": arguments.viewport_width,
+                        "height": arguments.viewport_height,
                         "deviceScaleFactor": 1,
-                        "mobile": False,
+                        "mobile": arguments.viewport_width <= 640,
                     },
                     session_id=session_id,
                 )
                 client.command(
+                    "Page.navigate",
+                    {"url": f"{base_url}/?view=home&preview=network"},
+                    session_id=session_id,
+                )
+                _wait_for_text(client, session_id, "See the network behind the transaction.")
+                _wait_for_text(client, session_id, "6 accounts")
+                _assert_product_chrome(client, session_id)
+                public_destination = (output_dir / "public_home.png").resolve()
+                _capture_rendered_page(
+                    client,
+                    session_id,
+                    "See the network behind the transaction.",
+                    public_destination,
+                )
+                created.append(public_destination)
+                expanded_destination = (
+                    output_dir / "public_product_preview_expanded.png"
+                ).resolve()
+                _capture_element(
+                    client,
+                    session_id,
+                    ".st-key-public_preview_canvas",
+                    expanded_destination,
+                )
+                created.append(expanded_destination)
+                client.command(
+                    "Page.navigate",
+                    {"url": f"{base_url}/?view=home"},
+                    session_id=session_id,
+                )
+                _wait_for_text(client, session_id, "2 accounts")
+                preview_destination = (output_dir / "public_product_preview_single.png").resolve()
+                _capture_element(
+                    client,
+                    session_id,
+                    ".st-key-public_preview_canvas",
+                    preview_destination,
+                )
+                created.append(preview_destination)
+                public_sections = {
+                    "problem_value": ".argus-value-section",
+                    "how_it_works": ".argus-process",
+                    "operational_value": ".argus-outcome-band",
+                    "analyst_experience": ".argus-analyst-journey",
+                    "responsible_ai": ".argus-trust-grid",
+                    "credibility": ".argus-credibility-strip",
+                    "request_demo": ".st-key-contact_callout",
+                    "footer": ".st-key-public_footer",
+                }
+                for slug, selector in public_sections.items():
+                    destination = (output_dir / f"public_{slug}.png").resolve()
+                    _capture_element(client, session_id, selector, destination)
+                    _assert_product_chrome(client, session_id)
+                    created.append(destination)
+                client.command(
+                    "Page.navigate", {"url": f"{base_url}/?view=demo"}, session_id=session_id
+                )
+                _wait_for_text(client, session_id, "Start a conversation")
+                _assert_product_chrome(client, session_id)
+                demo_destination = (output_dir / "request_demo_form.png").resolve()
+                _capture_rendered_page(
+                    client,
+                    session_id,
+                    "Start a conversation",
+                    demo_destination,
+                )
+                created.append(demo_destination)
+                client.command(
                     "Page.navigate", {"url": f"{base_url}/?view=login"}, session_id=session_id
                 )
                 _wait_for_text(client, session_id, "Corporate Login")
-                _fill_input(client, session_id, "Corporate email", demo_email)
-                _fill_input(client, session_id, "Password", demo_password)
-                _click_text(client, session_id, "button", "Sign in")
-                _wait_for_text(client, session_id, "Overview")
-                for slug, page in pages.items():
-                    if page != "Overview":
-                        _click_text(client, session_id, "label", page)
-                    destination = (output_dir / f"{slug}.png").resolve()
-                    _capture_rendered_page(client, session_id, page, destination)
-                    created.append(destination)
+                _assert_product_chrome(client, session_id)
+                login_destination = (output_dir / "login.png").resolve()
+                _capture_rendered_page(client, session_id, "Corporate Login", login_destination)
+                created.append(login_destination)
+                if not arguments.public_only:
+                    created.extend(
+                        _capture_portal_pages(
+                            client,
+                            session_id,
+                            output_dir,
+                            demo_email=demo_email,
+                            demo_password=demo_password,
+                        )
+                    )
             finally:
                 if client is not None and target_id is not None:
                     client.command("Target.closeTarget", {"targetId": target_id})
@@ -438,6 +877,11 @@ def main() -> int:
     print("Final Streamlit screenshots: PASS")
     for path in created:
         print(path)
+    after_snapshot = {str(root): _snapshot_tree(root) for root in protected_roots}
+    if before_snapshot != after_snapshot:
+        raise RuntimeError("Scientific artifact files changed during screenshot capture")
+    print("Artifact read-only check: PASS")
+    print(f"Viewport: {arguments.viewport_width}x{arguments.viewport_height}")
     return 0
 
 
