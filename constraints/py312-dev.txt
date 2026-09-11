@@ -1,0 +1,17 @@
+# Direct dependency versions verified for repository QA on Python 3.12.
+# This constrains development installs; it does not recreate the frozen scientific run.
+duckdb==1.5.5
+joblib==1.6.0
+lightgbm==4.7.0
+matplotlib==3.11.1
+networkx==3.6.1
+numpy==2.5.3
+pandas==2.3.3
+PyYAML==6.0.3
+scikit-learn==1.9.1
+torch==2.14.0
+plotly==6.9.0
+streamlit==1.63.0
+pytest==8.4.2
+pytest-cov==6.3.0
+ruff==0.16.7

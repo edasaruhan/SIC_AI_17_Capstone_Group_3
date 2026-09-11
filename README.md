@@ -161,6 +161,7 @@ scripts/             Pipeline, doğrulama ve kalite komutları
 src/argus/           Veri, model, GNN, vaka ve uygulama kodu
 tests/               Otomatik testler
 artifacts/           Yerel çalışma çıktıları; Git dışında
+demo/artifacts/      Temiz klon için sentetik ürün demosu
 ```
 
 ## Hızlı başlangıç
@@ -172,8 +173,14 @@ git clone https://github.com/edasaruhan/SIC_AI_17_Capstone_Group_3
 Set-Location SIC_AI_17_Capstone_Group_3
 py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install --upgrade pip
-.\.venv\Scripts\python.exe -m pip install -e .[graph,app,dev]
+.\.venv\Scripts\python.exe -m pip install -e ".[graph,app,dev]"
 ```
+
+GNU Make bulunan ortamlarda aynı tam geliştirme kurulumu `make setup`, çekirdek ve
+geliştirme araçlarıyla sınırlı hafif kurulum ise `make setup-core` ile yapılabilir. Python 3.12
+üzerinde doğrulanmış doğrudan bağımlılık sürümleriyle tekrarlanabilir QA kurulumu için
+`make setup-locked` kullanılır. Bu constraints dosyası yazılım kalite ortamını sabitler; frozen
+bilimsel eğitim çalışmasını yeniden üretme iddiası taşımaz.
 
 HI-Small dosyalarını aşağıdaki yerel yollara ekleyin:
 
@@ -186,6 +193,7 @@ Veri ve kalite kontrolleri:
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe -m pytest --cov=argus --cov-report=term-missing --cov-fail-under=70
 .\.venv\Scripts\python.exe -m ruff check --no-cache src scripts tests app.py
 .\.venv\Scripts\python.exe -m ruff format --no-cache --check src scripts tests app.py
 .\.venv\Scripts\python.exe -m pip check
@@ -200,12 +208,23 @@ doğrulaması için:
 .\.venv\Scripts\python.exe scripts/verify_final_evaluation.py --config configs/final_evaluation.yaml
 ```
 
+`artifacts/` veri, model, tahmin ve ekran görüntüsü çıktıları boyut ve veri politikası
+nedeniyle Git'e eklenmez. Bu nedenle temiz bir klonda yalnızca özet raporlar bulunur;
+artifact içindeki kanıt yolları, doğrulanmış yerel paket geri yüklendiğinde kullanılabilir.
+
 Yerel final artifact'ları mevcutsa uygulama şu komutla açılır:
 
 ```powershell
 $env:ARGUS_ARTIFACT_DIR = (Resolve-Path artifacts/sprint5)
 .\.venv\Scripts\streamlit.exe run app.py
 ```
+
+Gerçek artifact paketi bulunmayan temiz bir klonda uygulama otomatik olarak
+`demo/artifacts/dashboard_bundle.json` içindeki küçük sentetik ürün demosunu açar. Bu vakalar
+yalnızca arayüz akışını göstermek içindir; IBM HI-Small kaydı, frozen model çıktısı veya bilimsel
+sonuç değildir. `ARGUS_ARTIFACT_DIR` verilirse açıkça seçilen gerçek paket her zaman önceliklidir.
+Demo vaka içeriğinin provenance sözleşmesi otomatik testlerle, lint ve en az `%70` coverage
+eşiği ise GitHub Actions kalite iş akışıyla korunur.
 
 Tam çalıştırma sırası [`docs/EXPERIMENT_PROTOCOL.md`](docs/EXPERIMENT_PROTOCOL.md)
 dosyasındadır.

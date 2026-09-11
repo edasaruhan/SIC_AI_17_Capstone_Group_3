@@ -41,6 +41,11 @@ _comparison_focus = portal_views._comparison_focus
 _metric_value = portal_views._metric_value
 _PUBLIC_ROUTES = {"home", "demo", "login", "resources", "privacy", "terms"}
 _VALID_ROUTES = _PUBLIC_ROUTES | {"portal"}
+_TRACKED_DEMO_NOTICE = (
+    "Illustrative synthetic demo · These walkthrough cases are not IBM HI-Small records and "
+    "are not frozen scientific model outputs. No result from this demo should be reported as "
+    "project evaluation evidence."
+)
 _PORTAL_WIDGET_KEYS = {
     "case_investigator_select",
     "investigation_selected_case_id",
@@ -81,7 +86,17 @@ def configured_artifact_root() -> Path:
         return Path(configured)
     sprint5_root = _project_root() / "artifacts" / "sprint5"
     final_summary = sprint5_root / "product" / "final_test_summary.json"
-    return sprint5_root if final_summary.is_file() else _project_root() / "artifacts" / "sprint4"
+    if final_summary.is_file():
+        return sprint5_root
+    sprint4_root = _project_root() / "artifacts" / "sprint4"
+    sprint4_payloads = (
+        sprint4_root / "dashboard_bundle.json",
+        sprint4_root / "product" / "dashboard_bundle.json",
+        sprint4_root / "product" / "investigation_queue.csv",
+    )
+    if any(path.is_file() for path in sprint4_payloads):
+        return sprint4_root
+    return _project_root() / "demo" / "artifacts"
 
 
 @st.cache_data(show_spinner=False)
@@ -288,6 +303,8 @@ def _render_portal() -> None:
         except ArtifactLoadError:
             _render_artifact_error()
             return
+    if artifacts.is_tracked_demo:
+        st.warning(_TRACKED_DEMO_NOTICE, icon="⚠️")
     render_page(page, artifacts, open_case=_open_case)
     st.divider()
     st.caption(

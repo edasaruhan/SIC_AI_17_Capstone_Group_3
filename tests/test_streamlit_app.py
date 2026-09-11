@@ -6,7 +6,7 @@ from pathlib import Path
 import pandas as pd
 from streamlit.testing.v1 import AppTest
 
-from argus.app.dashboard import _metric_value
+from argus.app.dashboard import _metric_value, configured_artifact_root
 from argus.app.portal import _selected_dataframe_rows
 
 
@@ -165,6 +165,35 @@ def test_streamlit_missing_artifacts_shows_actionable_error(tmp_path: Path, monk
     )
     assert str(tmp_path) not in visible_text
     assert "investigation_queue.csv" not in visible_text
+
+
+def test_clean_clone_uses_tracked_synthetic_demo(monkeypatch) -> None:
+    monkeypatch.delenv("ARGUS_ARTIFACT_DIR", raising=False)
+    monkeypatch.delenv("ARGUS_SPRINT4_ARTIFACT_DIR", raising=False)
+    monkeypatch.delenv("ARGUS_DEMO_EMAIL", raising=False)
+    monkeypatch.delenv("ARGUS_DEMO_PASSWORD", raising=False)
+
+    root = configured_artifact_root()
+    assert root.parts[-2:] == ("demo", "artifacts")
+    app_path = Path(__file__).resolve().parents[1] / "app.py"
+    app = _login(AppTest.from_file(str(app_path)).run(timeout=20))
+
+    assert not app.exception
+    assert app.title[0].value == "Overview"
+    assert any("Illustrative synthetic demo" in warning.value for warning in app.warning)
+
+    app.sidebar.radio[0].set_value("Investigations")
+    app.run(timeout=20)
+    assert not app.exception
+    assert app.title[0].value == "Investigations"
+    assert any("Illustrative demo case set" in item.value for item in app.markdown)
+
+    app.sidebar.radio[0].set_value("Case Investigator")
+    app.run(timeout=20)
+    assert not app.exception
+    assert app.title[0].value == "Case Investigator"
+    assert any("Illustrative demo score" in item.value for item in app.markdown)
+    assert any("Not a scientific model output" in item.value for item in app.caption)
 
 
 def test_executive_metrics_do_not_mix_queue_and_validation_leader_models() -> None:

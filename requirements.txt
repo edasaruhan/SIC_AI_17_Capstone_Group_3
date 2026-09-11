@@ -1,6 +1,7 @@
 # Convenience file for environments that do not install from pyproject.toml.
 # The authoritative dependency declarations are in pyproject.toml.
 duckdb>=1.5,<2
+joblib>=1.4,<2
 lightgbm>=4.5,<5
 matplotlib>=3.8,<4
 networkx>=3.2,<4

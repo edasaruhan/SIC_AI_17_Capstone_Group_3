@@ -131,6 +131,26 @@ def test_loads_single_dashboard_bundle(tmp_path: Path) -> None:
 
     assert artifacts.summary["transactions_analyzed"] == 100
     assert artifacts.provenance["bundle"].endswith("dashboard_bundle.json")
+    assert artifacts.is_tracked_demo is False
+
+
+def test_tracked_demo_requires_explicit_non_scientific_provenance(tmp_path: Path) -> None:
+    bundle = {
+        "summary": {
+            "artifact_scope": "tracked_synthetic_demo",
+            "dataset_label": "Illustrative synthetic fixture",
+            "locally_generated_fixture": True,
+            "scientific_result_claim": True,
+            "final_test_opened": False,
+        },
+        "queue": [{"case_id": "ARG-0001", "risk_score": 0.91}],
+        "cases": [_case()],
+        "model_comparison": [{"model": "GraphSAGE", "pr_auc": 0.2}],
+    }
+    (tmp_path / "dashboard_bundle.json").write_text(json.dumps(bundle), encoding="utf-8")
+
+    with pytest.raises(ArtifactLoadError, match="scientific_result_claim=false"):
+        load_dashboard_artifacts(tmp_path)
 
 
 def test_missing_artifacts_report_expected_paths(tmp_path: Path) -> None:

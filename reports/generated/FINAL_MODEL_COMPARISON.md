@@ -35,19 +35,21 @@ This table is generated from the persisted one-shot final-test artifacts. The mo
 
 ## Machine-readable evidence
 
-- [Final metrics](../../artifacts/sprint5/final_metrics.json)
-- [Final comparison](../../artifacts/sprint5/final_model_comparison.json)
-- [Final Top-K metrics](../../artifacts/sprint5/final_top_k_metrics.json)
-- [Saved final predictions](../../artifacts/sprint5/final_test_predictions.parquet)
-- [Prevalence analysis](../../artifacts/sprint5/prevalence_shift.json)
-- [Test identity/leakage audit](../../artifacts/sprint5/test_identity_audit.json)
-- [Immutable run manifest](../../artifacts/sprint5/run_manifest.json)
-- [Read-only verification](../../artifacts/sprint5/verification_report.json)
-- [Quality report](../../artifacts/sprint5/quality_report.json)
-- [Streamlit: Executive Dashboard](../../artifacts/sprint5/screenshots/executive_dashboard.png)
-- [Streamlit: Investigation Queue](../../artifacts/sprint5/screenshots/investigation_queue.png)
-- [Streamlit: Case Investigator](../../artifacts/sprint5/screenshots/case_investigator.png)
-- [Streamlit: Model Comparison](../../artifacts/sprint5/screenshots/model_comparison.png)
+The paths below are generated locally and intentionally excluded from Git. They become available after the frozen artifact package is restored locally.
+
+- Final metrics: `../../artifacts/sprint5/final_metrics.json`
+- Final comparison: `../../artifacts/sprint5/final_model_comparison.json`
+- Final Top-K metrics: `../../artifacts/sprint5/final_top_k_metrics.json`
+- Saved final predictions: `../../artifacts/sprint5/final_test_predictions.parquet`
+- Prevalence analysis: `../../artifacts/sprint5/prevalence_shift.json`
+- Test identity/leakage audit: `../../artifacts/sprint5/test_identity_audit.json`
+- Immutable run manifest: `../../artifacts/sprint5/run_manifest.json`
+- Read-only verification: `../../artifacts/sprint5/verification_report.json`
+- Quality report: `../../artifacts/sprint5/quality_report.json`
+- Streamlit — Executive Dashboard: `../../artifacts/sprint5/screenshots/executive_dashboard.png`
+- Streamlit — Investigation Queue: `../../artifacts/sprint5/screenshots/investigation_queue.png`
+- Streamlit — Case Investigator: `../../artifacts/sprint5/screenshots/case_investigator.png`
+- Streamlit — Model Comparison: `../../artifacts/sprint5/screenshots/model_comparison.png`
 
 ## Final quality
 

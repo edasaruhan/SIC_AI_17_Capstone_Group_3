@@ -236,12 +236,19 @@ def _render_empty_state(title: str, copy: str) -> None:
     )
 
 
-def _render_research_case_indicator(*, selection: bool = False) -> None:
-    label = "Research case selection" if selection else "Research case set"
-    detail = (
-        "These case examples were selected using the GraphSAGE research comparator. "
-        "Graph-enhanced LightGBM remains the primary model."
-    )
+def _render_case_provenance(artifacts: DashboardArtifacts, *, selection: bool = False) -> None:
+    if artifacts.is_tracked_demo:
+        label = "Illustrative demo case" if selection else "Illustrative demo case set"
+        detail = (
+            "These synthetic walkthrough cases are bundled for product exploration only. "
+            "They are not IBM HI-Small records or frozen scientific model outputs."
+        )
+    else:
+        label = "Research case selection" if selection else "Research case set"
+        detail = (
+            "These case examples were selected using the GraphSAGE research comparator. "
+            "Graph-enhanced LightGBM remains the primary model."
+        )
     st.markdown(
         '<div class="argus-provenance-line">'
         f'<span class="argus-provenance-badge" tabindex="0" title="{html.escape(detail)}">'
@@ -452,11 +459,11 @@ def render_investigations(
         "Investigations",
         "Search, filter and open investigation cases for human review.",
     )
-    if all(
+    if artifacts.is_tracked_demo or all(
         _canonical_model_name(name) in {"graphsage", "graphsage_edge_classifier"}
         for name in _queue_model_names(artifacts)
     ):
-        _render_research_case_indicator()
+        _render_case_provenance(artifacts)
     worklist = _queue_view(artifacts)
     if worklist.empty:
         _render_empty_state(
@@ -708,28 +715,43 @@ def _render_model_evidence(
 ) -> None:
     st.markdown('<div class="section-kicker model">MODEL EVIDENCE</div>', unsafe_allow_html=True)
     st.subheader("How models inform this review")
-    _render_research_case_indicator(selection=True)
+    _render_case_provenance(artifacts, selection=True)
     saved = case.get("model_evidence", {})
     if not isinstance(saved, dict) or not saved:
         st.info("No model evidence is available for this case.")
     else:
         model_name = saved.get("model_name", "GraphSAGE")
         with st.container(border=True):
-            st.markdown("#### Research comparator perspective")
-            st.caption("Selected by GraphSAGE research comparator.")
+            if artifacts.is_tracked_demo:
+                st.markdown("#### Illustrative demo score")
+                st.caption("Synthetic walkthrough value · Not a scientific model output")
+            else:
+                st.markdown("#### Research comparator perspective")
+                st.caption("Selected by GraphSAGE research comparator.")
             metrics = st.columns(3)
             metrics[0].metric("Model", _display_model_name(model_name))
             metrics[1].metric(
-                "Research ranking score", _format_metric(saved.get("score"), digits=6)
+                "Illustrative score" if artifacts.is_tracked_demo else "Research ranking score",
+                _format_metric(saved.get("score"), digits=6),
             )
             metrics[2].metric("Case-set rank", _format_count(saved.get("rank")))
-            st.write(
-                "The GraphSAGE score selected this research case example. It is not a "
-                "probability of wrongdoing. Graph-enhanced LightGBM remains the primary model."
-            )
+            if artifacts.is_tracked_demo:
+                st.write(
+                    "This stored value exists only to exercise the product workflow. It is not "
+                    "a probability of wrongdoing and must not be compared with project metrics."
+                )
+            else:
+                st.write(
+                    "The GraphSAGE score selected this research case example. It is not a "
+                    "probability of wrongdoing. Graph-enhanced LightGBM remains the primary model."
+                )
             _render_contributions(
                 saved.get("feature_contributions", case.get("feature_contributions")),
-                title="Factors influencing the research-comparator score",
+                title=(
+                    "Illustrative saved-score factors"
+                    if artifacts.is_tracked_demo
+                    else "Factors influencing the research-comparator score"
+                ),
                 key=f"graphsage-contributions-{case_id}",
             )
 
@@ -751,7 +773,7 @@ def _render_model_evidence(
                 st.write(f"Raw score: {_format_metric(primary.get('raw_score'), digits=6)}")
                 st.write(f"Baseline value: {_format_metric(primary.get('base_value'), digits=6)}")
                 st.caption("Raw model scores are technical values, not calibrated probabilities.")
-    else:
+    elif not artifacts.is_tracked_demo:
         st.caption("No compatible primary-model explanation exists for this case.")
     st.warning(
         "Model evidence supports prioritization only. It does not establish wrongdoing or "

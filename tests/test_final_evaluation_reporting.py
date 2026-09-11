@@ -68,6 +68,8 @@ def test_final_comparison_report_is_artifact_driven_and_labels_frozen_role() -> 
     assert "Test/validation positive-rate ratio: 2.00000000" in rendered
     assert "123 passed" in rendered
     assert "final_test_predictions.parquet" in rendered
+    assert "intentionally excluded from Git" in rendered
+    assert "[Saved final predictions]" not in rendered
 
 
 def test_final_comparison_report_rejects_incomplete_model_set() -> None:

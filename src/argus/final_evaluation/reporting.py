@@ -128,22 +128,25 @@ def render_final_comparison_markdown(
             "",
             "## Machine-readable evidence",
             "",
-            f"- [Final metrics]({artifact_prefix}/final_metrics.json)",
-            f"- [Final comparison]({artifact_prefix}/final_model_comparison.json)",
-            f"- [Final Top-K metrics]({artifact_prefix}/final_top_k_metrics.json)",
-            f"- [Saved final predictions]({artifact_prefix}/final_test_predictions.parquet)",
-            f"- [Prevalence analysis]({artifact_prefix}/prevalence_shift.json)",
-            f"- [Test identity/leakage audit]({artifact_prefix}/test_identity_audit.json)",
-            f"- [Immutable run manifest]({artifact_prefix}/run_manifest.json)",
-            f"- [Read-only verification]({artifact_prefix}/verification_report.json)",
-            f"- [Quality report]({artifact_prefix}/quality_report.json)",
-            "- [Streamlit: Executive Dashboard]"
-            f"({artifact_prefix}/screenshots/executive_dashboard.png)",
-            "- [Streamlit: Investigation Queue]"
-            f"({artifact_prefix}/screenshots/investigation_queue.png)",
-            "- [Streamlit: Case Investigator]"
-            f"({artifact_prefix}/screenshots/case_investigator.png)",
-            f"- [Streamlit: Model Comparison]({artifact_prefix}/screenshots/model_comparison.png)",
+            "The paths below are generated locally and intentionally excluded from Git. They "
+            "become available after the frozen artifact package is restored locally.",
+            "",
+            f"- Final metrics: `{artifact_prefix}/final_metrics.json`",
+            f"- Final comparison: `{artifact_prefix}/final_model_comparison.json`",
+            f"- Final Top-K metrics: `{artifact_prefix}/final_top_k_metrics.json`",
+            f"- Saved final predictions: `{artifact_prefix}/final_test_predictions.parquet`",
+            f"- Prevalence analysis: `{artifact_prefix}/prevalence_shift.json`",
+            f"- Test identity/leakage audit: `{artifact_prefix}/test_identity_audit.json`",
+            f"- Immutable run manifest: `{artifact_prefix}/run_manifest.json`",
+            f"- Read-only verification: `{artifact_prefix}/verification_report.json`",
+            f"- Quality report: `{artifact_prefix}/quality_report.json`",
+            "- Streamlit — Executive Dashboard: "
+            f"`{artifact_prefix}/screenshots/executive_dashboard.png`",
+            "- Streamlit — Investigation Queue: "
+            f"`{artifact_prefix}/screenshots/investigation_queue.png`",
+            "- Streamlit — Case Investigator: "
+            f"`{artifact_prefix}/screenshots/case_investigator.png`",
+            f"- Streamlit — Model Comparison: `{artifact_prefix}/screenshots/model_comparison.png`",
         ]
     )
     if quality:

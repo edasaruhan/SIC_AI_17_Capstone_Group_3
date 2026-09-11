@@ -38,6 +38,12 @@ class DashboardArtifacts:
     final_evaluation: FinalEvaluationArtifacts | None = None
     primary_explanations: dict[str, dict[str, Any]] = field(default_factory=dict)
 
+    @property
+    def is_tracked_demo(self) -> bool:
+        """Return whether this is the repository's illustrative demo package."""
+
+        return self.summary.get("artifact_scope") == "tracked_synthetic_demo"
+
 
 @dataclass(frozen=True)
 class FinalEvaluationArtifacts:
@@ -967,6 +973,23 @@ def _derive_summary(
     return summary
 
 
+def _validate_tracked_demo_summary(summary: dict[str, Any]) -> None:
+    if summary.get("artifact_scope") != "tracked_synthetic_demo":
+        return
+    expected = {
+        "locally_generated_fixture": True,
+        "scientific_result_claim": False,
+        "final_test_opened": False,
+    }
+    for key, value in expected.items():
+        if summary.get(key) is not value:
+            raise ArtifactLoadError(
+                f"Tracked demo summary must declare {key}={str(value).lower()}."
+            )
+    if not str(summary.get("dataset_label", "")).strip():
+        raise ArtifactLoadError("Tracked demo summary must provide a dataset_label.")
+
+
 def load_dashboard_artifacts(root: str | Path) -> DashboardArtifacts:
     """Load the Network Investigator without fitting or importing any model."""
 
@@ -1084,6 +1107,7 @@ def load_dashboard_artifacts(root: str | Path) -> DashboardArtifacts:
             "Validation dashboard summary cannot report final_test_opened=true."
         )
     summary = _derive_summary(summary_value, queue, comparison)
+    _validate_tracked_demo_summary(summary)
     final_evaluation = _load_final_evaluation(presentation_root)
     provenance["validation_artifact_root"] = str(artifact_root)
 

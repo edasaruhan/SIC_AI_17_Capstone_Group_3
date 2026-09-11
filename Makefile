@@ -1,13 +1,26 @@
-.PHONY: setup test lint quick full baseline verify-baseline validate-sprint2 eda validate audit final-eval verify-final validate-final final-docs final-screenshots
+.PHONY: setup setup-core setup-locked test coverage lint check quick full baseline verify-baseline validate-sprint2 eda validate audit final-eval verify-final validate-final final-docs final-screenshots
 
 setup:
+	python -m pip install -e ".[graph,app,dev]"
+
+setup-core:
 	python -m pip install -e ".[dev]"
+
+setup-locked:
+	python -m pip install -c constraints/py312-dev.txt -e ".[graph,app,dev]"
 
 test:
 	python -m pytest
 
+coverage:
+	python -m pytest --cov=argus --cov-report=term-missing --cov-fail-under=70
+
 lint:
-	python -m ruff check --no-cache src scripts tests
+	python -m ruff check --no-cache src scripts tests app.py
+	python -m ruff format --no-cache --check src scripts tests app.py
+
+check: test lint
+	python -m pip check
 
 quick:
 	python scripts/run_quick_pipeline.py

@@ -1,0 +1,241 @@
+{
+  "schema_version": "1.0",
+  "summary": {
+    "artifact_scope": "tracked_synthetic_demo",
+    "dataset_label": "Locally generated illustrative synthetic product fixture",
+    "model_metrics_scope": "published_validation_reference_copied_from_reports",
+    "locally_generated_fixture": true,
+    "scientific_result_claim": false,
+    "final_test_opened": false,
+    "transactions_analyzed": 11,
+    "flagged_transactions": 3,
+    "high_priority_cases": 1
+  },
+  "queue": [
+    {
+      "case_id": "ARG-DEMO-001",
+      "priority": "high",
+      "risk_score": 0.91,
+      "account_count": 4,
+      "transaction_count": 4,
+      "total_flow": 24750.0,
+      "major_pattern": "fan-out concentration",
+      "evidence_count": 4
+    },
+    {
+      "case_id": "ARG-DEMO-002",
+      "priority": "elevated",
+      "risk_score": 0.78,
+      "account_count": 3,
+      "transaction_count": 3,
+      "total_flow": 14400.0,
+      "major_pattern": "rapid pass-through",
+      "evidence_count": 4
+    },
+    {
+      "case_id": "ARG-DEMO-003",
+      "priority": "medium",
+      "risk_score": 0.64,
+      "account_count": 2,
+      "transaction_count": 4,
+      "total_flow": 148000.0,
+      "major_pattern": "repeated directed route",
+      "evidence_count": 4
+    }
+  ],
+  "cases": [
+    {
+      "schema_version": "1.0",
+      "case_id": "ARG-DEMO-001",
+      "transaction_id": "DEMO-TX-004",
+      "focal_timestamp": "2026-01-15T09:18:00Z",
+      "status": "pending_human_review",
+      "priority": {
+        "basis": "illustrative_demo_score",
+        "band": "high",
+        "threshold_exceeded": true
+      },
+      "sender_id": "DEMO-BANK-A::ACCT-101",
+      "receiver_id": "DEMO-BANK-D::ACCT-404",
+      "observed_evidence": [
+        {
+          "basis": "observed",
+          "kind": "directed_transfer_route",
+          "statement": "One illustrative sender transferred to three distinct receivers in a short sequence.",
+          "scope": "strictly_prior_supplied_neighborhood"
+        },
+        {
+          "basis": "observed",
+          "kind": "strictly_prior_sender_neighborhood",
+          "statement": "Three earlier outgoing transfers are present in the saved demo context.",
+          "scope": "strictly_prior_supplied_neighborhood"
+        },
+        {
+          "basis": "observed",
+          "kind": "transaction_time_and_channel",
+          "statement": "All four demo transfers occurred within eighteen minutes through the same channel.",
+          "scope": "focal_transaction"
+        },
+        {
+          "basis": "observed",
+          "kind": "transaction_value",
+          "statement": "The focal demo transfer amount is 6,250 USD.",
+          "scope": "focal_transaction"
+        }
+      ],
+      "model_evidence": {
+        "basis": "illustrative_demo",
+        "model_name": "graph_enhanced_lightgbm",
+        "score_name": "illustrative_saved_score",
+        "score": 0.91,
+        "threshold": 0.75,
+        "threshold_exceeded": true,
+        "rank": 1,
+        "feature_contributions": [
+          {"feature": "sender_prior_fan_out_degree", "contribution": 0.24},
+          {"feature": "sender_burst_count_1h", "contribution": 0.18},
+          {"feature": "amount_paid", "contribution": 0.11},
+          {"feature": "receiver_previous_transaction_count", "contribution": -0.05}
+        ]
+      },
+      "guardrails": {
+        "human_review_required": true,
+        "automatic_action_authorized": false
+      },
+      "analyst_note": {
+        "text": "Illustrative walkthrough only. Verify source records before any real investigation decision.",
+        "mode": "deterministic_template",
+        "fallback_reason": "tracked_synthetic_demo"
+      },
+      "network": {
+        "nodes": [
+          {"node_id": "DEMO-BANK-A::ACCT-101", "role": "focal_sender", "case_in_degree": 0, "case_out_degree": 4},
+          {"node_id": "DEMO-BANK-B::ACCT-202", "role": "context", "case_in_degree": 1, "case_out_degree": 0},
+          {"node_id": "DEMO-BANK-C::ACCT-303", "role": "context", "case_in_degree": 1, "case_out_degree": 0},
+          {"node_id": "DEMO-BANK-D::ACCT-404", "role": "focal_receiver", "case_in_degree": 2, "case_out_degree": 0}
+        ],
+        "edges": [
+          {"transaction_id": "DEMO-TX-001", "from_node_id": "DEMO-BANK-A::ACCT-101", "to_node_id": "DEMO-BANK-B::ACCT-202", "timestamp": "2026-01-15T09:00:00Z", "amount": 6100.0, "currency": "USD", "payment_format": "Wire", "is_focal": false},
+          {"transaction_id": "DEMO-TX-002", "from_node_id": "DEMO-BANK-A::ACCT-101", "to_node_id": "DEMO-BANK-C::ACCT-303", "timestamp": "2026-01-15T09:05:00Z", "amount": 6200.0, "currency": "USD", "payment_format": "Wire", "is_focal": false},
+          {"transaction_id": "DEMO-TX-003", "from_node_id": "DEMO-BANK-A::ACCT-101", "to_node_id": "DEMO-BANK-D::ACCT-404", "timestamp": "2026-01-15T09:11:00Z", "amount": 6200.0, "currency": "USD", "payment_format": "Wire", "is_focal": false},
+          {"transaction_id": "DEMO-TX-004", "from_node_id": "DEMO-BANK-A::ACCT-101", "to_node_id": "DEMO-BANK-D::ACCT-404", "timestamp": "2026-01-15T09:18:00Z", "amount": 6250.0, "currency": "USD", "payment_format": "Wire", "is_focal": true, "suspicious": true}
+        ]
+      },
+      "transactions": [
+        {"transaction_id": "DEMO-TX-001", "from_node_id": "DEMO-BANK-A::ACCT-101", "to_node_id": "DEMO-BANK-B::ACCT-202", "timestamp": "2026-01-15T09:00:00Z", "amount": 6100.0, "currency": "USD", "payment_format": "Wire", "is_focal": false},
+        {"transaction_id": "DEMO-TX-002", "from_node_id": "DEMO-BANK-A::ACCT-101", "to_node_id": "DEMO-BANK-C::ACCT-303", "timestamp": "2026-01-15T09:05:00Z", "amount": 6200.0, "currency": "USD", "payment_format": "Wire", "is_focal": false},
+        {"transaction_id": "DEMO-TX-003", "from_node_id": "DEMO-BANK-A::ACCT-101", "to_node_id": "DEMO-BANK-D::ACCT-404", "timestamp": "2026-01-15T09:11:00Z", "amount": 6200.0, "currency": "USD", "payment_format": "Wire", "is_focal": false},
+        {"transaction_id": "DEMO-TX-004", "from_node_id": "DEMO-BANK-A::ACCT-101", "to_node_id": "DEMO-BANK-D::ACCT-404", "timestamp": "2026-01-15T09:18:00Z", "amount": 6250.0, "currency": "USD", "payment_format": "Wire", "is_focal": true, "suspicious": true}
+      ]
+    },
+    {
+      "schema_version": "1.0",
+      "case_id": "ARG-DEMO-002",
+      "transaction_id": "DEMO-TX-007",
+      "focal_timestamp": "2026-01-16T14:12:00Z",
+      "status": "pending_human_review",
+      "priority": {"basis": "illustrative_demo_score", "band": "elevated", "threshold_exceeded": true},
+      "sender_id": "DEMO-BANK-E::ACCT-505",
+      "receiver_id": "DEMO-BANK-G::ACCT-707",
+      "observed_evidence": [
+        {"basis": "observed", "kind": "directed_transfer_route", "statement": "The demo context shows funds entering an intermediate account and leaving for a third account.", "scope": "strictly_prior_supplied_neighborhood"},
+        {"basis": "observed", "kind": "transaction_time_and_channel", "statement": "The outgoing demo transfer followed the incoming transfer by twelve minutes.", "scope": "focal_transaction"},
+        {"basis": "observed", "kind": "transaction_value", "statement": "The two linked EUR amounts are similar but are not presented as proof of pass-through activity.", "scope": "strictly_prior_supplied_neighborhood"},
+        {"basis": "observed", "kind": "strictly_prior_receiver_neighborhood", "statement": "The destination also received one earlier illustrative transfer.", "scope": "strictly_prior_supplied_neighborhood"}
+      ],
+      "model_evidence": {
+        "basis": "illustrative_demo",
+        "model_name": "graph_enhanced_lightgbm",
+        "score_name": "illustrative_saved_score",
+        "score": 0.78,
+        "threshold": 0.75,
+        "threshold_exceeded": true,
+        "rank": 2,
+        "feature_contributions": [
+          {"feature": "sender_seconds_since_previous", "contribution": 0.21},
+          {"feature": "pair_previous_transfer_count", "contribution": 0.13},
+          {"feature": "amount_paid", "contribution": 0.08}
+        ]
+      },
+      "guardrails": {"human_review_required": true, "automatic_action_authorized": false},
+      "analyst_note": {"text": "Illustrative timing pattern; confirm transaction ownership and source records in a real review.", "mode": "deterministic_template", "fallback_reason": "tracked_synthetic_demo"},
+      "network": {
+        "nodes": [
+          {"node_id": "DEMO-BANK-E::ACCT-505", "role": "context", "case_in_degree": 0, "case_out_degree": 1},
+          {"node_id": "DEMO-BANK-F::ACCT-606", "role": "focal_sender", "case_in_degree": 1, "case_out_degree": 1},
+          {"node_id": "DEMO-BANK-G::ACCT-707", "role": "focal_receiver", "case_in_degree": 2, "case_out_degree": 0}
+        ],
+        "edges": [
+          {"transaction_id": "DEMO-TX-005", "from_node_id": "DEMO-BANK-E::ACCT-505", "to_node_id": "DEMO-BANK-F::ACCT-606", "timestamp": "2026-01-16T14:00:00Z", "amount": 4800.0, "currency": "EUR", "payment_format": "ACH", "is_focal": false},
+          {"transaction_id": "DEMO-TX-006", "from_node_id": "DEMO-BANK-E::ACCT-505", "to_node_id": "DEMO-BANK-G::ACCT-707", "timestamp": "2026-01-16T14:06:00Z", "amount": 5000.0, "currency": "EUR", "payment_format": "ACH", "is_focal": false},
+          {"transaction_id": "DEMO-TX-007", "from_node_id": "DEMO-BANK-F::ACCT-606", "to_node_id": "DEMO-BANK-G::ACCT-707", "timestamp": "2026-01-16T14:12:00Z", "amount": 4600.0, "currency": "EUR", "payment_format": "ACH", "is_focal": true, "suspicious": true}
+        ]
+      },
+      "transactions": [
+        {"transaction_id": "DEMO-TX-005", "from_node_id": "DEMO-BANK-E::ACCT-505", "to_node_id": "DEMO-BANK-F::ACCT-606", "timestamp": "2026-01-16T14:00:00Z", "amount": 4800.0, "currency": "EUR", "payment_format": "ACH", "is_focal": false},
+        {"transaction_id": "DEMO-TX-006", "from_node_id": "DEMO-BANK-E::ACCT-505", "to_node_id": "DEMO-BANK-G::ACCT-707", "timestamp": "2026-01-16T14:06:00Z", "amount": 5000.0, "currency": "EUR", "payment_format": "ACH", "is_focal": false},
+        {"transaction_id": "DEMO-TX-007", "from_node_id": "DEMO-BANK-F::ACCT-606", "to_node_id": "DEMO-BANK-G::ACCT-707", "timestamp": "2026-01-16T14:12:00Z", "amount": 4600.0, "currency": "EUR", "payment_format": "ACH", "is_focal": true, "suspicious": true}
+      ]
+    },
+    {
+      "schema_version": "1.0",
+      "case_id": "ARG-DEMO-003",
+      "transaction_id": "DEMO-TX-011",
+      "focal_timestamp": "2026-01-17T11:45:00Z",
+      "status": "pending_human_review",
+      "priority": {"basis": "illustrative_demo_score", "band": "medium", "threshold_exceeded": false},
+      "sender_id": "DEMO-BANK-H::ACCT-808",
+      "receiver_id": "DEMO-BANK-I::ACCT-909",
+      "observed_evidence": [
+        {"basis": "observed", "kind": "strictly_prior_directed_pair_activity", "statement": "The same illustrative sender-receiver route appears four times in the saved context.", "scope": "strictly_prior_supplied_neighborhood"},
+        {"basis": "observed", "kind": "transaction_time_and_channel", "statement": "The demo transfers span two days and use the same payment format.", "scope": "strictly_prior_supplied_neighborhood"},
+        {"basis": "observed", "kind": "transaction_value", "statement": "Recorded demo amounts range from 32,000 TRY to 42,000 TRY.", "scope": "strictly_prior_supplied_neighborhood"},
+        {"basis": "observed", "kind": "directed_transfer_route", "statement": "All saved transfers follow one direction; no reverse demo edge is present.", "scope": "strictly_prior_supplied_neighborhood"}
+      ],
+      "model_evidence": {
+        "basis": "illustrative_demo",
+        "model_name": "graph_enhanced_lightgbm",
+        "score_name": "illustrative_saved_score",
+        "score": 0.64,
+        "threshold": 0.75,
+        "threshold_exceeded": false,
+        "rank": 3,
+        "feature_contributions": [
+          {"feature": "pair_previous_transfer_count", "contribution": 0.19},
+          {"feature": "sender_previous_transaction_count", "contribution": 0.09},
+          {"feature": "same_bank", "contribution": -0.07}
+        ]
+      },
+      "guardrails": {"human_review_required": true, "automatic_action_authorized": false},
+      "analyst_note": {"text": "Illustrative repeated-route context only; repetition alone does not establish suspicious conduct.", "mode": "deterministic_template", "fallback_reason": "tracked_synthetic_demo"},
+      "network": {
+        "nodes": [
+          {"node_id": "DEMO-BANK-H::ACCT-808", "role": "focal_sender", "case_in_degree": 0, "case_out_degree": 4},
+          {"node_id": "DEMO-BANK-I::ACCT-909", "role": "focal_receiver", "case_in_degree": 4, "case_out_degree": 0}
+        ],
+        "edges": [
+          {"transaction_id": "DEMO-TX-008", "from_node_id": "DEMO-BANK-H::ACCT-808", "to_node_id": "DEMO-BANK-I::ACCT-909", "timestamp": "2026-01-16T10:10:00Z", "amount": 32000.0, "currency": "TRY", "payment_format": "Wire", "is_focal": false},
+          {"transaction_id": "DEMO-TX-009", "from_node_id": "DEMO-BANK-H::ACCT-808", "to_node_id": "DEMO-BANK-I::ACCT-909", "timestamp": "2026-01-16T16:30:00Z", "amount": 35000.0, "currency": "TRY", "payment_format": "Wire", "is_focal": false},
+          {"transaction_id": "DEMO-TX-010", "from_node_id": "DEMO-BANK-H::ACCT-808", "to_node_id": "DEMO-BANK-I::ACCT-909", "timestamp": "2026-01-17T08:15:00Z", "amount": 39000.0, "currency": "TRY", "payment_format": "Wire", "is_focal": false},
+          {"transaction_id": "DEMO-TX-011", "from_node_id": "DEMO-BANK-H::ACCT-808", "to_node_id": "DEMO-BANK-I::ACCT-909", "timestamp": "2026-01-17T11:45:00Z", "amount": 42000.0, "currency": "TRY", "payment_format": "Wire", "is_focal": true}
+        ]
+      },
+      "transactions": [
+        {"transaction_id": "DEMO-TX-008", "from_node_id": "DEMO-BANK-H::ACCT-808", "to_node_id": "DEMO-BANK-I::ACCT-909", "timestamp": "2026-01-16T10:10:00Z", "amount": 32000.0, "currency": "TRY", "payment_format": "Wire", "is_focal": false},
+        {"transaction_id": "DEMO-TX-009", "from_node_id": "DEMO-BANK-H::ACCT-808", "to_node_id": "DEMO-BANK-I::ACCT-909", "timestamp": "2026-01-16T16:30:00Z", "amount": 35000.0, "currency": "TRY", "payment_format": "Wire", "is_focal": false},
+        {"transaction_id": "DEMO-TX-010", "from_node_id": "DEMO-BANK-H::ACCT-808", "to_node_id": "DEMO-BANK-I::ACCT-909", "timestamp": "2026-01-17T08:15:00Z", "amount": 39000.0, "currency": "TRY", "payment_format": "Wire", "is_focal": false},
+        {"transaction_id": "DEMO-TX-011", "from_node_id": "DEMO-BANK-H::ACCT-808", "to_node_id": "DEMO-BANK-I::ACCT-909", "timestamp": "2026-01-17T11:45:00Z", "amount": 42000.0, "currency": "TRY", "payment_format": "Wire", "is_focal": true}
+      ]
+    }
+  ],
+  "model_comparison": [
+    {"model": "graph_enhanced_lightgbm", "version": "Published validation reference", "pr_auc": 0.4717542, "roc_auc": 0.98635944, "recall_at_k": 0.76447368, "precision_at_k": 0.11631632, "fpr": 0.00580035, "alerts": 4995, "evaluation_partition": "validation", "test_metrics_used": false, "is_champion": true},
+    {"model": "refined_transaction_lightgbm", "version": "Published validation reference", "pr_auc": 0.35535042, "roc_auc": 0.98179242, "recall_at_k": 0.66842105, "precision_at_k": 0.1030217, "fpr": 0.00581217, "alerts": 4931, "evaluation_partition": "validation", "test_metrics_used": false, "is_champion": false},
+    {"model": "graphsage_edge_classifier", "version": "Published validation research reference", "pr_auc": 0.00943876, "roc_auc": 0.8466417, "recall_at_k": 0.06315789, "precision_at_k": 0.0096911, "fpr": 0.00644556, "alerts": 4953, "evaluation_partition": "validation", "test_metrics_used": false, "is_champion": false}
+  ],
+  "ablation": [
+    {"feature_family": "Transaction only", "pr_auc": 0.09984124},
+    {"feature_family": "Transaction + temporal/history", "pr_auc": 0.35535042},
+    {"feature_family": "Transaction + temporal/history + graph", "pr_auc": 0.4717542}
+  ]
+}
