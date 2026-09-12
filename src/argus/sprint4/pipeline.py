@@ -72,6 +72,8 @@ matplotlib.use("Agg")
 from matplotlib import pyplot as plt  # noqa: E402
 
 _WORK_PREFIX = ".argus_sprint4_work_"
+_STAGING_PREFIX = ".argus_sprint4_stage_"
+_BACKUP_PREFIX = ".argus_sprint4_backup_"
 _SPRINT4_SCORE_KEYS = frozenset(
     {
         "source_row_number",
@@ -134,20 +136,63 @@ def _load_json(path: Path, label: str) -> dict[str, Any]:
     return payload
 
 
-def _prepare_run_directory(run_dir: Path) -> None:
-    """Clean only generated Sprint 4 content and preserve the tracked marker."""
+def _create_staging_run_directory(published_run_dir: Path) -> Path:
+    """Create a scoped sibling directory without modifying the published run."""
 
-    run_dir.mkdir(parents=True, exist_ok=True)
-    resolved = run_dir.resolve()
-    if resolved.name != "sprint4" or resolved.parent.name != "artifacts":
-        raise Sprint4PipelineError(f"Refusing to clean unexpected run directory: {resolved}")
-    for child in run_dir.iterdir():
-        if child.name == ".gitkeep":
-            continue
-        if child.is_dir():
-            shutil.rmtree(child)
-        else:
-            child.unlink()
+    published = published_run_dir.resolve()
+    if published.name != "sprint4" or published.parent.name != "artifacts":
+        raise Sprint4PipelineError(f"Refusing to stage unexpected run directory: {published}")
+    published.parent.mkdir(parents=True, exist_ok=True)
+    staging = published.parent / f"{_STAGING_PREFIX}{uuid.uuid4().hex}"
+    staging.mkdir(parents=False, exist_ok=False)
+    marker = published / ".gitkeep"
+    if marker.is_file():
+        shutil.copy2(marker, staging / ".gitkeep")
+    else:
+        (staging / ".gitkeep").touch()
+    return staging
+
+
+def _publish_staged_run(staging_run_dir: Path, published_run_dir: Path) -> None:
+    """Atomically swap a complete staged run into the canonical Sprint 4 path."""
+
+    staging = staging_run_dir.resolve()
+    published = published_run_dir.resolve()
+    if published.name != "sprint4" or published.parent.name != "artifacts":
+        raise Sprint4PipelineError(f"Refusing to publish unexpected run directory: {published}")
+    if staging.parent != published.parent or not staging.name.startswith(_STAGING_PREFIX):
+        raise Sprint4PipelineError(f"Refusing to publish unexpected staging directory: {staging}")
+    manifest_path = staging / "run_manifest.json"
+    if not staging.is_dir() or not manifest_path.is_file():
+        raise Sprint4PipelineError(f"Staged Sprint 4 run is incomplete: {staging}")
+    if _load_json(manifest_path, "staged Sprint 4 manifest").get("status") != "PASS":
+        raise Sprint4PipelineError("Staged Sprint 4 manifest status is not PASS")
+    if any(staging.glob(f"{_WORK_PREFIX}*")):
+        raise Sprint4PipelineError("Staged Sprint 4 run still contains work directories")
+
+    backup = published.parent / f"{_BACKUP_PREFIX}{uuid.uuid4().hex}"
+    previous_moved = False
+    if published.exists():
+        os.replace(published, backup)
+        previous_moved = True
+    try:
+        os.replace(staging, published)
+    except BaseException as publish_error:
+        if previous_moved:
+            try:
+                os.replace(backup, published)
+            except BaseException as restore_error:
+                raise Sprint4PipelineError(
+                    "Sprint 4 publish failed and the previous run could not be restored; "
+                    f"backup retained at {backup}"
+                ) from restore_error
+        raise Sprint4PipelineError("Sprint 4 staged run could not be published") from publish_error
+
+    if backup.exists():
+        try:
+            shutil.rmtree(backup)
+        except OSError:
+            print(f"[sprint4] Previous run backup retained: {backup}", flush=True)
 
 
 def _safe_cleanup_work_directory(work_dir: Path, run_dir: Path) -> None:
@@ -1109,19 +1154,18 @@ def run_sprint4_pipeline(config_path: str | Path = "configs/sprint4.yaml") -> Sp
     split_table = get_path(config, "split_table")
     split_metadata_path = get_path(config, "split_metadata")
     upstream_manifest_path = get_path(config, "upstream_manifest")
-    run_dir = get_path(config, "run_dir")
+    published_run_dir = get_path(config, "run_dir")
     sprint3_dir = get_path(config, "sprint3_run_dir")
     report_path = get_path(config, "generated_report")
-    manifest_path = run_dir / "run_manifest.json"
+    manifest_path = published_run_dir / "run_manifest.json"
     sprint3_predictions = sprint3_dir / "validation_predictions.parquet"
     compression = str(settings["parquet_compression"])
     recorder = _StageRecorder()
     connection: duckdb.DuckDBPyConnection | None = None
-    work_dir = run_dir / f"{_WORK_PREFIX}{uuid.uuid4().hex}"
     succeeded = False
 
-    # Immutable input and Git checks precede cleanup so a bad dependency cannot
-    # destroy the last successful Sprint 4 evidence set.
+    # Immutable input and Git checks precede staging. The published evidence set
+    # remains untouched until the replacement run is complete and inventoried.
     with recorder.measure("frozen_input_preflight"):
         provenance, prevalence, _ = _verify_frozen_inputs(
             settings=baseline_settings,
@@ -1139,7 +1183,8 @@ def run_sprint4_pipeline(config_path: str | Path = "configs/sprint4.yaml") -> Sp
                 f"Sprint 3 validation predictions missing: {sprint3_predictions}"
             )
 
-    _prepare_run_directory(run_dir)
+    run_dir = _create_staging_run_directory(published_run_dir)
+    work_dir = run_dir / f"{_WORK_PREFIX}{uuid.uuid4().hex}"
     work_dir.mkdir(parents=True, exist_ok=False)
     try:
         atomic_write_json(config, run_dir / "resolved_config.json")
@@ -1615,16 +1660,19 @@ def run_sprint4_pipeline(config_path: str | Path = "configs/sprint4.yaml") -> Sp
             run_dir,
             exclude_paths=[work_dir],
         )
-        render_sprint4_report(manifest, report_path)
+        if connection is not None:
+            connection.close()
+            connection = None
+        _safe_cleanup_work_directory(work_dir, run_dir)
+        _publish_staged_run(run_dir, published_run_dir)
         succeeded = True
-        return Sprint4RunResult(run_dir, manifest_path, report_path, manifest)
+        render_sprint4_report(manifest, report_path)
+        return Sprint4RunResult(published_run_dir, manifest_path, report_path, manifest)
     finally:
         if connection is not None:
             connection.close()
-        if succeeded:
-            _safe_cleanup_work_directory(work_dir, run_dir)
-        elif work_dir.exists():
-            print(f"[sprint4] Work files retained after failure: {work_dir}", flush=True)
+        if not succeeded and run_dir.exists():
+            print(f"[sprint4] Staged run retained after failure: {run_dir}", flush=True)
 
 
 __all__ = ["Sprint4PipelineError", "Sprint4RunResult", "run_sprint4_pipeline"]

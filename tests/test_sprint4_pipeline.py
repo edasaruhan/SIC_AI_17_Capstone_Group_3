@@ -7,13 +7,16 @@ import numpy as np
 import pandas as pd
 import pytest
 
+import argus.sprint4.pipeline as sprint4_module
 from argus.sprint4.graph_data import build_graph_view
 from argus.sprint4.pipeline import (
     Sprint4PipelineError,
-    _prepare_run_directory,
+    _create_staging_run_directory,
+    _publish_staged_run,
     _train_graphsage,
     _write_frame_parquet,
     _write_validation_predictions,
+    run_sprint4_pipeline,
 )
 
 
@@ -32,22 +35,122 @@ def _settings() -> dict[str, object]:
     }
 
 
-def test_prepare_sprint4_run_directory_preserves_only_marker(tmp_path: Path) -> None:
-    run_dir = tmp_path / "artifacts" / "sprint4"
-    run_dir.mkdir(parents=True)
-    (run_dir / ".gitkeep").write_text("", encoding="utf-8")
-    (run_dir / "old.json").write_text("{}", encoding="utf-8")
-    (run_dir / "old").mkdir()
-    (run_dir / "old" / "payload.txt").write_text("old", encoding="utf-8")
+def test_staged_run_publish_replaces_complete_package(tmp_path: Path) -> None:
+    published = tmp_path / "artifacts" / "sprint4"
+    published.mkdir(parents=True)
+    (published / ".gitkeep").touch()
+    (published / "old.txt").write_text("old", encoding="utf-8")
+    staging = _create_staging_run_directory(published)
+    (staging / "run_manifest.json").write_text('{"status":"PASS"}', encoding="utf-8")
+    (staging / "new.txt").write_text("new", encoding="utf-8")
 
-    _prepare_run_directory(run_dir)
+    _publish_staged_run(staging, published)
 
-    assert [path.name for path in run_dir.iterdir()] == [".gitkeep"]
+    assert not staging.exists()
+    assert not (published / "old.txt").exists()
+    assert (published / "new.txt").read_text(encoding="utf-8") == "new"
+    assert list(published.parent.glob(".argus_sprint4_backup_*")) == []
 
 
-def test_prepare_sprint4_run_directory_rejects_unexpected_target(tmp_path: Path) -> None:
-    with pytest.raises(Sprint4PipelineError, match="Refusing"):
-        _prepare_run_directory(tmp_path / "artifacts" / "full")
+def test_staged_run_publish_failure_restores_previous_package(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    published = tmp_path / "artifacts" / "sprint4"
+    published.mkdir(parents=True)
+    (published / "sentinel.txt").write_text("previous-pass", encoding="utf-8")
+    staging = _create_staging_run_directory(published)
+    (staging / "run_manifest.json").write_text('{"status":"PASS"}', encoding="utf-8")
+    real_replace = sprint4_module.os.replace
+
+    def fail_staging_swap(source: object, destination: object) -> None:
+        if Path(source).resolve() == staging.resolve():
+            raise OSError("simulated staging swap failure")
+        real_replace(source, destination)
+
+    monkeypatch.setattr(sprint4_module.os, "replace", fail_staging_swap)
+
+    with pytest.raises(Sprint4PipelineError, match="could not be published"):
+        _publish_staged_run(staging, published)
+
+    assert (published / "sentinel.txt").read_text(encoding="utf-8") == "previous-pass"
+    assert staging.is_dir()
+    assert list(published.parent.glob(".argus_sprint4_backup_*")) == []
+
+
+def test_staged_run_publish_rejects_incomplete_or_failed_stage(tmp_path: Path) -> None:
+    published = tmp_path / "artifacts" / "sprint4"
+    staging = _create_staging_run_directory(published)
+
+    with pytest.raises(Sprint4PipelineError, match="incomplete"):
+        _publish_staged_run(staging, published)
+
+    (staging / "run_manifest.json").write_text('{"status":"FAIL"}', encoding="utf-8")
+    with pytest.raises(Sprint4PipelineError, match="status is not PASS"):
+        _publish_staged_run(staging, published)
+
+
+def test_staged_run_publish_rejects_retained_work_directory(tmp_path: Path) -> None:
+    published = tmp_path / "artifacts" / "sprint4"
+    staging = _create_staging_run_directory(published)
+    (staging / "run_manifest.json").write_text('{"status":"PASS"}', encoding="utf-8")
+    (staging / ".argus_sprint4_work_incomplete").mkdir()
+
+    with pytest.raises(Sprint4PipelineError, match="still contains work directories"):
+        _publish_staged_run(staging, published)
+
+
+def test_pipeline_failure_after_preflight_preserves_published_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    published = tmp_path / "artifacts" / "sprint4"
+    published.mkdir(parents=True)
+    sentinel = published / "run_manifest.json"
+    sentinel.write_text('{"status":"PASS","run":"previous"}', encoding="utf-8")
+    sprint3_dir = tmp_path / "artifacts" / "sprint3"
+    sprint3_dir.mkdir(parents=True)
+    (sprint3_dir / "validation_predictions.parquet").touch()
+    paths = {
+        "feature_table": tmp_path / "features.parquet",
+        "split_table": tmp_path / "splits.parquet",
+        "split_metadata": tmp_path / "split.json",
+        "upstream_manifest": tmp_path / "upstream.json",
+        "run_dir": published,
+        "sprint3_run_dir": sprint3_dir,
+        "generated_report": tmp_path / "report.md",
+    }
+    config = {
+        "_meta": {"project_root": str(tmp_path)},
+        "project": {"random_seed": 7},
+        "baseline": {},
+        "sprint4": {
+            "frozen_references": {},
+            "graph_sampling": {},
+            "supervised_training": {},
+            "parquet_compression": "zstd",
+        },
+    }
+    monkeypatch.setattr(sprint4_module, "load_config", lambda _path: config)
+    monkeypatch.setattr(sprint4_module, "get_path", lambda _config, key: paths[key])
+    monkeypatch.setattr(
+        sprint4_module, "_verify_frozen_inputs", lambda **_kwargs: ({}, {}, {})
+    )
+    monkeypatch.setattr(
+        sprint4_module, "_verify_sprint3_reference", lambda *_args: ({}, {})
+    )
+    monkeypatch.setattr(sprint4_module, "_source_snapshot", lambda _root: {})
+
+    def fail_duckdb_configuration(*_args: object) -> None:
+        raise RuntimeError("simulated post-preflight failure")
+
+    monkeypatch.setattr(sprint4_module, "_configure_duckdb", fail_duckdb_configuration)
+
+    with pytest.raises(RuntimeError, match="post-preflight failure"):
+        run_sprint4_pipeline(tmp_path / "sprint4.yaml")
+
+    assert sentinel.read_text(encoding="utf-8") == '{"status":"PASS","run":"previous"}'
+    staged = list(published.parent.glob(".argus_sprint4_stage_*"))
+    assert len(staged) == 1
+    assert (staged[0] / "resolved_config.json").is_file()
 
 
 def test_small_graphsage_training_is_transaction_edge_supervision_only() -> None:
