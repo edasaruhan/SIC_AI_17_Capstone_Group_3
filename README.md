@@ -1,5 +1,10 @@
 # ARGUS AI
 
+[![Quality](https://github.com/edasaruhan/SIC_AI_17_Capstone_Group_3/actions/workflows/quality.yml/badge.svg?branch=main)](https://github.com/edasaruhan/SIC_AI_17_Capstone_Group_3/actions/workflows/quality.yml)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Streamlit-FF4B4B?logo=streamlit&logoColor=white)](https://sicai17capstonegroup3-azala6r97tsxkq7fu2loga.streamlit.app/?view=home)
+[![Python](https://img.shields.io/badge/Python-3.11--3.13-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-0F766E.svg)](LICENSE)
+
 **Graph-Based Financial Crime & Account Network Intelligence**
 
 > Şüpheli işlemlerden şüpheli ağlara.
@@ -10,7 +15,57 @@ model katkılarıyla birlikte banka finansal suç analistine sunulur.
 
 **Samsung Innovation Campus · Pazarlamada Yapay Zekâ · Capstone Projesi · Grup 3**
 
-## Problem
+[Canlı demoyu aç](https://sicai17capstonegroup3-azala6r97tsxkq7fu2loga.streamlit.app/?view=home) ·
+[Model kartı](docs/MODEL_CARD.md) ·
+[Deney protokolü](docs/EXPERIMENT_PROTOCOL.md) ·
+[Sorumlu kullanım](#sınırlılıklar-ve-sorumlu-kullanım)
+
+## İçindekiler
+
+- [Canlı demo](#canlı-demo)
+- [Problem ve hedef](#problem-ve-hedef)
+- [ARGUS nasıl çalışır?](#argus-nasıl-çalışır)
+- [Veri ve yöntem](#veri)
+- [Final sonuçlar](#final-sonuçlar)
+- [Analist ürünü](#analist-ürünü)
+- [Mimari](#mimari)
+- [Kurulum ve kalite kontrolleri](#hızlı-başlangıç)
+- [Canlı yayın](#canlı-yayın-ve-yeniden-dağıtım)
+- [Sınırlılıklar ve sorumlu kullanım](#sınırlılıklar-ve-sorumlu-kullanım)
+
+## Canlı demo
+
+**[ARGUS canlı uygulamasını aç →](https://sicai17capstonegroup3-azala6r97tsxkq7fu2loga.streamlit.app/?view=home)**
+
+| Alan | Demo bilgisi |
+| --- | --- |
+| Kurumsal e-posta | `analyst@bank.example` |
+| Parola | `prototype-access` |
+| Ortam | Sentetik ve oturum bazlı ürün demosu |
+| Kalıcılık | Notlar ve kararlar çıkış yapıldığında sıfırlanır |
+
+Önerilen kısa demo akışı:
+
+1. `Corporate Login` ile demo çalışma alanına girin.
+2. `Overview` ekranında iş yükünü ve sıradaki vakayı görün.
+3. `Investigations` ekranında vakaları arayın, filtreleyin ve bir vaka açın.
+4. `Case Investigator` içinde önce kayıtları ve ağ bağlamını, ardından model desteğini inceleyin.
+5. Analist notu ekleyin ve insan denetimli bir karar kaydedin.
+6. `Model Evidence` ekranında model kalitesini, karşılaştırmaları ve sınırlılıkları okuyun.
+
+> **Demo güvenliği:** Bu giriş bilgileri yalnızca herkese açık prototip içindir. Gerçek,
+> kişisel veya kurumsal parolalar kullanmayın. Canlı arayüzdeki walkthrough vakaları
+> sentetiktir; aşağıdaki dondurulmuş bilimsel sonuçların yeniden üretimi değildir.
+
+## Öne çıkanlar
+
+- Zamana duyarlı ve leakage-safe özellik üretimi
+- Yönlü hesap ağı ve işlem geçmişi bağlamı
+- Birincil Graph-enhanced LightGBM modeli ve araştırma karşılaştırıcısı GraphSAGE
+- Model kanıtını gözlenen kayıtlardan ayıran insan denetimli inceleme akışı
+- Tekrarlanabilir deney sözleşmesi, dondurulmuş artifact doğrulaması ve otomatik kalite kapıları
+
+## Problem ve hedef
 
 Tekil işlemler olağan görünürken hesaplar arasındaki toplama, dağıtma, hızlı aktarım
 ve tekrarlı transfer örüntüleri birlikte şüpheli olabilir. ARGUS iki soruya odaklanır:
@@ -63,6 +118,17 @@ dosyasındadır.
 Tüm öğrenilen dönüşümler eğitim verisine fit edilir; doğrulama ve test yalnız
 transform edilir. Aynı zaman damgasındaki işlemler aynı bölümde tutulur. Geçmiş
 özellikleri, incelenen işlemle aynı anda veya daha sonra gerçekleşen olayları kullanmaz.
+
+### Teknoloji yığını
+
+| Alan | Teknolojiler |
+| --- | --- |
+| Veri işleme | Python, Pandas, NumPy, DuckDB |
+| Makine öğrenmesi | scikit-learn, LightGBM, imbalanced-learn |
+| Graf öğrenmesi | PyTorch, GraphSAGE, NetworkX |
+| Açıklanabilirlik | SHAP ve kayıt-temelli ağ kanıtları |
+| Ürün arayüzü | Streamlit, Plotly |
+| Kalite güvencesi | Pytest, Ruff, coverage, GitHub Actions |
 
 ## Final sonuçlar
 
@@ -226,14 +292,23 @@ sonuç değildir. `ARGUS_ARTIFACT_DIR` verilirse açıkça seçilen gerçek pake
 Demo vaka içeriğinin provenance sözleşmesi otomatik testlerle, lint ve en az `%77` coverage
 eşiği ise GitHub Actions kalite iş akışıyla korunur.
 
-## Streamlit Community Cloud deployment
+## Canlı yayın ve yeniden dağıtım
+
+Mevcut yayın:
+
+- **Uygulama:** [sicai17capstonegroup3-azala6r97tsxkq7fu2loga.streamlit.app](https://sicai17capstonegroup3-azala6r97tsxkq7fu2loga.streamlit.app/?view=home)
+- **Ana kaynak depo:** [edasaruhan/SIC_AI_17_Capstone_Group_3](https://github.com/edasaruhan/SIC_AI_17_Capstone_Group_3)
+- **Yayın kaynağı:** [aaayseee/SIC_AI_17_Capstone_Group_3](https://github.com/aaayseee/SIC_AI_17_Capstone_Group_3)
+
+Streamlit Community Cloud depo yönetim yetkisi istediği için mevcut canlı demo, ana depoyla
+senkron tutulan yayın kaynağından çalışır. Ürün kodu ve `main` dalı iki depoda aynıdır.
 
 Depo, kökteki `app.py`, `.streamlit/config.toml`, `requirements.txt` ve izlenen sentetik demo
 artifact'iyle doğrudan Streamlit Community Cloud'a yayınlanabilir:
 
 1. `share.streamlit.io` üzerinde GitHub hesabını bağlayıp **Create app** seçin.
-2. Repository olarak `edasaruhan/SIC_AI_17_Capstone_Group_3`, branch olarak `main`, entrypoint
-   olarak `app.py` girin.
+2. Yönetim yetkiniz bulunan senkron depoyu seçin; branch olarak `main`, entrypoint olarak
+   `app.py` girin.
 3. **Advanced settings** altında Python `3.12` seçin.
 4. Secrets alanını boş bırakın. İzlenen sentetik demo, harici servis veya API anahtarı olmadan
    çalışır ve açıkça etiketlenen prototip giriş formunu kullanır.
