@@ -174,6 +174,20 @@ def _format_metric(value: Any, *, digits: int = 4) -> str:
         return str(value)
 
 
+def _format_percent(value: Any, *, digits: int = 1) -> str:
+    if value is None or pd.isna(value):
+        return "Not available"
+    try:
+        return f"{float(value):.{digits}%}"
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def _format_score(value: Any, label: str) -> str:
+    formatted = _format_metric(value, digits=3)
+    return formatted if formatted == "Not available" else f"{formatted} {label}"
+
+
 def _format_count(value: Any) -> str:
     if value is None or pd.isna(value):
         return "Not available"
@@ -205,13 +219,37 @@ def _format_compact_amount(value: Any) -> str:
     return f"{number:,.2f}"
 
 
-def _case_summary_card(column: Any, label: str, value: str, *, detail: str = "") -> None:
+def _context_metric(
+    column: Any,
+    label: str,
+    value: str,
+    *,
+    context: str,
+    help_text: str,
+) -> None:
+    with column:
+        st.metric(label, value, help=help_text)
+        st.markdown(
+            f'<p class="argus-metric-context">{html.escape(context)}</p>',
+            unsafe_allow_html=True,
+        )
+
+
+def _case_summary_card(
+    column: Any,
+    label: str,
+    value: str,
+    *,
+    supporting: str,
+    detail: str = "",
+) -> None:
     title = html.escape(detail or value)
     with column:
         st.markdown(
             '<div class="case-summary-card">'
             f"<span>{html.escape(label)}</span>"
             f'<strong title="{title}">{html.escape(value)}</strong>'
+            f"<small>{html.escape(supporting)}</small>"
             "</div>",
             unsafe_allow_html=True,
         )
@@ -232,6 +270,23 @@ def _render_empty_state(title: str, copy: str) -> None:
         "</svg>"
         f"<div><strong>{html.escape(title)}</strong><span>{html.escape(copy)}</span></div>"
         "</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def _render_review_path(*, active_step: int) -> None:
+    steps = (
+        ("1", "Select", "Choose the case that needs attention."),
+        ("2", "Understand", "Review records before model evidence."),
+        ("3", "Decide", "Document and record a human decision."),
+    )
+    items = "".join(
+        f'<li class="{"active" if index == active_step else ""}"><b>{number}</b>'
+        f"<div><strong>{html.escape(title)}</strong><span>{html.escape(copy)}</span></div></li>"
+        for index, (number, title, copy) in enumerate(steps, start=1)
+    )
+    st.markdown(
+        f'<ol class="argus-review-path" aria-label="Investigation workflow">{items}</ol>',
         unsafe_allow_html=True,
     )
 
@@ -318,23 +373,68 @@ def render_overview(artifacts: DashboardArtifacts, *, open_case: Callable[[str],
         pd.to_numeric(worklist["transaction_count"], errors="coerce").fillna(0).gt(1).sum()
     )
     activity = _activity_records()
+    attention = worklist[worklist["status"].map(canonical_token).isin(active_statuses)].sort_values(
+        ["priority_rank", "last_activity"], ascending=[True, False]
+    )
 
+    st.markdown('<div class="section-kicker">WORKLOAD AT A GLANCE</div>', unsafe_allow_html=True)
     metrics = st.columns(4)
-    metrics[0].metric("Open cases", _format_count(active))
-    metrics[1].metric("In review", _format_count(in_progress))
-    metrics[2].metric(
+    _context_metric(
+        metrics[0],
+        "Open cases",
+        _format_count(active),
+        context="Awaiting an analyst decision",
+        help_text="Cases that are pending review, in review or escalated.",
+    )
+    _context_metric(
+        metrics[1],
+        "In review",
+        _format_count(in_progress),
+        context="Already started or escalated",
+        help_text="Open cases whose review has already started, including escalations.",
+    )
+    _context_metric(
+        metrics[2],
         "Prior context",
         _format_count(cases_with_context),
-        help="Cases containing more than one transaction in the available case context.",
+        context="Include two or more linked transfers",
+        help_text="Cases containing more than one transaction in the saved case context.",
     )
-    metrics[3].metric("Analyst actions", _format_count(len(activity)))
+    _context_metric(
+        metrics[3],
+        "Analyst actions",
+        _format_count(len(activity)),
+        context="Recorded during this sign-in",
+        help_text="Review starts, notes and decisions recorded in the current demo session.",
+    )
+
+    if not attention.empty:
+        next_case = attention.iloc[0]
+        next_case_id = str(next_case["case_id"])
+        with st.container(key="overview_next_action"):
+            copy, action = st.columns([4, 1.1], vertical_alignment="center")
+            copy.markdown(
+                '<div class="argus-next-action-copy"><span>NEXT BEST ACTION</span>'
+                f"<strong>Review {html.escape(next_case_id)}</strong>"
+                f"<p>{html.escape(str(next_case['priority_label']))} priority · "
+                f"{html.escape(str(next_case['pattern_label']))} · "
+                f"{_format_count(next_case['transaction_count'])} saved transfers</p></div>",
+                unsafe_allow_html=True,
+            )
+            if action.button(
+                "Review next case",
+                type="primary",
+                key="overview_next_case",
+                width="stretch",
+            ):
+                open_case(next_case_id)
 
     left, right = st.columns([1.45, 1], gap="large")
     with left:
         st.subheader("Cases requiring attention")
-        attention = worklist[
-            worklist["status"].map(canonical_token).isin(active_statuses)
-        ].sort_values(["priority_rank", "last_activity"], ascending=[True, False])
+        st.caption(
+            "Highest-priority open work appears first. Open one case to inspect its evidence."
+        )
         if attention.empty:
             _render_empty_state(
                 "No cases require attention",
@@ -348,7 +448,8 @@ def render_overview(artifacts: DashboardArtifacts, *, open_case: Callable[[str],
                     detail.markdown(f"**{html.escape(case_id)}**")
                     detail.caption(
                         f"{row['priority_label']} priority · {row['pattern_label']} · "
-                        f"{row['status_label']}"
+                        f"{row['status_label']} · {_format_count(row['account_count'])} accounts · "
+                        f"{_format_count(row['transaction_count'])} transfers"
                     )
                     if action.button(
                         "Review",
@@ -366,6 +467,7 @@ def render_overview(artifacts: DashboardArtifacts, *, open_case: Callable[[str],
         )
         if priority_bands > 1:
             st.subheader("Priority distribution")
+            st.caption("Shows how the current worklist is distributed across review urgency bands.")
             chart_x = priority_counts["Cases"]
             chart_y = priority_counts["Priority"]
             x_title = "Cases"
@@ -373,6 +475,7 @@ def render_overview(artifacts: DashboardArtifacts, *, open_case: Callable[[str],
             orientation = "h"
         else:
             st.subheader("Case composition")
+            st.caption("Shows how much transaction context is available inside each case.")
             transfer_counts = (
                 pd.to_numeric(worklist["transaction_count"], errors="coerce")
                 .fillna(0)
@@ -407,7 +510,7 @@ def render_overview(artifacts: DashboardArtifacts, *, open_case: Callable[[str],
             showlegend=False,
         )
         st.plotly_chart(figure, width="stretch", config={"displayModeBar": False})
-        st.caption("Composition is derived from the transaction context stored with each case.")
+        st.caption("Counts describe saved case context; they are not model-performance metrics.")
 
     st.subheader("Recent activity")
     if not activity:
@@ -457,8 +560,9 @@ def render_investigations(
     _page_heading(
         "INVESTIGATION WORKLIST",
         "Investigations",
-        "Search, filter and open investigation cases for human review.",
+        "Find the right case quickly, confirm its context and open it for human review.",
     )
+    _render_review_path(active_step=1)
     if artifacts.is_tracked_demo or all(
         _canonical_model_name(name) in {"graphsage", "graphsage_edge_classifier"}
         for name in _queue_model_names(artifacts)
@@ -520,6 +624,16 @@ def render_investigations(
             st.rerun()
         return
 
+    urgent_count = int(filtered["priority_rank"].le(2).sum())
+    st.markdown(
+        '<div class="argus-results-summary">'
+        f"<div><strong>{len(filtered):,}</strong><span>cases shown</span></div>"
+        f"<div><strong>{urgent_count:,}</strong><span>high or elevated priority</span></div>"
+        "<p>Select one row to preview it, then open the case to review evidence.</p>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
     table_event = st.dataframe(
         display_queue(filtered),
         width="stretch",
@@ -554,12 +668,20 @@ def render_investigations(
         selected = available_ids[0]
         st.session_state["investigation_selected_case_id"] = selected
     selected_row = filtered.loc[filtered["case_id"].astype(str).eq(selected)].iloc[0]
+    selected_flow = display_queue(filtered.loc[[selected_row.name]]).iloc[0]["Total Flow"]
     with st.container(key="investigation_action_panel"):
         detail, action = st.columns([4, 1], vertical_alignment="center")
-        detail.markdown(f"**{html.escape(selected)}**")
-        detail.caption(
-            f"{selected_row['priority_label']} priority · {selected_row['pattern_label']} · "
-            f"{selected_row['status_label']}"
+        detail.markdown(
+            '<div class="argus-selected-case-copy"><span>SELECTED CASE</span>'
+            f"<strong>{html.escape(selected)}</strong>"
+            f"<p>{html.escape(str(selected_row['priority_label']))} priority · "
+            f"{html.escape(str(selected_row['pattern_label']))} · "
+            f"{html.escape(str(selected_row['status_label']))}</p>"
+            f"<small>{_format_count(selected_row['account_count'])} accounts · "
+            f"{_format_count(selected_row['transaction_count'])} transfers · "
+            f"{html.escape(str(selected_flow))}"
+            "</small></div>",
+            unsafe_allow_html=True,
         )
         if action.button(
             "Open case",
@@ -881,22 +1003,48 @@ def _apply_action(case_id: str, case: Mapping[str, Any], action: str, **kwargs: 
         st.session_state["argus_workflow_error"] = result.message
 
 
-def _render_action_bar(case_id: str, case: Mapping[str, Any], status: str) -> None:
-    terminal = canonical_token(status) in {"false_positive", "closed"}
-    with st.container(key="case_action_bar"):
-        st.markdown("#### Case actions")
-        st.caption("Demo actions reset after sign-out.")
-        actions = st.columns([1.15, 1, 1.35, 1, 2.2])
-        if actions[0].button(
-            "Start Review",
+def _render_review_start(case_id: str, case: Mapping[str, Any], status: str) -> None:
+    status_token = canonical_token(status)
+    pending = status_token in {"pending_review", "pending_human_review"}
+    with st.container(key="case_review_start"):
+        copy, action = st.columns([4, 1.2], vertical_alignment="center")
+        if pending:
+            heading = "Start with the saved evidence"
+            detail = (
+                "Beginning review marks the case as in progress. Inspect observed records first, "
+                "then use model evidence as supporting context."
+            )
+        else:
+            heading = f"Review status: {display_status(status)}"
+            detail = (
+                "Continue through the observed records and model context before recording a "
+                "decision at the end of this page."
+            )
+        copy.markdown(
+            '<div class="argus-review-start-copy"><span>CURRENT TASK</span>'
+            f"<strong>{html.escape(heading)}</strong><p>{html.escape(detail)}</p></div>",
+            unsafe_allow_html=True,
+        )
+        if pending and action.button(
+            "Start review",
             type="primary",
             key=f"start-review-{case_id}",
-            disabled=canonical_token(status) not in {"pending_review", "pending_human_review"},
             width="stretch",
         ):
             _apply_action(case_id, case, START_REVIEW)
             st.rerun()
-        if actions[1].button(
+
+
+def _render_action_bar(case_id: str, case: Mapping[str, Any], status: str) -> None:
+    terminal = canonical_token(status) in {"false_positive", "closed"}
+    with st.container(key="case_action_bar"):
+        st.markdown("#### Record a decision")
+        st.caption(
+            "Use observed records as the basis for your decision. Model output supports "
+            "prioritization only. Demo decisions reset after sign-out."
+        )
+        actions = st.columns([1, 1.35, 1, 2.65])
+        if actions[0].button(
             "Escalate",
             key=f"escalate-{case_id}",
             disabled=terminal or canonical_token(status) == "escalated",
@@ -906,7 +1054,7 @@ def _render_action_bar(case_id: str, case: Mapping[str, Any], status: str) -> No
                 "case_id": case_id,
                 "action": ESCALATE,
             }
-        if actions[2].button(
+        if actions[1].button(
             "Mark False Positive",
             key=f"false-positive-{case_id}",
             disabled=terminal,
@@ -916,14 +1064,14 @@ def _render_action_bar(case_id: str, case: Mapping[str, Any], status: str) -> No
                 "case_id": case_id,
                 "action": MARK_FALSE_POSITIVE,
             }
-        if actions[3].button(
+        if actions[2].button(
             "Close Case", key=f"close-{case_id}", disabled=terminal, width="stretch"
         ):
             st.session_state["argus_pending_case_action"] = {
                 "case_id": case_id,
                 "action": CLOSE_CASE,
             }
-        actions[4].empty()
+        actions[3].empty()
 
     pending_state = st.session_state.get("argus_pending_case_action")
     if not isinstance(pending_state, Mapping) or pending_state.get("case_id") != case_id:
@@ -932,9 +1080,11 @@ def _render_action_bar(case_id: str, case: Mapping[str, Any], status: str) -> No
     if pending not in {ESCALATE, MARK_FALSE_POSITIVE, CLOSE_CASE}:
         return
     labels = {
-        ESCALATE: "Escalate this case for further review?",
-        MARK_FALSE_POSITIVE: "Mark this case as a false positive?",
-        CLOSE_CASE: "Close this case?",
+        ESCALATE: "Escalate this case? Its status will change to Escalated for further review.",
+        MARK_FALSE_POSITIVE: (
+            "Mark this case as a false positive? This records the current human-review outcome."
+        ),
+        CLOSE_CASE: "Close this case? It will no longer appear as active work in this session.",
     }
     st.warning(labels[str(pending)])
     confirm, cancel, _ = st.columns([1, 1, 3])
@@ -996,8 +1146,9 @@ def render_case_investigator(
     _page_heading(
         "CASE REVIEW",
         "Case Investigator",
-        "Understand the account network, observed facts and model contribution before deciding.",
+        "Follow the evidence from observed facts to model context, then record a human decision.",
     )
+    _render_review_path(active_step=2)
     queue = artifacts.queue
     case_ids = queue["case_id"].astype(str).tolist()
     if not case_ids:
@@ -1023,11 +1174,18 @@ def render_case_investigator(
             width="stretch",
         )
     widget_value = st.session_state.get("case_investigator_select")
+    priorities_by_case = {
+        str(row["case_id"]): display_priority(row.get("priority"))
+        for row in queue.to_dict(orient="records")
+    }
     selected_case_id = selection.selectbox(
-        "Case",
+        "Case to review",
         case_ids,
         index=None if widget_value in case_ids else index,
         key="case_investigator_select",
+        format_func=lambda value: (
+            f"{value} — {priorities_by_case.get(str(value), 'Priority unavailable')}"
+        ),
     )
     if selected_case_id is None:
         selected_case_id = requested
@@ -1056,8 +1214,9 @@ def render_case_investigator(
     with title_left:
         st.markdown(f"### {selected_case_id}")
         st.write(
-            f"Review **{accounts:,} account(s)** across **{transfer_count:,} transfer(s)**, "
-            "then document the appropriate investigation decision."
+            f"Review **{accounts:,} {'account' if accounts == 1 else 'accounts'}** across "
+            f"**{transfer_count:,} {'transfer' if transfer_count == 1 else 'transfers'}**. "
+            "The review signal explains why this case was prioritized; it is not a conclusion."
         )
     with title_right:
         st.markdown(
@@ -1066,9 +1225,24 @@ def render_case_investigator(
             unsafe_allow_html=True,
         )
     summary = st.columns(4)
-    _case_summary_card(summary[0], "Review signal", display_pattern(pattern))
-    _case_summary_card(summary[1], "Accounts", _format_count(accounts))
-    _case_summary_card(summary[2], "Transfers", _format_count(transfer_count))
+    _case_summary_card(
+        summary[0],
+        "Review signal",
+        display_pattern(pattern),
+        supporting="Why the case entered the worklist",
+    )
+    _case_summary_card(
+        summary[1],
+        "Accounts",
+        _format_count(accounts),
+        supporting="Distinct accounts in saved context",
+    )
+    _case_summary_card(
+        summary[2],
+        "Transfers",
+        _format_count(transfer_count),
+        supporting="Transactions available for review",
+    )
     total_flow = queue_row.get("total_flow")
     currency_context = case_currency_context(case)
     displayed_flow = (
@@ -1080,6 +1254,7 @@ def render_case_investigator(
         summary[3],
         "Recorded total flow",
         displayed_flow,
+        supporting="Recorded value; no currency conversion",
         detail="" if currency_context == "Mixed currencies" else _format_money(total_flow),
     )
     st.caption(
@@ -1090,7 +1265,7 @@ def render_case_investigator(
     error_message = st.session_state.pop("argus_workflow_error", None)
     if error_message:
         st.error(str(error_message))
-    _render_action_bar(selected_case_id, source_case, status)
+    _render_review_start(selected_case_id, source_case, status)
 
     st.divider()
     canvas, details = st.columns([2.15, 1], gap="large")
@@ -1138,9 +1313,20 @@ def render_case_investigator(
     transactions = _transactions_frame(case)
     if not transactions.empty:
         st.subheader("Transactions in this case")
+        st.caption("Verify the focal transfer and surrounding saved context before deciding.")
         st.dataframe(transactions, width="stretch", hide_index=True)
     st.divider()
+    st.markdown(
+        '<div class="section-kicker">DECISION & DOCUMENTATION</div>',
+        unsafe_allow_html=True,
+    )
+    st.subheader("Complete the human review")
+    st.write(
+        "Choose an outcome only after reconciling the observed records with the available context. "
+        "Add a concise note so another analyst can understand the basis for the decision."
+    )
     _render_notes_and_activity(selected_case_id, source_case)
+    _render_action_bar(selected_case_id, source_case, status)
 
 
 def _display_model_table(comparison: pd.DataFrame, *, final: bool = False) -> pd.DataFrame:
@@ -1150,18 +1336,23 @@ def _display_model_table(comparison: pd.DataFrame, *, final: bool = False) -> pd
     displayed["Model"] = ordered["model"].map(_display_model_name)
     if not final and "feature_family" in ordered:
         displayed["Feature set"] = ordered["feature_family"].map(humanize)
-    metric_labels = {
-        "pr_auc": "PR-AUC",
-        "roc_auc": "ROC-AUC",
+    score_labels = {"pr_auc": "PR-AUC", "roc_auc": "ROC-AUC"}
+    for source, label in score_labels.items():
+        if source in ordered:
+            displayed[label] = ordered[source].map(lambda value: _format_metric(value, digits=3))
+    ratio_labels = {
         "precision": "Precision",
         "recall": "Recall",
+        "precision_at_k": "Useful alerts at capacity",
+        "recall_at_k": "Positives found at capacity",
         "f1": "F1",
-        "fpr": "FPR",
-        "alerts": "Alerts",
+        "fpr": "False-positive rate",
     }
-    for source, label in metric_labels.items():
+    for source, label in ratio_labels.items():
         if source in ordered:
-            displayed[label] = ordered[source]
+            displayed[label] = ordered[source].map(_format_percent)
+    if "alerts" in ordered:
+        displayed["Review workload"] = ordered["alerts"].map(_format_count)
     return displayed.reset_index(drop=True)
 
 
@@ -1171,6 +1362,10 @@ def _render_top_k(top_k: pd.DataFrame, *, partition_label: str = "Final test") -
         return
     displayed = top_k.copy()
     displayed["model"] = displayed["model"].map(_display_model_name)
+    if "recall_at_k" in displayed:
+        displayed["recall_at_k"] = displayed["recall_at_k"].map(_format_percent)
+    if "precision_at_k" in displayed:
+        displayed["precision_at_k"] = displayed["precision_at_k"].map(_format_percent)
     columns = [
         column for column in ("model", "k", "recall_at_k", "precision_at_k") if column in displayed
     ]
@@ -1178,15 +1373,18 @@ def _render_top_k(top_k: pd.DataFrame, *, partition_label: str = "Final test") -
         displayed[columns].rename(
             columns={
                 "model": "Model",
-                "k": "K",
-                "recall_at_k": "Recall@K",
-                "precision_at_k": "Precision@K",
+                "k": "Review capacity (K)",
+                "recall_at_k": "Positives found (Recall@K)",
+                "precision_at_k": "Useful alerts (Precision@K)",
             }
         ),
         width="stretch",
         hide_index=True,
     )
-    st.caption(f"Saved {partition_label.lower()} values at fixed analyst workload sizes.")
+    st.caption(
+        f"At each saved {partition_label.lower()} review capacity, Recall@K shows how many "
+        "positive examples were found and Precision@K shows how many reviewed alerts were useful."
+    )
 
 
 def _render_ablation(ablation: pd.DataFrame) -> None:
@@ -1226,9 +1424,25 @@ def _render_ablation(ablation: pd.DataFrame) -> None:
             improvement = float(graph_rows.iloc[-1]["pr_auc"]) - float(
                 history_rows.iloc[-1]["pr_auc"]
             )
-            st.write(
-                "Adding directed account-network context improved validation PR-AUC by "
-                f"**{improvement:.6f}** over transaction and history context alone."
+            history_score = float(history_rows.iloc[-1]["pr_auc"])
+            relative = improvement / history_score if history_score else None
+            improved = improvement >= 0
+            relative_copy = (
+                f", a {_format_percent(abs(relative))} relative {'lift' if improved else 'decline'}"
+                if relative is not None
+                else ""
+            )
+            change_verb = "increased" if improved else "decreased"
+            st.markdown(
+                '<div class="argus-insight-banner"><span>BOTTOM LINE</span>'
+                f"<strong>Network context {'improved' if improved else 'reduced'} validation "
+                "ranking.</strong>"
+                f"<p>PR-AUC {change_verb} from {history_score:.3f} to "
+                f"{float(graph_rows.iloc[-1]['pr_auc']):.3f} "
+                f"({improvement:+.3f}{relative_copy}). "
+                "Higher PR-AUC means positive examples were placed earlier in the review ranking."
+                "</p></div>",
+                unsafe_allow_html=True,
             )
 
 
@@ -1242,6 +1456,73 @@ def _final_summary_value(summary: dict[str, Any], key: str) -> Any:
     return None
 
 
+def _render_performance_snapshot(row: pd.Series, *, partition_label: str) -> None:
+    st.markdown(
+        f'<div class="argus-snapshot-heading"><span>{html.escape(partition_label.upper())}</span>'
+        "<strong>Performance in plain language</strong>"
+        "<p>These values describe ranking quality and review workload. They do not measure the "
+        "probability that a person or account committed wrongdoing.</p></div>",
+        unsafe_allow_html=True,
+    )
+    metrics = st.columns(4)
+    _context_metric(
+        metrics[0],
+        "Ranking quality",
+        _format_score(row.get("pr_auc"), "PR-AUC"),
+        context="Higher is better for rare-positive ranking",
+        help_text=(
+            "PR-AUC measures how well positive examples stay near the top of a ranking when "
+            "positive cases are rare. Compare it with other models on the same data partition."
+        ),
+    )
+    _context_metric(
+        metrics[1],
+        "Overall separation",
+        _format_score(row.get("roc_auc"), "ROC-AUC"),
+        context="Higher means stronger overall separation",
+        help_text=(
+            "ROC-AUC summarizes ordering across all thresholds. PR-AUC remains the primary metric "
+            "for this rare-positive problem."
+        ),
+    )
+    _context_metric(
+        metrics[2],
+        "Positives found at capacity",
+        _format_percent(row.get("recall_at_k")),
+        context="Share of positives captured in the review budget",
+        help_text="Recall@K: the share of all positive examples found within the top K reviews.",
+    )
+    _context_metric(
+        metrics[3],
+        "Useful alerts at capacity",
+        _format_percent(row.get("precision_at_k")),
+        context="Share of reviewed alerts carrying a positive label",
+        help_text="Precision@K: the share of the top K reviewed alerts that were positive.",
+    )
+
+
+def _render_metric_guide() -> None:
+    definitions = (
+        ("PR-AUC", "Primary ranking measure", "Higher is better; compare models on the same data."),
+        ("Recall", "Coverage", "Of all positives, how many the model surfaced."),
+        ("Precision", "Alert usefulness", "Of reviewed alerts, how many carried a positive label."),
+        (
+            "False-positive rate",
+            "Unnecessary review",
+            "Of negatives, how many were incorrectly flagged.",
+        ),
+    )
+    cards = "".join(
+        f"<article><span>{html.escape(metric)}</span>"
+        f"<strong>{html.escape(label)}</strong><p>{html.escape(copy)}</p></article>"
+        for metric, label, copy in definitions
+    )
+    st.markdown(
+        f'<div class="argus-metric-guide" aria-label="Metric guide">{cards}</div>',
+        unsafe_allow_html=True,
+    )
+
+
 def render_model_evidence(artifacts: DashboardArtifacts) -> None:
     _page_heading(
         "TECHNICAL EVIDENCE",
@@ -1250,7 +1531,17 @@ def render_model_evidence(artifacts: DashboardArtifacts) -> None:
     )
     final = artifacts.final_evaluation
     if final is None:
-        st.info("Final-test evidence is not included in this saved artifact set.")
+        st.info(
+            "This artifact set contains validation evidence only. Final-test results are not "
+            "available in this workspace."
+        )
+        validation_focus = _comparison_focus(artifacts)
+        st.markdown("### Primary validation model")
+        st.write(
+            f"**{_display_model_name(validation_focus.get('model'))}** leads the saved validation "
+            "comparison. Validation supports model selection; it is not live-bank performance."
+        )
+        _render_performance_snapshot(validation_focus, partition_label="Validation evidence")
     else:
         comparison = _ordered_models(final.model_comparison)
         champion_rows = comparison[comparison["is_frozen_champion"]]
@@ -1261,25 +1552,41 @@ def render_model_evidence(artifacts: DashboardArtifacts) -> None:
                 "**Graph-enhanced LightGBM** was selected using validation evidence before the "
                 "single final-test evaluation."
             )
-            metrics = st.columns(2)
-            metrics[0].metric("Final PR-AUC", _format_metric(champion.get("pr_auc"), digits=6))
-            metrics[1].metric("Final ROC-AUC", _format_metric(champion.get("roc_auc"), digits=6))
+            _render_performance_snapshot(champion, partition_label="Frozen final test")
             threshold_values = (
-                ("Precision", _format_metric(champion.get("precision"), digits=6)),
-                ("Recall", _format_metric(champion.get("recall"), digits=6)),
-                ("F1", _format_metric(champion.get("f1"), digits=6)),
-                ("FPR", _format_metric(champion.get("fpr"), digits=6)),
-                ("Alert volume", _format_count(champion.get("alerts"))),
+                (
+                    "Precision",
+                    _format_percent(champion.get("precision")),
+                    "Share of alerts that were positive",
+                ),
+                (
+                    "Recall",
+                    _format_percent(champion.get("recall")),
+                    "Share of positives surfaced",
+                ),
+                ("F1", _format_percent(champion.get("f1")), "Balance of precision and recall"),
+                (
+                    "False-positive rate",
+                    _format_percent(champion.get("fpr"), digits=2),
+                    "Share of negatives incorrectly flagged",
+                ),
+                (
+                    "Review workload",
+                    _format_count(champion.get("alerts")),
+                    "Transactions sent to analyst review",
+                ),
             )
             items = "".join(
-                f"<div><span>{html.escape(label)}</span><strong>{html.escape(value)}</strong></div>"
-                for label, value in threshold_values
+                f"<div><span>{html.escape(label)}</span><strong>{html.escape(value)}</strong>"
+                f"<small>{html.escape(copy)}</small></div>"
+                for label, value, copy in threshold_values
             )
             st.markdown(
                 f'<div class="model-threshold-strip">{items}</div>',
                 unsafe_allow_html=True,
             )
-        st.subheader("Final model comparison")
+        st.subheader("Compare final-test models")
+        _render_metric_guide()
         st.dataframe(_display_model_table(comparison, final=True), width="stretch", hide_index=True)
         st.plotly_chart(
             build_model_metric_figure(comparison, partition_label="Final test"),
@@ -1306,20 +1613,21 @@ def render_model_evidence(artifacts: DashboardArtifacts) -> None:
                 "this observed prevalence shift."
             )
 
-    st.subheader("What network context added")
+    st.subheader("What network context changed")
+    st.caption(
+        "This controlled comparison adds one feature family at a time. The final bar includes "
+        "directed account-network context."
+    )
     _render_ablation(artifacts.ablation)
-    with st.expander("Validation comparison and metric guide"):
+    st.subheader("Compare validation models")
+    st.write(
+        "Use PR-AUC as the primary ranking comparison. Precision, recall and workload depend on "
+        "the saved decision threshold or review capacity."
+    )
+    _render_metric_guide()
+    with st.expander("Open full validation comparison"):
         validation = _ordered_models(artifacts.model_comparison)
         st.dataframe(_display_model_table(validation), width="stretch", hide_index=True)
-        st.markdown(
-            """
-            - **PR-AUC** is the primary rare-positive ranking metric.
-            - **Precision and recall** describe the trade-off at the saved threshold.
-            - **FPR** is the share of negative transactions flagged.
-            - **Alert volume** is the review workload produced by the saved threshold.
-            - **Precision@K and Recall@K** describe performance at fixed review budgets.
-            """
-        )
     st.warning(
         "IBM AML HI-Small is synthetic. These results are not live-bank validation, and model "
         "output does not establish wrongdoing. GraphSAGE remains a bounded research comparator. "

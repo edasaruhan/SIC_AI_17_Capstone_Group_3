@@ -115,6 +115,24 @@ def test_queue_sorting_and_filters_are_stable() -> None:
     assert filter_queue_view(view, priorities=["High"])["case_id"].tolist() == ["ARG-0001"]
 
 
+def test_priority_sort_distinguishes_high_elevated_and_medium() -> None:
+    queue = pd.DataFrame(
+        [
+            {"case_id": "MED", "priority": "medium"},
+            {"case_id": "ELEV", "priority": "elevated"},
+            {"case_id": "HIGH", "priority": "high"},
+        ]
+    )
+    cases = {
+        case_id: {"case_id": case_id, "status": "pending_review", "transactions": []}
+        for case_id in queue["case_id"]
+    }
+
+    view = build_queue_view(queue, cases)
+
+    assert sort_queue_view(view, "Priority")["case_id"].tolist() == ["HIGH", "ELEV", "MED"]
+
+
 def test_empty_queue_projection_keeps_display_contract() -> None:
     view = build_queue_view(pd.DataFrame(columns=["case_id"]), {})
 

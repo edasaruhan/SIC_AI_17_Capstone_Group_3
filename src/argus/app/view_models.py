@@ -27,10 +27,10 @@ _PRIORITY_ORDER = {
     "critical": 0,
     "high": 1,
     "high_priority": 1,
-    "elevated": 1,
-    "elevated_review_priority": 1,
-    "medium": 2,
-    "low": 3,
+    "elevated": 2,
+    "elevated_review_priority": 2,
+    "medium": 3,
+    "low": 4,
 }
 _QUEUE_COLUMNS = (
     "case_id",

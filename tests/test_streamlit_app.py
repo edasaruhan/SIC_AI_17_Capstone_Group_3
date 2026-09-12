@@ -205,6 +205,56 @@ def test_clean_clone_uses_tracked_synthetic_demo(monkeypatch) -> None:
     assert any("Not a scientific model output" in item.value for item in app.caption)
 
 
+def test_portal_guides_review_workflow_and_explains_metrics(monkeypatch) -> None:
+    monkeypatch.delenv("ARGUS_ARTIFACT_DIR", raising=False)
+    monkeypatch.delenv("ARGUS_SPRINT4_ARTIFACT_DIR", raising=False)
+    monkeypatch.delenv("ARGUS_DEMO_EMAIL", raising=False)
+    monkeypatch.delenv("ARGUS_DEMO_PASSWORD", raising=False)
+    app_path = Path(__file__).resolve().parents[1] / "app.py"
+    app = _login(AppTest.from_file(str(app_path)).run(timeout=20))
+
+    overview = " ".join(str(item.value) for item in app.markdown)
+    assert "NEXT BEST ACTION" in overview
+    assert "Awaiting an analyst decision" in overview
+    _button(app, "Review next case").click()
+    app.run(timeout=20)
+    assert app.title[0].value == "Case Investigator"
+    assert app.selectbox[0].value == "ARG-DEMO-001"
+
+    app.sidebar.radio[0].set_value("Investigations")
+    app.run(timeout=20)
+    investigations = " ".join(str(item.value) for item in app.markdown)
+    assert 'aria-label="Investigation workflow"' in investigations
+    assert "Choose the case that needs attention." in investigations
+    assert "SELECTED CASE" in investigations
+
+    app.sidebar.radio[0].set_value("Case Investigator")
+    app.run(timeout=20)
+    case_copy = " ".join(str(item.value) for item in app.markdown)
+    assert "CURRENT TASK" in case_copy
+    assert "Why the case entered the worklist" in case_copy
+    assert "DECISION & DOCUMENTATION" in case_copy
+    _button(app, "Start review").click()
+    app.run(timeout=20)
+    updated_case_copy = " ".join(str(item.value) for item in app.markdown)
+    assert "Review status: In review" in updated_case_copy
+    assert any(button.label == "Escalate" for button in app.button)
+
+    app.sidebar.radio[0].set_value("Model Evidence")
+    app.run(timeout=20)
+    model_copy = " ".join(str(item.value) for item in app.markdown)
+    metric_labels = [metric.label for metric in app.metric]
+    assert "Performance in plain language" in model_copy
+    assert "Higher is better for rare-positive ranking" in model_copy
+    assert "Alert usefulness" in model_copy
+    assert metric_labels == [
+        "Ranking quality",
+        "Overall separation",
+        "Positives found at capacity",
+        "Useful alerts at capacity",
+    ]
+
+
 def test_executive_metrics_do_not_mix_queue_and_validation_leader_models() -> None:
     summary = {
         "validation_pr_auc": 0.9,

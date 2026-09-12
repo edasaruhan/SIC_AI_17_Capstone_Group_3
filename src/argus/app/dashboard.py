@@ -239,6 +239,13 @@ def _render_portal_sidebar(page: str) -> str:
     selected = st.sidebar.radio("Workspace", PAGES, index=None, key="portal_nav")
     if selected not in PAGES:
         selected = page
+    page_guidance = {
+        "Overview": "See current workload and continue with the highest-priority open case.",
+        "Investigations": "Search, filter and select a case from the review queue.",
+        "Case Investigator": "Move from observed records to model context, then decide.",
+        "Model Evidence": "Understand model quality, workload and research limitations.",
+    }
+    st.sidebar.caption(page_guidance[selected])
     if selected != page:
         _sync_portal_route(selected)
     st.sidebar.divider()
