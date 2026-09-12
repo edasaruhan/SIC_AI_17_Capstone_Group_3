@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import duckdb
 import numpy as np
 import pandas as pd
 import pytest
@@ -19,6 +20,7 @@ from argus.modeling.refinement import (
     _trial_eligible,
     _write_ablation_artifacts,
     _write_comparison_artifacts,
+    _write_validation_predictions,
     run_sprint3_refinement,
 )
 
@@ -93,6 +95,81 @@ def test_prepare_run_directory_preserves_only_marker(tmp_path: Path) -> None:
 def test_prepare_run_directory_rejects_unexpected_path(tmp_path: Path) -> None:
     with pytest.raises(RefinementPipelineError, match="unexpected run directory"):
         _prepare_run_directory(tmp_path / "other")
+
+
+def _refinement_prediction_scores() -> dict[str, tuple[np.ndarray, np.ndarray]]:
+    raw = np.array([-2.0, 3.0])
+    probability = np.array([0.12, 0.95])
+    return {
+        "refined_logistic_regression": (raw, probability),
+        "refined_random_forest": (raw, probability),
+        "refined_lightgbm": (raw, probability),
+        "ablation_transaction_only": (raw, probability),
+        "ablation_transaction_temporal_history_graph": (raw, probability),
+        "ablation_transaction_temporal_history_graph_novel3": (raw, probability),
+    }
+
+
+def test_refinement_validation_predictions_are_complete_and_audited(tmp_path: Path) -> None:
+    connection = duckdb.connect()
+    destination = tmp_path / "nested" / "validation_predictions.parquet"
+
+    audit = _write_validation_predictions(
+        connection,
+        source_rows=np.array([9, 2]),
+        labels=np.array([1, 0]),
+        scores=_refinement_prediction_scores(),
+        source_filename="transactions.csv",
+        destination=destination,
+        compression="zstd",
+    )
+
+    rows = connection.execute(
+        "SELECT transaction_id, source_row_number FROM read_parquet(?) ORDER BY source_row_number",
+        [str(destination)],
+    ).fetchall()
+    assert rows == [("transactions.csv:row-2", 2), ("transactions.csv:row-9", 9)]
+    assert audit["rows"] == 2
+    assert audit["unique_transaction_ids"] == 2
+    assert set(audit["model_score_columns"]) == set(_refinement_prediction_scores())
+    assert audit["test_predictions_included"] is False
+
+
+@pytest.mark.parametrize(
+    ("invalid_case", "message"),
+    [
+        ("missing_model", "exactly the reviewed refinement models"),
+        ("raw_nan", "raw scores must be finite"),
+        ("probability_out_of_range", "probabilities must be finite and bounded"),
+        ("raw_length", "raw-score length differs"),
+    ],
+)
+def test_refinement_validation_predictions_reject_invalid_scores(
+    tmp_path: Path, invalid_case: str, message: str
+) -> None:
+    scores = _refinement_prediction_scores()
+    if invalid_case == "missing_model":
+        scores.pop("refined_random_forest")
+    elif invalid_case == "raw_nan":
+        scores["refined_lightgbm"] = (np.array([np.nan, 2.0]), np.array([0.2, 0.8]))
+    elif invalid_case == "probability_out_of_range":
+        scores["refined_lightgbm"] = (np.array([1.0, 2.0]), np.array([0.2, 1.1]))
+    else:
+        scores["refined_lightgbm"] = (np.array([1.0]), np.array([0.2, 0.8]))
+
+    destination = tmp_path / "validation_predictions.parquet"
+    with pytest.raises(RefinementPipelineError, match=message):
+        _write_validation_predictions(
+            duckdb.connect(),
+            source_rows=np.array([1, 2]),
+            labels=np.array([0, 1]),
+            scores=scores,
+            source_filename="transactions.csv",
+            destination=destination,
+            compression="zstd",
+        )
+
+    assert not destination.exists()
 
 
 def test_frozen_input_failure_preserves_previous_successful_run(

@@ -20,7 +20,7 @@ import time
 import uuid
 import warnings
 from collections.abc import Iterator, Mapping
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -350,9 +350,9 @@ def _materialize_partition(
             batches=batches,
         )
     except BaseException:
-        _close_memmap(source_rows)
-        _close_memmap(target)
-        _close_memmap(matrix)
+        for array in (source_rows, target, matrix):
+            with suppress(Exception):
+                _close_memmap(array)
         raise
 
 
@@ -388,6 +388,10 @@ def _write_validation_predictions(
     rows = len(source_values)
     if rows == 0 or len(label_values) != rows:
         raise BaselinePipelineError("Validation identity and label lengths differ or are empty")
+    if not np.issubdtype(source_values.dtype, np.integer) or (source_values < 0).any():
+        raise BaselinePipelineError(
+            "Validation source_row_number values must be non-negative integers"
+        )
     if np.unique(source_values).size != rows:
         raise BaselinePipelineError("Validation source_row_number values are not unique")
     if not np.isin(label_values, (0, 1)).all():
@@ -397,7 +401,11 @@ def _write_validation_predictions(
             raise BaselinePipelineError(
                 f"Validation score length differs for model {model_name}"
             )
-        if not np.isfinite(scores).all() or ((scores < 0) | (scores > 1)).any():
+        if not np.issubdtype(scores.dtype, np.number) or not np.isfinite(scores).all():
+            raise BaselinePipelineError(
+                f"Validation scores must be finite probabilities for model {model_name}"
+            )
+        if ((scores < 0) | (scores > 1)).any():
             raise BaselinePipelineError(
                 f"Validation scores must be finite probabilities for model {model_name}"
             )

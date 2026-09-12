@@ -94,6 +94,16 @@ _NOVEL_GRAPH_FEATURES = (
     "receiver_prior_fan_out_degree",
     "pair_previous_transfer_count",
 )
+_REFINEMENT_PREDICTION_KEYS = frozenset(
+    {
+        "refined_logistic_regression",
+        "refined_random_forest",
+        "refined_lightgbm",
+        "ablation_transaction_only",
+        "ablation_transaction_temporal_history_graph",
+        "ablation_transaction_temporal_history_graph_novel3",
+    }
+)
 
 
 class RefinementPipelineError(RuntimeError):
@@ -750,20 +760,67 @@ def _write_validation_predictions(
     destination: Path,
     compression: str,
 ) -> dict[str, Any]:
+    source_values = np.asarray(source_rows)
+    label_values = np.asarray(labels)
+    if set(scores) != _REFINEMENT_PREDICTION_KEYS:
+        raise RefinementPipelineError(
+            "Validation predictions must contain exactly the reviewed refinement models"
+        )
+    if source_values.ndim != 1 or label_values.ndim != 1:
+        raise RefinementPipelineError(
+            "Validation identity and label arrays must be one-dimensional"
+        )
+    rows = len(source_values)
+    if rows == 0 or len(label_values) != rows:
+        raise RefinementPipelineError(
+            "Validation identity and label lengths differ or are empty"
+        )
+    if not np.issubdtype(source_values.dtype, np.integer) or (source_values < 0).any():
+        raise RefinementPipelineError(
+            "Validation source_row_number values must be non-negative integers"
+        )
+    if np.unique(source_values).size != rows:
+        raise RefinementPipelineError("Validation source_row_number values are not unique")
+    if not np.isin(label_values, (0, 1)).all():
+        raise RefinementPipelineError("Validation labels must be binary")
+
     data: dict[str, np.ndarray] = {
-        "source_row_number": np.asarray(source_rows),
-        "is_laundering": np.asarray(labels),
+        "source_row_number": source_values,
+        "is_laundering": label_values,
     }
     model_columns: dict[str, dict[str, str]] = {}
     for key, (raw, probability) in sorted(scores.items()):
+        raw_values = np.asarray(raw)
+        probability_values = np.asarray(probability)
+        if raw_values.ndim != 1 or len(raw_values) != rows:
+            raise RefinementPipelineError(f"Validation raw-score length differs for model {key}")
+        if probability_values.ndim != 1 or len(probability_values) != rows:
+            raise RefinementPipelineError(
+                f"Validation probability length differs for model {key}"
+            )
+        if not np.issubdtype(raw_values.dtype, np.number) or not np.isfinite(raw_values).all():
+            raise RefinementPipelineError(f"Validation raw scores must be finite for model {key}")
+        if not np.issubdtype(probability_values.dtype, np.number) or not np.isfinite(
+            probability_values
+        ).all():
+            raise RefinementPipelineError(
+                f"Validation probabilities must be finite and bounded for model {key}"
+            )
+        if (
+            (probability_values < 0) | (probability_values > 1)
+        ).any():
+            raise RefinementPipelineError(
+                f"Validation probabilities must be finite and bounded for model {key}"
+            )
         raw_name = f"raw_score_{key}"
         probability_name = f"probability_{key}"
-        data[raw_name] = np.asarray(raw)
-        data[probability_name] = np.asarray(probability)
+        data[raw_name] = raw_values
+        data[probability_name] = probability_values
         model_columns[key] = {
             "raw_score": raw_name,
             "probability": probability_name,
         }
+    destination.parent.mkdir(parents=True, exist_ok=True)
     frame = pd.DataFrame(data)
     connection.register("argus_sprint3_predictions", frame)
     temporary = destination.with_name(f".{destination.name}.{uuid.uuid4().hex}.tmp")
