@@ -193,7 +193,7 @@ Veri ve kalite kontrolleri:
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -q
-.\.venv\Scripts\python.exe -m pytest --cov=argus --cov-report=term-missing --cov-fail-under=70
+.\.venv\Scripts\python.exe -m pytest --cov=argus --cov-report=term-missing --cov-fail-under=74
 .\.venv\Scripts\python.exe -m ruff check --no-cache src scripts tests app.py
 .\.venv\Scripts\python.exe -m ruff format --no-cache --check src scripts tests app.py
 .\.venv\Scripts\python.exe -m pip check
@@ -223,7 +223,7 @@ Gerçek artifact paketi bulunmayan temiz bir klonda uygulama otomatik olarak
 `demo/artifacts/dashboard_bundle.json` içindeki küçük sentetik ürün demosunu açar. Bu vakalar
 yalnızca arayüz akışını göstermek içindir; IBM HI-Small kaydı, frozen model çıktısı veya bilimsel
 sonuç değildir. `ARGUS_ARTIFACT_DIR` verilirse açıkça seçilen gerçek paket her zaman önceliklidir.
-Demo vaka içeriğinin provenance sözleşmesi otomatik testlerle, lint ve en az `%70` coverage
+Demo vaka içeriğinin provenance sözleşmesi otomatik testlerle, lint ve en az `%74` coverage
 eşiği ise GitHub Actions kalite iş akışıyla korunur.
 
 Tam çalıştırma sırası [`docs/EXPERIMENT_PROTOCOL.md`](docs/EXPERIMENT_PROTOCOL.md)

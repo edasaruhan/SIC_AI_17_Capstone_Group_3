@@ -13,7 +13,7 @@ test:
 	python -m pytest
 
 coverage:
-	python -m pytest --cov=argus --cov-report=term-missing --cov-fail-under=70
+	python -m pytest --cov=argus --cov-report=term-missing --cov-fail-under=74
 
 lint:
 	python -m ruff check --no-cache src scripts tests app.py

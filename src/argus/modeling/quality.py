@@ -113,6 +113,7 @@ def run_sprint2_quality_checks(
                     "src",
                     "scripts",
                     "tests",
+                    "app.py",
                 ],
                 project_root,
             ),
@@ -127,6 +128,7 @@ def run_sprint2_quality_checks(
                     "src",
                     "scripts",
                     "tests",
+                    "app.py",
                 ],
                 project_root,
             ),
@@ -138,7 +140,9 @@ def run_sprint2_quality_checks(
     finally:
         _safe_cleanup(work_dir, run_dir)
 
-    passed = all(check["exit_code"] == 0 for check in checks.values())
+    passed = artifact_verification["status"] == "PASS" and all(
+        check["exit_code"] == 0 for check in checks.values()
+    )
     pytest_text = checks["pytest"]["stdout"] + checks["pytest"]["stderr"]
     match = re.search(r"(?P<count>\d+) passed in (?P<seconds>\d+(?:\.\d+)?)s", pytest_text)
     pytest_count = int(match.group("count")) if match else None
