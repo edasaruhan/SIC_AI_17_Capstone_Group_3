@@ -82,6 +82,27 @@ def inject_global_styles() -> None:
 
         a:hover { color: var(--argus-navy-800); }
 
+        .argus-skip-link {
+            background: var(--argus-navy-950);
+            border-radius: var(--argus-radius-sm);
+            color: #ffffff;
+            font-size: .86rem;
+            font-weight: 700;
+            left: 1rem;
+            padding: .65rem .9rem;
+            position: fixed;
+            top: -5rem;
+            transition: top 120ms ease;
+            z-index: 2000;
+        }
+
+        .argus-skip-link:focus {
+            color: #ffffff;
+            top: .75rem;
+        }
+
+        .argus-main-anchor { display: block; scroll-margin-top: 5.5rem; }
+
         button:focus-visible,
         a:focus-visible,
         input:focus-visible,
@@ -444,6 +465,48 @@ def inject_global_styles() -> None:
 
         .argus-nav-links a:hover { color: var(--argus-teal-700); }
 
+        .argus-desktop-nav {
+            align-items: center;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.85rem 1.15rem;
+        }
+
+        .argus-mobile-nav { display: none; position: relative; }
+        .argus-mobile-nav summary {
+            border: 1px solid var(--argus-border);
+            border-radius: var(--argus-radius-sm);
+            color: var(--argus-navy-950);
+            cursor: pointer;
+            font-size: .82rem;
+            font-weight: 700;
+            list-style: none;
+            padding: .55rem .75rem;
+            width: fit-content;
+        }
+        .argus-mobile-nav summary::-webkit-details-marker { display: none; }
+        .argus-mobile-nav summary::after { content: " +"; }
+        .argus-mobile-nav[open] summary::after { content: " −"; }
+        .argus-mobile-nav-panel {
+            background: #ffffff;
+            border: 1px solid var(--argus-border);
+            border-radius: var(--argus-radius-md);
+            box-shadow: var(--argus-shadow);
+            display: grid;
+            gap: .15rem;
+            left: 0;
+            min-width: 14rem;
+            padding: .5rem;
+            position: absolute;
+            top: calc(100% + .4rem);
+            z-index: 1200;
+        }
+        .argus-mobile-nav-panel a {
+            border-radius: 4px;
+            padding: .5rem .55rem;
+        }
+        .argus-mobile-nav-panel a:hover { background: #eef3f3; }
+
         .argus-secondary-cta {
             align-items: center;
             background: transparent;
@@ -764,8 +827,8 @@ def inject_global_styles() -> None:
             .argus-hero { padding-top: 2.5rem; }
             .argus-hero-visual { min-height: 28rem; }
             .argus-flow-step { min-height: 0; margin-bottom: 0.75rem; }
-            .argus-nav-links { gap: 0.45rem 0.8rem; }
-            .argus-nav-links a { font-size: 0.77rem; }
+            .argus-desktop-nav { display: none; }
+            .argus-mobile-nav { display: block; }
             .argus-value-intro, .argus-outcome-band, .argus-analyst-journey { grid-template-columns: 1fr; }
             .argus-pillars { gap: 1.4rem; }
             .argus-process { gap: .5rem; grid-template-columns: 1fr; margin-left: .4rem; }
@@ -870,16 +933,14 @@ def inject_public_shell() -> None:
 
 
 def inject_portal_shell() -> None:
-    """Apply desktop-first analyst-workspace styling."""
+    """Apply responsive analyst-workspace styling."""
 
     st.markdown(
         """
         <style>
         [data-testid="stSidebar"] {
-            display: block;
             max-width: 18rem !important;
             min-width: 18rem !important;
-            transform: none !important;
             width: 18rem !important;
         }
         [data-testid="stSidebar"] [data-testid="stSidebarContent"] {
@@ -1057,7 +1118,7 @@ def inject_portal_shell() -> None:
             [data-testid="stSidebar"],
             [data-testid="stSidebar"] [data-testid="stSidebarContent"] {
                 max-width: 15rem !important;
-                min-width: 15rem;
+                min-width: 15rem !important;
                 width: 15rem !important;
             }
             [data-testid="stMainBlockContainer"] { padding-top: 1.2rem; }
@@ -1065,6 +1126,28 @@ def inject_portal_shell() -> None:
             .argus-provenance-line { align-items: flex-start; flex-direction: column; }
             .model-threshold-strip { grid-template-columns: repeat(2, 1fr); }
             .model-threshold-strip > div { border-bottom: 1px solid #d5e1df; }
+        }
+
+        @media (max-width: 640px) {
+            [data-testid="stSidebar"],
+            [data-testid="stSidebar"] [data-testid="stSidebarContent"] {
+                max-width: 86vw !important;
+                min-width: 0 !important;
+                width: 86vw !important;
+            }
+            [data-testid="stMainBlockContainer"] {
+                padding-left: .85rem;
+                padding-right: .85rem;
+                padding-top: .8rem;
+            }
+            .case-status-card { margin-top: .35rem; }
+            .model-threshold-strip { grid-template-columns: 1fr; }
+            .model-threshold-strip > div {
+                border-left: 0;
+                padding: .65rem .8rem;
+            }
+            .st-key-investigation_action_panel,
+            .st-key-case_action_bar { padding: .7rem .75rem; }
         }
         </style>
         """,
@@ -1076,6 +1159,24 @@ def anchor(name: str) -> None:
     """Render a stable in-page destination for public navigation."""
 
     st.markdown(f'<span id="{name}" class="argus-anchor"></span>', unsafe_allow_html=True)
+
+
+def render_skip_link() -> None:
+    """Expose a keyboard-only shortcut past repeated navigation."""
+
+    st.markdown(
+        '<a class="argus-skip-link" href="#argus-main-content">Skip to content</a>',
+        unsafe_allow_html=True,
+    )
+
+
+def render_main_content_anchor() -> None:
+    """Mark the beginning of route-specific content for keyboard navigation."""
+
+    st.markdown(
+        '<span id="argus-main-content" class="argus-main-anchor" tabindex="-1"></span>',
+        unsafe_allow_html=True,
+    )
 
 
 def section_heading(eyebrow: str, title: str, description: str) -> None:

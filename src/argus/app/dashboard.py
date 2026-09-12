@@ -32,7 +32,13 @@ from argus.app.public_site import (
     render_public_home,
     render_public_information,
 )
-from argus.app.styles import inject_global_styles, inject_portal_shell, inject_public_shell
+from argus.app.styles import (
+    inject_global_styles,
+    inject_portal_shell,
+    inject_public_shell,
+    render_main_content_anchor,
+    render_skip_link,
+)
 
 _PAGES = PAGES
 _PRIMARY_MODEL = PRIMARY_MODEL
@@ -48,6 +54,7 @@ _TRACKED_DEMO_NOTICE = (
 )
 _PORTAL_WIDGET_KEYS = {
     "case_investigator_select",
+    "case_back_to_investigations",
     "investigation_selected_case_id",
     "investigation_worklist_table",
     "investigation_open_case",
@@ -151,6 +158,7 @@ def _optional_artifacts() -> DashboardArtifacts | None:
 
 def _render_public_route(route: str) -> None:
     inject_public_shell()
+    render_skip_link()
     if route == "home":
         render_public_home(_navigate, artifacts=_optional_artifacts())
     elif route == "demo":
@@ -188,6 +196,12 @@ def _open_case(case_id: str) -> None:
     st.session_state.pop("argus_pending_case_action", None)
     _sync_portal_route("Case Investigator")
     st.rerun()
+
+
+def _back_to_investigations() -> None:
+    st.session_state["argus_nav_override"] = "Investigations"
+    st.session_state["argus_portal_page"] = "Investigations"
+    st.session_state.pop("argus_pending_case_action", None)
 
 
 def _logout() -> None:
@@ -292,7 +306,9 @@ def _render_portal() -> None:
         _navigate("login")
         st.rerun()
     inject_portal_shell()
+    render_skip_link()
     page = _render_portal_sidebar(_selected_portal_page())
+    render_main_content_anchor()
     _scroll_to_top_if_requested()
     login_notice = st.session_state.pop("argus_login_notice", None)
     if login_notice:
@@ -305,7 +321,12 @@ def _render_portal() -> None:
             return
     if artifacts.is_tracked_demo:
         st.warning(_TRACKED_DEMO_NOTICE, icon="⚠️")
-    render_page(page, artifacts, open_case=_open_case)
+    render_page(
+        page,
+        artifacts,
+        open_case=_open_case,
+        back_to_investigations=_back_to_investigations,
+    )
     st.divider()
     st.caption(
         "Decision support only · Human review remains mandatory · Model output is not an "

@@ -40,6 +40,10 @@ def test_public_navigation_anchors_have_matching_sections() -> None:
     app = _app()
     markup = " ".join(str(item.value) for item in app.markdown)
 
+    assert 'class="argus-skip-link" href="#argus-main-content"' in markup
+    assert 'id="argus-main-content"' in markup
+    assert '<details class="argus-mobile-nav">' in markup
+    assert "<summary>Explore</summary>" in markup
     for anchor in (
         "product",
         "how-it-works",
@@ -198,3 +202,13 @@ def test_streamlit_product_chrome_uses_supported_minimal_configuration() -> None
 
     assert config["client"]["toolbarMode"] == "minimal"
     assert config["client"]["showSidebarNavigation"] is False
+
+
+def test_portal_sidebar_keeps_streamlit_collapse_behavior_and_mobile_width() -> None:
+    styles_path = Path(__file__).resolve().parents[1] / "src" / "argus" / "app" / "styles.py"
+    styles = styles_path.read_text(encoding="utf-8")
+
+    assert "transform: none !important" not in styles
+    assert "max-width: 86vw !important" in styles
+    assert "min-width: 0 !important" in styles
+    assert ".argus-mobile-nav { display: block; }" in styles

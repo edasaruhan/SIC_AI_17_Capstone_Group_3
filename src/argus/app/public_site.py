@@ -10,7 +10,7 @@ from typing import Any
 import plotly.graph_objects as go
 import streamlit as st
 
-from argus.app.styles import COLORS, anchor, section_heading
+from argus.app.styles import COLORS, anchor, render_main_content_anchor, section_heading
 
 Navigate = Callable[[str], None]
 
@@ -58,12 +58,25 @@ def _public_navigation(navigate: Navigate) -> None:
             st.markdown(
                 """
                 <nav class="argus-nav-links" aria-label="Primary navigation">
-                  <a href="#product">Product</a>
-                  <a href="#how-it-works">How It Works</a>
-                  <a href="#analyst-experience">Analyst Experience</a>
-                  <a href="#responsible-ai">Security &amp; Responsible AI</a>
-                  <a href="#resources">Resources</a>
-                  <a href="#contact">Contact</a>
+                  <div class="argus-desktop-nav">
+                    <a href="#product">Product</a>
+                    <a href="#how-it-works">How It Works</a>
+                    <a href="#analyst-experience">Analyst Experience</a>
+                    <a href="#responsible-ai">Security &amp; Responsible AI</a>
+                    <a href="#resources">Resources</a>
+                    <a href="#contact">Contact</a>
+                  </div>
+                  <details class="argus-mobile-nav">
+                    <summary>Explore</summary>
+                    <div class="argus-mobile-nav-panel">
+                      <a href="#product">Product</a>
+                      <a href="#how-it-works">How It Works</a>
+                      <a href="#analyst-experience">Analyst Experience</a>
+                      <a href="#responsible-ai">Security &amp; Responsible AI</a>
+                      <a href="#resources">Resources</a>
+                      <a href="#contact">Contact</a>
+                    </div>
+                  </details>
                 </nav>
                 """,
                 unsafe_allow_html=True,
@@ -85,6 +98,7 @@ def _public_navigation(navigate: Navigate) -> None:
                 on_click=navigate,
                 args=("login",),
             )
+    render_main_content_anchor()
 
 
 def _page_navigation(navigate: Navigate) -> None:
@@ -110,6 +124,7 @@ def _page_navigation(navigate: Navigate) -> None:
                 on_click=navigate,
                 args=("login",),
             )
+    render_main_content_anchor()
 
 
 def _render_hero(navigate: Navigate) -> None:

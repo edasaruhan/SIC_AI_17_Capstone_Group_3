@@ -7,6 +7,7 @@ from collections.abc import Callable
 import streamlit as st
 
 from argus.app.auth import sign_in
+from argus.app.styles import render_main_content_anchor
 
 Navigate = Callable[[str], None]
 
@@ -25,6 +26,7 @@ def render_login(navigate: Navigate) -> None:
             on_click=navigate,
             args=("home",),
         )
+    render_main_content_anchor()
 
     st.markdown('<div class="login-spacer"></div>', unsafe_allow_html=True)
     context, form_column = st.columns([1.05, 0.95], gap="large", vertical_alignment="center")

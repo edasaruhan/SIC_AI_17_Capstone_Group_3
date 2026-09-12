@@ -113,6 +113,9 @@ def test_streamlit_all_required_screens_render_from_saved_artifacts(
     app = _login(app)
     assert not app.exception
     assert app.title[0].value == "Overview"
+    portal_markup = " ".join(str(item.value) for item in app.markdown)
+    assert 'class="argus-skip-link" href="#argus-main-content"' in portal_markup
+    assert 'id="argus-main-content"' in portal_markup
     assert all(metric.label != "GraphSAGE queue alerts" for metric in app.metric)
     assert [metric.label for metric in app.metric[:4]] == [
         "Open cases",
@@ -134,6 +137,12 @@ def test_streamlit_all_required_screens_render_from_saved_artifacts(
     assert not app.exception
     assert app.title[0].value == "Case Investigator"
     assert app.sidebar.radio[0].value == "Case Investigator"
+
+    _button(app, "Back to investigations").click()
+    app.run(timeout=20)
+    assert not app.exception
+    assert app.title[0].value == "Investigations"
+    assert app.sidebar.radio[0].value == "Investigations"
 
     _button(app, "Log out").click()
     app.run(timeout=20)

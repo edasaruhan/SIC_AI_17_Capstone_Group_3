@@ -988,7 +988,11 @@ def _render_notes_and_activity(case_id: str, case: Mapping[str, Any]) -> None:
     st.caption("Demo notes and actions reset after sign-out.")
 
 
-def render_case_investigator(artifacts: DashboardArtifacts) -> None:
+def render_case_investigator(
+    artifacts: DashboardArtifacts,
+    *,
+    back_to_investigations: Callable[[], None] | None = None,
+) -> None:
     _page_heading(
         "CASE REVIEW",
         "Case Investigator",
@@ -1010,8 +1014,16 @@ def render_case_investigator(artifacts: DashboardArtifacts) -> None:
         requested = case_ids[0]
         st.session_state["argus_selected_case_id"] = requested
     index = case_ids.index(requested) if requested in case_ids else 0
+    navigation, selection = st.columns([1, 3], vertical_alignment="bottom")
+    if back_to_investigations is not None:
+        navigation.button(
+            "Back to investigations",
+            key="case_back_to_investigations",
+            on_click=back_to_investigations,
+            width="stretch",
+        )
     widget_value = st.session_state.get("case_investigator_select")
-    selected_case_id = st.selectbox(
+    selected_case_id = selection.selectbox(
         "Case",
         case_ids,
         index=None if widget_value in case_ids else index,
@@ -1320,6 +1332,7 @@ def render_page(
     artifacts: DashboardArtifacts,
     *,
     open_case: Callable[[str], None],
+    back_to_investigations: Callable[[], None] | None = None,
 ) -> None:
     """Render one authenticated portal page."""
 
@@ -1328,7 +1341,10 @@ def render_page(
     elif page == "Investigations":
         render_investigations(artifacts, open_case=open_case)
     elif page == "Case Investigator":
-        render_case_investigator(artifacts)
+        render_case_investigator(
+            artifacts,
+            back_to_investigations=back_to_investigations,
+        )
     elif page == "Model Evidence":
         render_model_evidence(artifacts)
     else:
