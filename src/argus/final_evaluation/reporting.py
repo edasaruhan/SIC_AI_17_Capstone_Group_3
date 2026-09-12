@@ -153,10 +153,10 @@ def render_final_comparison_markdown(
         lines.extend(
             [
                 "",
-                "## Final quality",
+                "## Frozen-run quality snapshot",
                 "",
                 f"- Status: **{quality.get('status', 'UNKNOWN')}**",
-                f"- Pytest: {quality.get('pytest_passed', 'UNKNOWN')} passed",
+                f"- Pytest at scientific freeze: {quality.get('pytest_passed', 'UNKNOWN')} passed",
                 f"- Saved-artifact verification: "
                 f"{quality.get('artifact_verification_status', 'UNKNOWN')}",
             ]

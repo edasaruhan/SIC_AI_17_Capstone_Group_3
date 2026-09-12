@@ -124,7 +124,7 @@ transform edilir. Aynı zaman damgasındaki işlemler aynı bölümde tutulur. G
 | Alan | Teknolojiler |
 | --- | --- |
 | Veri işleme | Python, Pandas, NumPy, DuckDB |
-| Makine öğrenmesi | scikit-learn, LightGBM, imbalanced-learn |
+| Makine öğrenmesi | scikit-learn, LightGBM |
 | Graf öğrenmesi | PyTorch, GraphSAGE, NetworkX |
 | Açıklanabilirlik | SHAP ve kayıt-temelli ağ kanıtları |
 | Ürün arayüzü | Streamlit, Plotly |
@@ -241,6 +241,21 @@ py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install --upgrade pip
 .\.venv\Scripts\python.exe -m pip install -e ".[graph,app,dev]"
 ```
+
+### Dev Container ve GitHub Codespaces
+
+Depo, Python `3.12` tabanlı hazır bir geliştirme konteyneri içerir. GitHub'da
+**Code → Codespaces → Create codespace** seçildiğinde kilitli geliştirme bağımlılıkları
+kurulur, Pytest ve Ruff VS Code'a bağlanır ve Streamlit uygulaması `8501` portunda başlatılır.
+Konteyner yapılandırması CORS veya XSRF korumalarını kapatmaz.
+
+GNU Make kullanılan geliştirme ortamlarında tam CI karşılığı kontrol tek komutla çalışır:
+
+```bash
+make check
+```
+
+Uygulamayı ayrıca başlatmak için `make app` kullanılabilir.
 
 GNU Make bulunan ortamlarda aynı tam geliştirme kurulumu `make setup`, çekirdek ve
 geliştirme araçlarıyla sınırlı hafif kurulum ise `make setup-core` ile yapılabilir. Python 3.12

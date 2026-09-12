@@ -1,4 +1,4 @@
-.PHONY: setup setup-core setup-locked test coverage lint check quick full baseline verify-baseline validate-sprint2 eda validate audit final-eval verify-final validate-final final-docs final-screenshots
+.PHONY: setup setup-core setup-locked test coverage lint check app quick full baseline verify-baseline validate-sprint2 eda validate audit final-eval verify-final validate-final final-docs final-screenshots
 
 setup:
 	python -m pip install -e ".[graph,app,dev]"
@@ -19,8 +19,11 @@ lint:
 	python -m ruff check --no-cache src scripts tests app.py
 	python -m ruff format --no-cache --check src scripts tests app.py
 
-check: test lint
+check: coverage lint
 	python -m pip check
+
+app:
+	python -m streamlit run app.py
 
 quick:
 	python scripts/run_quick_pipeline.py

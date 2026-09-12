@@ -51,8 +51,8 @@ The paths below are generated locally and intentionally excluded from Git. They 
 - Streamlit — Case Investigator: `../../artifacts/sprint5/screenshots/case_investigator.png`
 - Streamlit — Model Comparison: `../../artifacts/sprint5/screenshots/model_comparison.png`
 
-## Final quality
+## Frozen-run quality snapshot
 
 - Status: **PASS**
-- Pytest: 377 passed
+- Pytest at scientific freeze: 377 passed
 - Saved-artifact verification: PASS
