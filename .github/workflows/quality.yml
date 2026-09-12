@@ -41,7 +41,7 @@ jobs:
           python -m pytest -q
           --cov=argus
           --cov-report=term-missing
-          --cov-fail-under=74
+          --cov-fail-under=75
 
       - name: Verify dependency consistency
         run: python -m pip check

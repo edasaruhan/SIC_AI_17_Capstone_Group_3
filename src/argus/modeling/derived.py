@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -11,7 +12,7 @@ import duckdb
 import numpy as np
 
 from argus.config import get_path, load_config
-from argus.modeling.artifacts import atomic_write_json, write_run_manifest
+from argus.modeling.artifacts import atomic_write_json, file_fingerprint, write_run_manifest
 from argus.modeling.metrics import evaluate_binary_predictions
 from argus.modeling.reporting import (
     PR_CURVE_MAX_PLOT_POINTS,
@@ -30,6 +31,32 @@ def _load_json(path: Path) -> dict[str, Any]:
     return payload
 
 
+def _verify_frozen_prediction_fingerprint(
+    run_dir: Path,
+    manifest: Mapping[str, Any],
+) -> Path:
+    """Refuse to derive new evidence from a changed prediction artifact."""
+
+    inventory = manifest.get("artifacts")
+    if not isinstance(inventory, list):
+        raise RuntimeError("Sprint 2 manifest has no frozen artifact inventory")
+    matches = [
+        item
+        for item in inventory
+        if isinstance(item, Mapping) and item.get("path") == "validation_predictions.parquet"
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(
+            "Sprint 2 manifest must contain exactly one validation prediction fingerprint"
+        )
+    prediction_path = run_dir / "validation_predictions.parquet"
+    actual = file_fingerprint(prediction_path, relative_to=run_dir)
+    expected = matches[0]
+    if any(actual[key] != expected.get(key) for key in ("path", "size_bytes", "sha256")):
+        raise RuntimeError("Saved validation prediction fingerprint differs from the frozen run")
+    return prediction_path
+
+
 def refresh_sprint2_derived_artifacts(
     config_path: str | Path = "configs/baseline.yaml",
 ) -> dict[str, Any]:
@@ -42,12 +69,13 @@ def refresh_sprint2_derived_artifacts(
     manifest = _load_json(run_dir / "run_manifest.json")
     if manifest.get("status") not in {"PASS", "FAIL_QUALITY_CHECKS"}:
         raise RuntimeError("No completed Sprint 2 core run is available to refresh")
+    prediction_path = _verify_frozen_prediction_fingerprint(run_dir, manifest)
 
     connection = duckdb.connect()
     try:
         prediction = connection.execute(
             "SELECT * FROM read_parquet(?) ORDER BY source_row_number",
-            [str((run_dir / "validation_predictions.parquet").resolve())],
+            [str(prediction_path.resolve())],
         ).fetch_df()
     finally:
         connection.close()
