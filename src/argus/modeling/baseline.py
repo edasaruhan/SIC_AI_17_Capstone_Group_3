@@ -65,6 +65,7 @@ from argus.modeling.selection import select_transaction_baseline_champion
 
 _WORK_PREFIX = ".argus_sprint2_work_"
 _MODEL_PARTITIONS = frozenset({"train", "validation"})
+_BASELINE_MODEL_NAMES = ("logistic_regression", "random_forest", "lightgbm")
 
 
 class BaselinePipelineError(RuntimeError):
@@ -282,69 +283,77 @@ def _materialize_partition(
     matrix_path = work_dir / f"X_{safe_partition}.npy"
     target_path = work_dir / f"y_{safe_partition}.npy"
     source_path = work_dir / f"source_rows_{safe_partition}.npy"
-    matrix = np.lib.format.open_memmap(
-        matrix_path, mode="w+", dtype=np.float32, shape=(expected_rows, feature_count)
-    )
-    target = np.lib.format.open_memmap(
-        target_path, mode="w+", dtype=np.int8, shape=(expected_rows,)
-    )
+    matrix: np.memmap | None = None
+    target: np.memmap | None = None
     source_rows: np.memmap | None = None
-    if safe_partition == "validation":
-        source_rows = np.lib.format.open_memmap(
-            source_path, mode="w+", dtype=np.int64, shape=(expected_rows,)
+    try:
+        matrix = np.lib.format.open_memmap(
+            matrix_path, mode="w+", dtype=np.float32, shape=(expected_rows, feature_count)
         )
+        target = np.lib.format.open_memmap(
+            target_path, mode="w+", dtype=np.int8, shape=(expected_rows,)
+        )
+        if safe_partition == "validation":
+            source_rows = np.lib.format.open_memmap(
+                source_path, mode="w+", dtype=np.int64, shape=(expected_rows,)
+            )
 
-    offset = 0
-    batches = 0
-    for batch in iter_duckdb_transformed_batches(
-        connection,
-        preprocessor,
-        feature_table,
-        split_table,
-        safe_partition,
-        batch_size=batch_rows,
-    ):
-        stop = offset + batch.rows
-        if stop > expected_rows:
-            raise BaselinePipelineError(
-                f"{safe_partition} batches exceed frozen row count {expected_rows}"
-            )
-        matrix[offset:stop] = batch.matrix
-        target[offset:stop] = batch.target
+        offset = 0
+        batches = 0
+        for batch in iter_duckdb_transformed_batches(
+            connection,
+            preprocessor,
+            feature_table,
+            split_table,
+            safe_partition,
+            batch_size=batch_rows,
+        ):
+            stop = offset + batch.rows
+            if stop > expected_rows:
+                raise BaselinePipelineError(
+                    f"{safe_partition} batches exceed frozen row count {expected_rows}"
+                )
+            matrix[offset:stop] = batch.matrix
+            target[offset:stop] = batch.target
+            if source_rows is not None:
+                source_rows[offset:stop] = batch.source_row_numbers
+            offset = stop
+            batches += 1
+            if batches == 1 or batches % 10 == 0:
+                print(
+                    f"[baseline] {safe_partition} matrix: {offset:,}/{expected_rows:,} rows",
+                    flush=True,
+                )
+        matrix.flush()
+        target.flush()
         if source_rows is not None:
-            source_rows[offset:stop] = batch.source_row_numbers
-        offset = stop
-        batches += 1
-        if batches == 1 or batches % 10 == 0:
-            print(
-                f"[baseline] {safe_partition} matrix: {offset:,}/{expected_rows:,} rows",
-                flush=True,
+            source_rows.flush()
+        if offset != expected_rows:
+            raise BaselinePipelineError(
+                f"{safe_partition} matrix rows differ: expected={expected_rows}, actual={offset}"
             )
-    matrix.flush()
-    target.flush()
-    if source_rows is not None:
-        source_rows.flush()
-    if offset != expected_rows:
-        raise BaselinePipelineError(
-            f"{safe_partition} matrix rows differ: expected={expected_rows}, actual={offset}"
+        actual_positives = int(np.count_nonzero(target == 1))
+        if actual_positives != expected_positives:
+            raise BaselinePipelineError(
+                f"{safe_partition} labels differ from frozen metadata: "
+                f"expected={expected_positives}, actual={actual_positives}"
+            )
+        if source_rows is not None and np.unique(source_rows).size != expected_rows:
+            raise BaselinePipelineError("Validation source_row_number values are not unique")
+        return PartitionMatrices(
+            partition=safe_partition,
+            matrix=matrix,
+            target=target,
+            source_row_numbers=source_rows,
+            rows=expected_rows,
+            positive_labels=actual_positives,
+            batches=batches,
         )
-    actual_positives = int(np.count_nonzero(target == 1))
-    if actual_positives != expected_positives:
-        raise BaselinePipelineError(
-            f"{safe_partition} labels differ from frozen metadata: "
-            f"expected={expected_positives}, actual={actual_positives}"
-        )
-    if source_rows is not None and np.unique(source_rows).size != expected_rows:
-        raise BaselinePipelineError("Validation source_row_number values are not unique")
-    return PartitionMatrices(
-        partition=safe_partition,
-        matrix=matrix,
-        target=target,
-        source_row_numbers=source_rows,
-        rows=expected_rows,
-        positive_labels=actual_positives,
-        batches=batches,
-    )
+    except BaseException:
+        _close_memmap(source_rows)
+        _close_memmap(target)
+        _close_memmap(matrix)
+        raise
 
 
 def _atomic_joblib_dump(model: Any, destination: Path, compression: int) -> None:
@@ -367,11 +376,38 @@ def _write_validation_predictions(
     destination: Path,
     compression: str,
 ) -> dict[str, Any]:
+    source_values = np.asarray(source_row_numbers)
+    label_values = np.asarray(labels)
+    score_values = {name: np.asarray(scores) for name, scores in scores_by_model.items()}
+    if set(score_values) != set(_BASELINE_MODEL_NAMES):
+        raise BaselinePipelineError(
+            "Validation predictions must contain exactly the three reviewed baseline models"
+        )
+    if source_values.ndim != 1 or label_values.ndim != 1:
+        raise BaselinePipelineError("Validation identity and label arrays must be one-dimensional")
+    rows = len(source_values)
+    if rows == 0 or len(label_values) != rows:
+        raise BaselinePipelineError("Validation identity and label lengths differ or are empty")
+    if np.unique(source_values).size != rows:
+        raise BaselinePipelineError("Validation source_row_number values are not unique")
+    if not np.isin(label_values, (0, 1)).all():
+        raise BaselinePipelineError("Validation labels must be binary")
+    for model_name, scores in score_values.items():
+        if scores.ndim != 1 or len(scores) != rows:
+            raise BaselinePipelineError(
+                f"Validation score length differs for model {model_name}"
+            )
+        if not np.isfinite(scores).all() or ((scores < 0) | (scores > 1)).any():
+            raise BaselinePipelineError(
+                f"Validation scores must be finite probabilities for model {model_name}"
+            )
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
     frame = pd.DataFrame(
         {
-            "source_row_number": np.asarray(source_row_numbers),
-            "is_laundering": np.asarray(labels),
-            **{f"score_{name}": np.asarray(scores) for name, scores in scores_by_model.items()},
+            "source_row_number": source_values,
+            "is_laundering": label_values,
+            **{f"score_{name}": scores for name, scores in score_values.items()},
         }
     )
     connection.register("argus_validation_predictions", frame)
@@ -379,7 +415,7 @@ def _write_validation_predictions(
     temporary = destination.with_name(f".{destination.name}.{uuid.uuid4().hex}.tmp")
     temporary_sql = temporary.resolve().as_posix().replace("'", "''")
     score_projection = ", ".join(
-        f'CAST("score_{name}" AS DOUBLE) AS "score_{name}"' for name in sorted(scores_by_model)
+        f'CAST("score_{name}" AS DOUBLE) AS "score_{name}"' for name in sorted(score_values)
     )
     try:
         connection.execute(
@@ -412,7 +448,7 @@ def _write_validation_predictions(
         "rows": int(row[0]),
         "unique_transaction_ids": int(row[1]),
         "positive_labels": int(row[2]),
-        "score_columns": [f"score_{name}" for name in sorted(scores_by_model)],
+        "score_columns": [f"score_{name}" for name in sorted(score_values)],
         "test_predictions_included": False,
     }
 
@@ -585,7 +621,7 @@ def run_sprint2_baselines(
             model_results: dict[str, dict[str, Any]] = {}
             scores_by_model: dict[str, np.memmap] = {}
             models_root = run_dir / "models"
-            for model_name in ("logistic_regression", "random_forest", "lightgbm"):
+            for model_name in _BASELINE_MODEL_NAMES:
                 estimator, implementation, effective_parameters = built.pop(model_name)
                 print(f"[baseline] fitting {model_name} ...", flush=True)
                 with warnings.catch_warnings(record=True) as caught:
