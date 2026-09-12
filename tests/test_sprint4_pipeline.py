@@ -133,6 +133,7 @@ def test_validation_prediction_writer_requires_validation_join_and_aligns_refere
         assert audit["partition"] == "validation"
         assert audit["rows"] == 3
         assert audit["positive_labels"] == 1
+        assert audit["out_of_range_probability_rows"] == 0
         assert audit["test_predictions_included"] is False
         columns = (
             connection.execute(
@@ -146,3 +147,108 @@ def test_validation_prediction_writer_requires_validation_join_and_aligns_refere
         assert "raw_score_graphsage_edge_classifier" in columns
     finally:
         connection.close()
+
+
+def test_validation_prediction_writer_preserves_previous_artifact_on_bad_reference(
+    tmp_path: Path,
+) -> None:
+    connection = duckdb.connect()
+    try:
+        feature_path = _write_frame_parquet(
+            connection,
+            pd.DataFrame(
+                {"transaction_id": ["T1"], "source_row_number": [1], "is_laundering": [0]}
+            ),
+            tmp_path / "feature.parquet",
+            compression="zstd",
+        )
+        split_path = _write_frame_parquet(
+            connection,
+            pd.DataFrame({"transaction_id": ["T1"], "partition": ["validation"]}),
+            tmp_path / "split.parquet",
+            compression="zstd",
+        )
+        reference_path = _write_frame_parquet(
+            connection,
+            pd.DataFrame(
+                {
+                    "source_row_number": [1],
+                    "is_laundering": [0],
+                    "raw_score_refined_lightgbm": [0.1],
+                    "probability_refined_lightgbm": [np.nan],
+                    "raw_score_ablation_transaction_temporal_history_graph": [0.2],
+                    "probability_ablation_transaction_temporal_history_graph": [0.4],
+                }
+            ),
+            tmp_path / "reference.parquet",
+            compression="zstd",
+        )
+        destination = _write_frame_parquet(
+            connection,
+            pd.DataFrame({"sentinel": [42]}),
+            tmp_path / "predictions.parquet",
+            compression="zstd",
+        )
+        values = {
+            "source_row_number": np.array([1]),
+            "is_laundering": np.array([0]),
+            "raw_score_graphsage_edge_classifier": np.array([0.3]),
+            "probability_graphsage_edge_classifier": np.array([0.6]),
+        }
+
+        with pytest.raises(Sprint4PipelineError, match="pre-commit verification"):
+            _write_validation_predictions(
+                connection,
+                values,
+                feature_table=feature_path,
+                split_table=split_path,
+                sprint3_predictions=reference_path,
+                destination=destination,
+                compression="zstd",
+            )
+
+        assert connection.execute(
+            "SELECT sentinel FROM read_parquet(?)", [str(destination)]
+        ).fetchall() == [(42,)]
+        assert list(tmp_path.glob(".predictions.parquet.*.tmp")) == []
+    finally:
+        connection.close()
+
+
+@pytest.mark.parametrize(
+    ("invalid_case", "message"),
+    [
+        ("missing_column", "exactly the reviewed columns"),
+        ("duplicate_source", "not unique"),
+        ("nonfinite_raw", "raw scores must be finite"),
+        ("probability_out_of_range", "probabilities must be bounded"),
+    ],
+)
+def test_validation_prediction_writer_rejects_invalid_graphsage_values(
+    tmp_path: Path, invalid_case: str, message: str
+) -> None:
+    values = {
+        "source_row_number": np.array([1, 2]),
+        "is_laundering": np.array([0, 1]),
+        "raw_score_graphsage_edge_classifier": np.array([-1.0, 2.0]),
+        "probability_graphsage_edge_classifier": np.array([0.2, 0.9]),
+    }
+    if invalid_case == "missing_column":
+        values.pop("raw_score_graphsage_edge_classifier")
+    elif invalid_case == "duplicate_source":
+        values["source_row_number"] = np.array([1, 1])
+    elif invalid_case == "nonfinite_raw":
+        values["raw_score_graphsage_edge_classifier"] = np.array([np.inf, 2.0])
+    else:
+        values["probability_graphsage_edge_classifier"] = np.array([0.2, 1.1])
+
+    with pytest.raises(Sprint4PipelineError, match=message):
+        _write_validation_predictions(
+            duckdb.connect(),
+            values,
+            feature_table=tmp_path / "feature.parquet",
+            split_table=tmp_path / "split.parquet",
+            sprint3_predictions=tmp_path / "reference.parquet",
+            destination=tmp_path / "predictions.parquet",
+            compression="zstd",
+        )

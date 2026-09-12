@@ -72,6 +72,14 @@ matplotlib.use("Agg")
 from matplotlib import pyplot as plt  # noqa: E402
 
 _WORK_PREFIX = ".argus_sprint4_work_"
+_SPRINT4_SCORE_KEYS = frozenset(
+    {
+        "source_row_number",
+        "is_laundering",
+        "raw_score_graphsage_edge_classifier",
+        "probability_graphsage_edge_classifier",
+    }
+)
 
 
 class Sprint4PipelineError(RuntimeError):
@@ -442,7 +450,38 @@ def _write_validation_predictions(
     destination: Path,
     compression: str,
 ) -> dict[str, Any]:
-    frame = pd.DataFrame(values)
+    if set(values) != _SPRINT4_SCORE_KEYS:
+        raise Sprint4PipelineError(
+            "GraphSAGE validation scores must contain exactly the reviewed columns"
+        )
+    arrays = {name: np.asarray(array) for name, array in values.items()}
+    source_rows = arrays["source_row_number"]
+    labels = arrays["is_laundering"]
+    raw_scores = arrays["raw_score_graphsage_edge_classifier"]
+    probabilities = arrays["probability_graphsage_edge_classifier"]
+    if any(array.ndim != 1 for array in arrays.values()):
+        raise Sprint4PipelineError("GraphSAGE validation score arrays must be one-dimensional")
+    rows = len(source_rows)
+    if rows == 0 or any(len(array) != rows for array in arrays.values()):
+        raise Sprint4PipelineError("GraphSAGE validation score lengths differ or are empty")
+    if not np.issubdtype(source_rows.dtype, np.integer) or (source_rows < 0).any():
+        raise Sprint4PipelineError(
+            "GraphSAGE source_row_number values must be non-negative integers"
+        )
+    if np.unique(source_rows).size != rows:
+        raise Sprint4PipelineError("GraphSAGE source_row_number values are not unique")
+    if not np.isin(labels, (0, 1)).all():
+        raise Sprint4PipelineError("GraphSAGE validation labels must be binary")
+    if not np.issubdtype(raw_scores.dtype, np.number) or not np.isfinite(raw_scores).all():
+        raise Sprint4PipelineError("GraphSAGE validation raw scores must be finite")
+    if not np.issubdtype(probabilities.dtype, np.number) or not np.isfinite(
+        probabilities
+    ).all():
+        raise Sprint4PipelineError("GraphSAGE validation probabilities must be finite")
+    if ((probabilities < 0) | (probabilities > 1)).any():
+        raise Sprint4PipelineError("GraphSAGE validation probabilities must be bounded")
+
+    frame = pd.DataFrame(arrays)
     connection.register("argus_sprint4_gnn_scores", frame)
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary = destination.with_name(f".{destination.name}.{uuid.uuid4().hex}.tmp")
@@ -487,50 +526,78 @@ def _write_validation_predictions(
                 str(sprint3_predictions.resolve()),
             ],
         )
+        row = connection.execute(
+            """
+            SELECT
+                count(*), count(DISTINCT transaction_id), count(DISTINCT source_row_number),
+                sum(is_laundering), count(DISTINCT evaluation_partition),
+                min(evaluation_partition),
+                count(*) FILTER (
+                    WHERE raw_score_graphsage_edge_classifier IS NULL
+                       OR NOT isfinite(raw_score_graphsage_edge_classifier)
+                       OR probability_graphsage_edge_classifier IS NULL
+                       OR NOT isfinite(probability_graphsage_edge_classifier)
+                       OR raw_score_refined_transaction_lightgbm IS NULL
+                       OR NOT isfinite(raw_score_refined_transaction_lightgbm)
+                       OR probability_refined_transaction_lightgbm IS NULL
+                       OR NOT isfinite(probability_refined_transaction_lightgbm)
+                       OR raw_score_graph_enhanced_lightgbm IS NULL
+                       OR NOT isfinite(raw_score_graph_enhanced_lightgbm)
+                       OR probability_graph_enhanced_lightgbm IS NULL
+                       OR NOT isfinite(probability_graph_enhanced_lightgbm)
+                ),
+                count(*) FILTER (
+                    WHERE probability_graphsage_edge_classifier NOT BETWEEN 0 AND 1
+                       OR probability_refined_transaction_lightgbm NOT BETWEEN 0 AND 1
+                       OR probability_graph_enhanced_lightgbm NOT BETWEEN 0 AND 1
+                )
+            FROM read_parquet(?)
+            """,
+            [str(temporary.resolve())],
+        ).fetchone()
+        audit = {
+            "partition": str(row[5]),
+            "rows": int(row[0]),
+            "unique_transaction_ids": int(row[1]),
+            "unique_source_rows": int(row[2]),
+            "positive_labels": int(row[3]),
+            "distinct_partition_values": int(row[4]),
+            "nonfinite_score_rows": int(row[6]),
+            "out_of_range_probability_rows": int(row[7]),
+            "model_score_columns": {
+                "graphsage_edge_classifier": {
+                    "raw": "raw_score_graphsage_edge_classifier",
+                    "probability": "probability_graphsage_edge_classifier",
+                },
+                "refined_transaction_lightgbm": {
+                    "raw": "raw_score_refined_transaction_lightgbm",
+                    "probability": "probability_refined_transaction_lightgbm",
+                },
+                "graph_enhanced_lightgbm": {
+                    "raw": "raw_score_graph_enhanced_lightgbm",
+                    "probability": "probability_graph_enhanced_lightgbm",
+                },
+            },
+            "test_predictions_included": False,
+        }
+        if (
+            audit["rows"] != rows
+            or audit["positive_labels"] != int(np.count_nonzero(labels == 1))
+            or audit["unique_transaction_ids"] != rows
+            or audit["unique_source_rows"] != rows
+            or audit["partition"] != "validation"
+            or audit["distinct_partition_values"] != 1
+            or audit["nonfinite_score_rows"] != 0
+            or audit["out_of_range_probability_rows"] != 0
+        ):
+            raise Sprint4PipelineError(
+                f"Validation prediction artifact failed pre-commit verification: {audit}"
+            )
         os.replace(temporary, destination)
+        return audit
     finally:
         connection.unregister("argus_sprint4_gnn_scores")
         temporary.unlink(missing_ok=True)
-    row = connection.execute(
-        """
-        SELECT
-            count(*), count(DISTINCT transaction_id), count(DISTINCT source_row_number),
-            sum(is_laundering), count(DISTINCT evaluation_partition),
-            min(evaluation_partition),
-            count(*) FILTER (
-                WHERE NOT isfinite(raw_score_graphsage_edge_classifier)
-                   OR NOT isfinite(probability_graphsage_edge_classifier)
-                   OR NOT isfinite(raw_score_refined_transaction_lightgbm)
-                   OR NOT isfinite(raw_score_graph_enhanced_lightgbm)
-            )
-        FROM read_parquet(?)
-        """,
-        [str(destination.resolve())],
-    ).fetchone()
-    return {
-        "partition": str(row[5]),
-        "rows": int(row[0]),
-        "unique_transaction_ids": int(row[1]),
-        "unique_source_rows": int(row[2]),
-        "positive_labels": int(row[3]),
-        "distinct_partition_values": int(row[4]),
-        "nonfinite_score_rows": int(row[6]),
-        "model_score_columns": {
-            "graphsage_edge_classifier": {
-                "raw": "raw_score_graphsage_edge_classifier",
-                "probability": "probability_graphsage_edge_classifier",
-            },
-            "refined_transaction_lightgbm": {
-                "raw": "raw_score_refined_transaction_lightgbm",
-                "probability": "probability_refined_transaction_lightgbm",
-            },
-            "graph_enhanced_lightgbm": {
-                "raw": "raw_score_graph_enhanced_lightgbm",
-                "probability": "probability_graph_enhanced_lightgbm",
-            },
-        },
-        "test_predictions_included": False,
-    }
 
 
 def _evaluate_saved_predictions(
@@ -1291,9 +1358,11 @@ def run_sprint4_pipeline(config_path: str | Path = "configs/sprint4.yaml") -> Sp
                 prediction_manifest["rows"] != int(frozen["validation_rows"])
                 or prediction_manifest["positive_labels"] != int(frozen["validation_positives"])
                 or prediction_manifest["unique_transaction_ids"] != int(frozen["validation_rows"])
+                or prediction_manifest["unique_source_rows"] != int(frozen["validation_rows"])
                 or prediction_manifest["partition"] != "validation"
                 or prediction_manifest["distinct_partition_values"] != 1
                 or prediction_manifest["nonfinite_score_rows"] != 0
+                or prediction_manifest["out_of_range_probability_rows"] != 0
             ):
                 raise Sprint4PipelineError(
                     f"Validation prediction artifact failed verification: {prediction_manifest}"
