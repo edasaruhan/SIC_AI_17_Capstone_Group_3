@@ -95,6 +95,7 @@ def test_network_figure_has_readable_roles_and_plotly_navigation_controls() -> N
         "Network context",
     }.issubset(legend_names)
     node_trace = figure.data[-1]
+    assert list(node_trace.text) == ["Primary sender", "Selected receiver", "Linked account 1"]
     account_rows = {row[0]: row for row in node_trace.customdata}
     assert account_rows["BANK-A::A1"][1:] == ["Focal sender", 0, 1]
     assert account_rows["BANK-B::B1"][1:] == ["Focal receiver", 1, 1]
@@ -127,7 +128,7 @@ def test_timeline_uses_saved_edge_timestamps_and_amounts() -> None:
 
     assert figure is not None
     assert list(figure.data[0].y) == [100.0, 90.0]
-    assert list(figure.data[0].text) == ["TX-1", "TX-2"]
+    assert list(figure.data[0].text) == ["100 USD", "90 USD"]
     assert list(figure.data[0].marker.color) == ["#C97918", "#0B6B66"]
     assert list(figure.data[0].marker.symbol) == ["diamond", "circle"]
     assert list(figure.data[0].customdata[0]) == [
@@ -138,6 +139,8 @@ def test_timeline_uses_saved_edge_timestamps_and_amounts() -> None:
         "Focal transfer",
     ]
     assert figure.layout.xaxis.title.text == "Timestamp (UTC)"
+    assert list(figure.layout.yaxis.range) == [87.5, 104.5]
+    assert figure.data[0].mode == "lines+markers+text"
     assert figure.layout.dragmode == "pan"
 
 

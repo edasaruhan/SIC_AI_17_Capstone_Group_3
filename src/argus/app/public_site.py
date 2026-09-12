@@ -165,78 +165,31 @@ def _render_hero(navigate: Navigate) -> None:
             """
             <div class="argus-hero-visual">
               <div class="argus-visual-header">
-                <span>Network investigation</span>
-                <span class="argus-visual-status">Review ready</span>
+                <span>What ARGUS adds</span>
+                <span class="argus-visual-status">Human review</span>
               </div>
-              <div class="argus-visual-toolbar" aria-hidden="true">
-                <span class="active">Account network</span><span>Transfer history</span>
-                <span class="argus-visual-case">ILLUSTRATIVE CASE · A-2048</span>
-              </div>
-              <div class="argus-visual-path">
-                <svg viewBox="0 0 560 330" role="img"
-                     aria-label="Illustrative directed account network with a selected transfer">
-                  <defs>
-                    <pattern id="argus-grid" width="28" height="28" patternUnits="userSpaceOnUse">
-                      <path d="M28 0H0V28" fill="none" stroke="#17384b" stroke-width="1"/>
-                    </pattern>
-                    <marker id="argus-arrow" viewBox="0 0 10 10" refX="8" refY="5"
-                            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-                      <path d="M 0 0 L 10 5 L 0 10 z" fill="#b7791f"></path>
-                    </marker>
-                    <marker id="argus-context-arrow" viewBox="0 0 10 10" refX="8" refY="5"
-                            markerWidth="5" markerHeight="5" orient="auto-start-reverse">
-                      <path d="M 0 0 L 10 5 L 0 10 z" fill="#72909b"></path>
-                    </marker>
-                  </defs>
-                  <rect x="0" y="0" width="560" height="330" rx="12" fill="url(#argus-grid)"/>
-                  <g stroke="#668390" stroke-width="2" fill="none" opacity=".86"
-                     marker-end="url(#argus-context-arrow)">
-                    <path d="M92 74 C158 74 184 118 240 145"></path>
-                    <path d="M302 146 C362 120 386 72 454 72"></path>
-                    <path d="M302 170 C364 192 397 250 466 250"></path>
-                    <path d="M95 258 C160 250 194 202 243 177"></path>
-                    <path d="M464 88 C491 132 492 190 472 229"></path>
-                  </g>
-                  <path d="M99 164 C148 164 188 164 238 164" stroke="#b7791f" stroke-width="5"
-                        fill="none"
-                        marker-end="url(#argus-arrow)"></path>
-                  <rect x="116" y="136" width="104" height="22" rx="11" fill="#4b3415"/>
-                  <text x="168" y="151" fill="#f4c57b" text-anchor="middle"
-                        font-family="Segoe UI, sans-serif" font-size="11">SELECTED TRANSFER</text>
-                  <g fill="#147d76" stroke="#d9f0ed" stroke-width="4">
-                    <circle cx="76" cy="69" r="21"></circle>
-                    <circle cx="72" cy="164" r="29" fill="#0f6b66"></circle>
-                    <circle cx="78" cy="264" r="21"></circle>
-                    <circle cx="272" cy="164" r="34" fill="#123149" stroke="#79c9c1"></circle>
-                    <circle cx="476" cy="69" r="23"></circle>
-                    <circle cx="484" cy="254" r="23"></circle>
-                  </g>
-                  <g font-family="Segoe UI, sans-serif" text-anchor="middle">
-                    <g fill="#ffffff" font-size="13" font-weight="600">
-                      <text x="76" y="73">A-1047</text><text x="72" y="168">A-2048</text>
-                      <text x="78" y="268">A-4472</text><text x="272" y="168">A-3382</text>
-                      <text x="476" y="73">A-5821</text><text x="484" y="258">A-7714</text>
-                    </g>
-                    <g fill="#b4c8ce" font-size="12">
-                      <text x="76" y="108">prior sender</text><text x="72" y="210">sender</text>
-                      <text x="78" y="302">prior receiver</text>
-                      <text x="272" y="218">receiver</text>
-                      <text x="476" y="111">connected</text><text x="484" y="296">connected</text>
-                    </g>
-                  </g>
-                </svg>
-              </div>
-              <div class="argus-evidence-lanes">
-                <div class="argus-evidence-lane">
-                  <span class="argus-lane-icon" aria-hidden="true">01</span>
-                  <strong>Observed evidence</strong>
-                  <span>Direction, timing, transfer history</span>
+              <div class="argus-hero-story">
+                <div class="argus-story-step">
+                  <span>01</span>
+                  <div><strong>A transfer needs attention</strong>
+                  <p>The recorded transaction is the starting point, not the conclusion.</p></div>
                 </div>
-                <div class="argus-evidence-lane">
-                  <span class="argus-lane-icon" aria-hidden="true">02</span>
-                  <strong>Model evidence</strong>
-                  <span>Priority and contributions, kept separate</span>
+                <div class="argus-story-connector" aria-hidden="true"></div>
+                <div class="argus-story-step">
+                  <span>02</span>
+                  <div><strong>Context reveals the pattern</strong>
+                  <p>Recent activity and linked accounts are brought into the same case.</p></div>
                 </div>
+                <div class="argus-story-connector" aria-hidden="true"></div>
+                <div class="argus-story-step active">
+                  <span>03</span>
+                  <div><strong>The analyst decides what happens next</strong>
+                  <p>Observed facts and model guidance stay visibly separate.</p></div>
+                </div>
+              </div>
+              <div class="argus-story-result">
+                <span>Outcome</span>
+                <strong>A focused case brief with a clear next action</strong>
               </div>
             </div>
             """,
@@ -481,23 +434,18 @@ def _render_how_it_works() -> None:
     anchor("how-it-works")
     section_heading(
         "How it works",
-        "A disciplined path from transaction data to analyst review.",
-        "The operational journey stays simple even when the underlying evidence includes time "
-        "and network context.",
+        "A clear path from alert to human decision.",
+        "ARGUS organizes complex evidence into three steps an investigator can follow.",
     )
     st.markdown(
         """
         <ol class="argus-process" aria-label="ARGUS investigation process">
-          <li><span class="argus-process-node">01</span><div><strong>Transaction data</strong>
-          <p>Read the recorded transfer and its attributes.</p></div></li>
-          <li><span class="argus-process-node">02</span><div><strong>Historical context</strong>
-          <p>Use activity available before the transfer.</p></div></li>
-          <li><span class="argus-process-node">03</span><div><strong>Account network</strong>
-          <p>Trace directed sender and receiver relationships.</p></div></li>
-          <li><span class="argus-process-node">04</span><div><strong>Risk prioritization</strong>
-          <p>Focus limited analyst attention.</p></div></li>
-          <li><span class="argus-process-node">05</span><div><strong>Investigation</strong>
-          <p>Review evidence and make a human decision.</p></div></li>
+          <li><span class="argus-process-node">01</span><div><strong>Prioritize</strong>
+          <p>Bring the cases that need attention to the top of the worklist.</p></div></li>
+          <li><span class="argus-process-node">02</span><div><strong>Understand</strong>
+          <p>Review the transfer, recent activity and connected accounts together.</p></div></li>
+          <li><span class="argus-process-node">03</span><div><strong>Decide</strong>
+          <p>Record a documented human decision with the evidence kept in context.</p></div></li>
         </ol>
         """,
         unsafe_allow_html=True,
@@ -694,7 +642,17 @@ def _render_scientific_credibility(artifacts: Any | None, navigate: Navigate) ->
             unsafe_allow_html=True,
         )
     else:
-        st.info("Project evidence becomes available when the verified evaluation bundle is loaded.")
+        st.markdown(
+            """
+            <div class="argus-resource-note">
+              <span>TRANSPARENT BY DESIGN</span>
+              <strong>Model evidence is kept separate from daily case review.</strong>
+              <p>The demo workspace explains what each saved metric means and clearly labels
+              the limits of synthetic evidence.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
     link, note = st.columns([1.2, 4.8], vertical_alignment="center")
     link.button(
         "View Model Evidence",
@@ -703,7 +661,7 @@ def _render_scientific_credibility(artifacts: Any | None, navigate: Navigate) ->
         args=("resources",),
         width="stretch",
     )
-    note.caption("Synthetic project evaluation · Not live-bank validation")
+    note.caption("Technical details remain available without interrupting the analyst workflow.")
 
 
 def _render_contact(navigate: Navigate) -> None:
@@ -760,9 +718,7 @@ def render_public_home(navigate: Navigate, artifacts: Any | None = None) -> None
     _public_navigation(navigate)
     _render_hero(navigate)
     _render_product_preview()
-    _render_problem_and_value()
     _render_how_it_works()
-    _render_outcomes()
     _render_analyst_experience()
     _render_responsible_ai()
     _render_scientific_credibility(artifacts, navigate)

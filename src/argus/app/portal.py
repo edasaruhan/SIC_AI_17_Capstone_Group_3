@@ -228,9 +228,13 @@ def _context_metric(
     help_text: str,
 ) -> None:
     with column:
-        st.metric(label, value, help=help_text)
         st.markdown(
-            f'<p class="argus-metric-context">{html.escape(context)}</p>',
+            '<div class="argus-context-metric" '
+            f'title="{html.escape(help_text)}">'
+            f"<span>{html.escape(label)}</span>"
+            f"<strong>{html.escape(value)}</strong>"
+            f"<p>{html.escape(context)}</p>"
+            "</div>",
             unsafe_allow_html=True,
         )
 
@@ -458,59 +462,27 @@ def render_overview(artifacts: DashboardArtifacts, *, open_case: Callable[[str],
                     ):
                         open_case(case_id)
     with right:
-        priority_bands = worklist["priority_label"].dropna().nunique()
         priority_counts = (
             worklist["priority_label"]
             .value_counts()
             .rename_axis("Priority")
             .reset_index(name="Cases")
         )
-        if priority_bands > 1:
-            st.subheader("Priority distribution")
-            st.caption("Shows how the current worklist is distributed across review urgency bands.")
-            chart_x = priority_counts["Cases"]
-            chart_y = priority_counts["Priority"]
-            x_title = "Cases"
-            y_title = None
-            orientation = "h"
-        else:
-            st.subheader("Case composition")
-            st.caption("Shows how much transaction context is available inside each case.")
-            transfer_counts = (
-                pd.to_numeric(worklist["transaction_count"], errors="coerce")
-                .fillna(0)
-                .astype(int)
-                .value_counts()
-                .sort_index()
-                .rename_axis("Transfers")
-                .reset_index(name="Cases")
-            )
-            chart_x = transfer_counts["Transfers"]
-            chart_y = transfer_counts["Cases"]
-            x_title = "Transfers in case context"
-            y_title = "Cases"
-            orientation = "v"
-        figure = go.Figure(
-            go.Bar(
-                x=chart_x,
-                y=chart_y,
-                orientation=orientation,
-                marker_color="#0F6B66",
-                text=priority_counts["Cases"] if priority_bands > 1 else chart_y,
-                textposition="auto",
-            )
+        st.subheader("Worklist mix")
+        st.caption("A quick count of cases by review urgency.")
+        priority_items = "".join(
+            '<div class="argus-priority-row">'
+            f'<span class="{canonical_token(row.Priority)}"></span>'
+            f"<strong>{html.escape(str(row.Priority))}</strong>"
+            f"<b>{_format_count(row.Cases)} {'case' if int(row.Cases) == 1 else 'cases'}</b>"
+            "</div>"
+            for row in priority_counts.itertuples(index=False)
         )
-        figure.update_layout(
-            height=250,
-            margin={"l": 8, "r": 8, "t": 12, "b": 22},
-            xaxis_title=x_title,
-            yaxis_title=y_title,
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            showlegend=False,
+        st.markdown(
+            f'<div class="argus-priority-list">{priority_items}</div>',
+            unsafe_allow_html=True,
         )
-        st.plotly_chart(figure, width="stretch", config={"displayModeBar": False})
-        st.caption("Counts describe saved case context; they are not model-performance metrics.")
+        st.caption("High and elevated cases should be reviewed before medium-priority work.")
 
     st.subheader("Recent activity")
     if not activity:
@@ -598,20 +570,32 @@ def render_investigations(
     status_values = sorted(worklist["status_label"].unique())
     pattern_values = sorted(worklist["pattern_label"].unique())
     priorities = filter_columns[0].multiselect(
-        "Priority", priority_values, default=priority_values, key="queue_priorities"
+        "Priority",
+        priority_values,
+        default=[],
+        placeholder="All priorities",
+        key="queue_priorities",
     )
     statuses = filter_columns[1].multiselect(
-        "Status", status_values, default=status_values, key="queue_statuses"
+        "Status",
+        status_values,
+        default=[],
+        placeholder="All statuses",
+        key="queue_statuses",
     )
     patterns = filter_columns[2].multiselect(
-        "Review signal", pattern_values, default=pattern_values, key="queue_patterns"
+        "Review signal",
+        pattern_values,
+        default=[],
+        placeholder="All review signals",
+        key="queue_patterns",
     )
     filtered = filter_queue_view(
         worklist,
         query=query,
-        priorities=priorities,
-        statuses=statuses,
-        patterns=patterns,
+        priorities=priorities or None,
+        statuses=statuses or None,
+        patterns=patterns or None,
     )
     filtered = sort_queue_view(filtered, sort_label)
     if filtered.empty:
@@ -812,12 +796,12 @@ def _render_contributions(
             x=chart[value_column],
             y=chart["Readable factor"],
             orientation="h",
-            marker_color=["#B42318" if value >= 0 else "#31688E" for value in chart[value_column]],
+            marker_color=["#147D76" if value >= 0 else "#647C8A" for value in chart[value_column]],
         )
     )
     figure.update_layout(
         title=title,
-        xaxis_title="Contribution to the saved model score",
+        xaxis_title="Effect on the saved priority signal",
         height=max(320, len(chart) * 34),
         margin={"l": 12, "r": 12, "t": 52, "b": 42},
         paper_bgcolor="rgba(0,0,0,0)",
@@ -836,7 +820,7 @@ def _render_model_evidence(
     case_id: str, case: Mapping[str, Any], artifacts: DashboardArtifacts
 ) -> None:
     st.markdown('<div class="section-kicker model">MODEL EVIDENCE</div>', unsafe_allow_html=True)
-    st.subheader("How models inform this review")
+    st.subheader("Why this case was prioritized")
     _render_case_provenance(artifacts, selection=True)
     saved = case.get("model_evidence", {})
     if not isinstance(saved, dict) or not saved:
@@ -845,22 +829,36 @@ def _render_model_evidence(
         model_name = saved.get("model_name", "GraphSAGE")
         with st.container(border=True):
             if artifacts.is_tracked_demo:
-                st.markdown("#### Illustrative demo score")
-                st.caption("Synthetic walkthrough value · Not a scientific model output")
+                st.markdown("#### Demo priority signal")
+                st.caption("A saved walkthrough value for demonstrating the review experience.")
             else:
                 st.markdown("#### Research comparator perspective")
                 st.caption("Selected by GraphSAGE research comparator.")
             metrics = st.columns(3)
-            metrics[0].metric("Model", _display_model_name(model_name))
-            metrics[1].metric(
-                "Illustrative score" if artifacts.is_tracked_demo else "Research ranking score",
-                _format_metric(saved.get("score"), digits=6),
+            _case_summary_card(
+                metrics[0],
+                "Model used for this signal",
+                _display_model_name(model_name),
+                supporting="Technical model name",
             )
-            metrics[2].metric("Case-set rank", _format_count(saved.get("rank")))
+            _case_summary_card(
+                metrics[1],
+                "Demo priority signal" if artifacts.is_tracked_demo else "Research ranking score",
+                _format_metric(saved.get("score"), digits=2),
+                supporting="Not a probability of wrongdoing",
+            )
+            rank = _format_count(saved.get("rank"))
+            total_cases = _format_count(len(artifacts.queue))
+            _case_summary_card(
+                metrics[2],
+                "Position in this case set",
+                f"#{rank} of {total_cases}" if rank != "Not available" else rank,
+                supporting="Relative demo worklist position",
+            )
             if artifacts.is_tracked_demo:
                 st.write(
-                    "This stored value exists only to exercise the product workflow. It is not "
-                    "a probability of wrongdoing and must not be compared with project metrics."
+                    "Use this signal only to understand why the case appears near the top of the "
+                    "demo worklist. Base any decision on the observed records below."
                 )
             else:
                 st.write(
@@ -870,7 +868,7 @@ def _render_model_evidence(
             _render_contributions(
                 saved.get("feature_contributions", case.get("feature_contributions")),
                 title=(
-                    "Illustrative saved-score factors"
+                    "What raised or reduced the demo priority signal"
                     if artifacts.is_tracked_demo
                     else "Factors influencing the research-comparator score"
                 ),
@@ -897,9 +895,11 @@ def _render_model_evidence(
                 st.caption("Raw model scores are technical values, not calibrated probabilities.")
     elif not artifacts.is_tracked_demo:
         st.caption("No compatible primary-model explanation exists for this case.")
-    st.warning(
-        "Model evidence supports prioritization only. It does not establish wrongdoing or "
-        "authorize an automatic account action."
+    st.markdown(
+        '<div class="argus-safety-note"><strong>Human decision required</strong>'
+        "<span>Model evidence helps order the worklist. It cannot establish wrongdoing or "
+        "authorize an account action.</span></div>",
+        unsafe_allow_html=True,
     )
 
 
@@ -928,6 +928,23 @@ def _transactions_frame(case: Mapping[str, Any]) -> pd.DataFrame:
     return displayed.rename(columns=aliases)
 
 
+def _compact_identifier(value: Any) -> str:
+    identifier = str(value or "Not available")
+    return identifier.rsplit("::", 1)[-1]
+
+
+def _account_role_label(value: Any) -> str:
+    labels = {
+        "focal_sender": "Primary sender",
+        "focal_receiver": "Selected receiver",
+        "focal_account": "Primary account",
+        "strictly_prior_context": "Linked account",
+        "context": "Linked account",
+    }
+    token = canonical_token(value)
+    return labels.get(token, humanize(value) or "Linked account")
+
+
 def _network_options(case: Mapping[str, Any]) -> dict[str, tuple[str, Mapping[str, Any]]]:
     options: dict[str, tuple[str, Mapping[str, Any]]] = {}
     network = case.get("network", {})
@@ -937,15 +954,19 @@ def _network_options(case: Mapping[str, Any]) -> dict[str, tuple[str, Mapping[st
             if not isinstance(node, dict):
                 continue
             node_id = str(node.get("node_id", node.get("id", "Unknown")))
-            options[f"Account · {node_id}"] = ("account", node)
+            role = _account_role_label(node.get("role"))
+            options[f"{role} · {_compact_identifier(node_id)}"] = ("account", node)
     transactions = case.get("transactions", [])
     if isinstance(transactions, list):
         for transaction in transactions:
             if not isinstance(transaction, dict):
                 continue
             transaction_id = str(transaction.get("transaction_id", "Unknown"))
-            prefix = "Focal transfer" if transaction.get("is_focal") else "Transfer"
-            options[f"{prefix} · {transaction_id}"] = ("transaction", transaction)
+            prefix = "Selected transfer" if transaction.get("is_focal") else "Earlier transfer"
+            options[f"{prefix} · {_compact_identifier(transaction_id)}"] = (
+                "transaction",
+                transaction,
+            )
     return options
 
 
@@ -963,19 +984,32 @@ def _render_network_inspector(case: Mapping[str, Any]) -> None:
     kind, record = options[selected]
     if kind == "account":
         account_id = record.get("node_id", record.get("id", "Not available"))
-        st.write(f"**Account:** `{account_id}`")
-        st.write(f"**Network role:** {humanize(record.get('role'))}")
-        st.write(f"**Incoming links in case:** {_format_count(record.get('case_in_degree'))}")
-        st.write(f"**Outgoing links in case:** {_format_count(record.get('case_out_degree'))}")
-        st.caption("Only attributes saved in the case context are shown.")
+        role = _account_role_label(record.get("role"))
+        incoming = _format_count(record.get("case_in_degree"))
+        outgoing = _format_count(record.get("case_out_degree"))
+        st.markdown(
+            '<div class="argus-inspector-card">'
+            f"<span>{html.escape(role)}</span>"
+            f"<strong>{html.escape(_compact_identifier(account_id))}</strong>"
+            f"<p><b>{incoming}</b> incoming and <b>{outgoing}</b> outgoing links in this case.</p>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        st.caption("References are shortened on screen; the saved record remains unchanged.")
         return
-    st.write(f"**Sender:** `{record.get('from_node_id', 'Not available')}`")
-    st.write(f"**Receiver:** `{record.get('to_node_id', 'Not available')}`")
-    st.write(
-        f"**Amount:** {_format_money(record.get('amount'))} {record.get('currency', '')}".rstrip()
+    sender = _compact_identifier(record.get("from_node_id"))
+    receiver = _compact_identifier(record.get("to_node_id"))
+    amount = f"{_format_money(record.get('amount'))} {record.get('currency', '')}".rstrip()
+    st.markdown(
+        '<div class="argus-inspector-card transfer">'
+        "<span>Transfer summary</span>"
+        f"<strong>{html.escape(amount)}</strong>"
+        f"<p>{html.escape(sender)} → {html.escape(receiver)}</p>"
+        "</div>",
+        unsafe_allow_html=True,
     )
-    st.write(f"**Timestamp:** {record.get('timestamp', 'Not available')}")
-    st.write(f"**Payment format:** {record.get('payment_format') or 'Not available'}")
+    st.write(f"**When:** {record.get('timestamp', 'Not available')}")
+    st.write(f"**Channel:** {record.get('payment_format') or 'Not available'}")
 
 
 def _flash_message() -> None:
@@ -1465,38 +1499,34 @@ def _render_performance_snapshot(row: pd.Series, *, partition_label: str) -> Non
         unsafe_allow_html=True,
     )
     metrics = st.columns(4)
-    _context_metric(
+    _case_summary_card(
         metrics[0],
-        "Ranking quality",
-        _format_score(row.get("pr_auc"), "PR-AUC"),
-        context="Higher is better for rare-positive ranking",
-        help_text=(
-            "PR-AUC measures how well positive examples stay near the top of a ranking when "
-            "positive cases are rare. Compare it with other models on the same data partition."
-        ),
+        "Primary model",
+        _display_model_name(row.get("model")),
+        supporting="Selected using validation evidence",
     )
     _context_metric(
         metrics[1],
-        "Overall separation",
-        _format_score(row.get("roc_auc"), "ROC-AUC"),
-        context="Higher means stronger overall separation",
+        "Ranking quality",
+        _format_score(row.get("pr_auc"), "PR-AUC"),
+        context="Higher is better; compare models on the same data",
         help_text=(
-            "ROC-AUC summarizes ordering across all thresholds. PR-AUC remains the primary metric "
-            "for this rare-positive problem."
+            "PR-AUC measures how well positive examples stay near the top of a ranking when "
+            "positive cases are rare."
         ),
     )
     _context_metric(
         metrics[2],
-        "Positives found at capacity",
+        "Positive cases found",
         _format_percent(row.get("recall_at_k")),
-        context="Share of positives captured in the review budget",
+        context="Captured within the saved analyst review capacity",
         help_text="Recall@K: the share of all positive examples found within the top K reviews.",
     )
     _context_metric(
         metrics[3],
-        "Useful alerts at capacity",
+        "Useful reviewed alerts",
         _format_percent(row.get("precision_at_k")),
-        context="Share of reviewed alerts carrying a positive label",
+        context="Reviewed alerts that carried a positive label",
         help_text="Precision@K: the share of the top K reviewed alerts that were positive.",
     )
 
@@ -1531,9 +1561,11 @@ def render_model_evidence(artifacts: DashboardArtifacts) -> None:
     )
     final = artifacts.final_evaluation
     if final is None:
-        st.info(
-            "This artifact set contains validation evidence only. Final-test results are not "
-            "available in this workspace."
+        st.markdown(
+            '<div class="argus-evidence-scope"><span>VALIDATION SNAPSHOT</span>'
+            "<p>This page explains the saved model comparison. It is separate from daily case "
+            "triage and does not represent live-bank performance.</p></div>",
+            unsafe_allow_html=True,
         )
         validation_focus = _comparison_focus(artifacts)
         st.markdown("### Primary validation model")

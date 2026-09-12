@@ -335,6 +335,19 @@ def build_network_figure(case: dict[str, Any]) -> go.Figure | None:
         node_id: _node_role(node_id, node_metadata.get(node_id, {}), focal_source, focal_target)
         for node_id in ordered
     }
+    readable_labels: dict[str, str] = {}
+    linked_index = 0
+    for node_id in ordered:
+        role = node_roles[node_id]
+        if role == "focal_sender":
+            readable_labels[node_id] = "Primary sender"
+        elif role == "focal_receiver":
+            readable_labels[node_id] = "Selected receiver"
+        elif role == "focal_account":
+            readable_labels[node_id] = "Primary account"
+        else:
+            linked_index += 1
+            readable_labels[node_id] = f"Linked account {linked_index}"
     for role in _NODE_STYLES:
         if role not in node_roles.values():
             continue
@@ -380,7 +393,7 @@ def build_network_figure(case: dict[str, Any]) -> go.Figure | None:
             x=[positions[node_id][0] for node_id in ordered],
             y=[positions[node_id][1] for node_id in ordered],
             mode="markers+text",
-            text=[node_id if len(node_id) <= 18 else f"{node_id[:15]}…" for node_id in ordered],
+            text=[readable_labels[node_id] for node_id in ordered],
             textposition="bottom center",
             textfont={"color": _COLORS["navy"], "size": 11},
             customdata=node_customdata,
@@ -402,9 +415,9 @@ def build_network_figure(case: dict[str, Any]) -> go.Figure | None:
     )
     figure.update_layout(
         annotations=annotations,
-        title={"text": "Account and transfer network", "x": 0.01, "xanchor": "left"},
-        height=590,
-        margin={"l": 20, "r": 20, "t": 70, "b": 85},
+        title={"text": "Who sent money to whom", "x": 0.01, "xanchor": "left"},
+        height=500,
+        margin={"l": 20, "r": 20, "t": 64, "b": 82},
         paper_bgcolor=_COLORS["paper"],
         plot_bgcolor=_COLORS["paper"],
         font={"color": _COLORS["navy"]},
@@ -419,7 +432,7 @@ def build_network_figure(case: dict[str, Any]) -> go.Figure | None:
             "xanchor": "left",
             "yanchor": "top",
             "font": {"size": 11},
-            "title": {"text": "Network key"},
+            "title": {"text": "Legend"},
         },
         modebar={
             "add": ["zoomIn2d", "zoomOut2d", "autoScale2d", "resetScale2d"],
@@ -504,11 +517,26 @@ def build_timeline_figure(case: dict[str, Any]) -> go.Figure | None:
             transaction_ids, sources, targets, currencies, roles, strict=False
         )
     ]
+    amount_labels = [
+        f"{value:,.0f} {currency}"
+        for value, currency in zip(frame["_amount"], currencies, strict=False)
+    ]
+    y_axis: dict[str, Any] = {
+        "gridcolor": _COLORS["grid"],
+        "fixedrange": False,
+        "rangemode": "normal",
+    }
+    if amount_column is not None and not frame["_amount"].empty:
+        minimum = float(frame["_amount"].min())
+        maximum = float(frame["_amount"].max())
+        spread = maximum - minimum
+        padding = max(spread * 0.22, max(abs(maximum), 1.0) * 0.025)
+        y_axis["range"] = [minimum - padding, maximum + (padding * 1.8)]
     figure = go.Figure(
         go.Scatter(
             x=frame["_timestamp"],
             y=frame["_amount"],
-            mode="lines+markers",
+            mode="lines+markers+text",
             marker={
                 "size": 11,
                 "color": colors,
@@ -516,7 +544,10 @@ def build_timeline_figure(case: dict[str, Any]) -> go.Figure | None:
                 "line": {"width": 1.5, "color": _COLORS["white"]},
             },
             line={"color": _COLORS["muted"], "width": 1.6},
-            text=transaction_ids,
+            text=amount_labels,
+            textposition="top center",
+            textfont={"size": 11, "color": _COLORS["navy"]},
+            cliponaxis=False,
             customdata=customdata,
             hovertemplate=(
                 "<b>%{customdata[4]}</b><br>%{x}"
@@ -528,7 +559,7 @@ def build_timeline_figure(case: dict[str, Any]) -> go.Figure | None:
     )
     figure.update_layout(
         title={"text": "Case transaction timeline", "x": 0.01, "xanchor": "left"},
-        height=350,
+        height=320,
         margin={"l": 20, "r": 20, "t": 60, "b": 35},
         paper_bgcolor=_COLORS["paper"],
         plot_bgcolor=_COLORS["paper"],
@@ -538,7 +569,7 @@ def build_timeline_figure(case: dict[str, Any]) -> go.Figure | None:
         xaxis_title="Timestamp (UTC)",
         yaxis_title=y_title,
         xaxis={"gridcolor": _COLORS["grid"], "fixedrange": False},
-        yaxis={"gridcolor": _COLORS["grid"], "fixedrange": False, "rangemode": "tozero"},
+        yaxis=y_axis,
     )
     return figure
 

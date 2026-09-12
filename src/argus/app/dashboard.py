@@ -48,9 +48,8 @@ _metric_value = portal_views._metric_value
 _PUBLIC_ROUTES = {"home", "demo", "login", "resources", "privacy", "terms"}
 _VALID_ROUTES = _PUBLIC_ROUTES | {"portal"}
 _TRACKED_DEMO_NOTICE = (
-    "Illustrative synthetic demo · These walkthrough cases are not IBM HI-Small records and "
-    "are not frozen scientific model outputs. No result from this demo should be reported as "
-    "project evaluation evidence."
+    "Illustrative synthetic demo · Three walkthrough cases · Not real bank records or project "
+    "evaluation evidence"
 )
 _PORTAL_WIDGET_KEYS = {
     "case_investigator_select",
@@ -252,8 +251,8 @@ def _render_portal_sidebar(page: str) -> str:
     st.sidebar.markdown(
         """
         <div class="portal-status-grid">
-          <span>Model</span><strong>Graph-enhanced LightGBM</strong>
-          <span>Environment</span><strong>Demo</strong>
+          <span>Data</span><strong>Synthetic demo cases</strong>
+          <span>Session</span><strong>Resets on sign-out</strong>
         </div>
         """,
         unsafe_allow_html=True,
@@ -319,15 +318,19 @@ def _render_portal() -> None:
     _scroll_to_top_if_requested()
     login_notice = st.session_state.pop("argus_login_notice", None)
     if login_notice:
-        st.success(str(login_notice))
+        st.toast(str(login_notice), icon="✅")
     with st.spinner("Loading the investigation workspace…"):
         try:
             artifacts = _cached_load(str(configured_artifact_root()))
         except ArtifactLoadError:
             _render_artifact_error()
             return
-    if artifacts.is_tracked_demo:
-        st.warning(_TRACKED_DEMO_NOTICE, icon="⚠️")
+    if artifacts.is_tracked_demo and page == "Overview":
+        st.markdown(
+            '<div class="argus-demo-notice"><span>DEMO DATA</span>'
+            f"<p>{html.escape(_TRACKED_DEMO_NOTICE)}</p></div>",
+            unsafe_allow_html=True,
+        )
     render_page(
         page,
         artifacts,

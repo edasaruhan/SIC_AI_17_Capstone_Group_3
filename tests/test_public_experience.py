@@ -55,6 +55,11 @@ def test_public_navigation_anchors_have_matching_sections() -> None:
         assert f'href="#{anchor}"' in markup
         assert f'id="{anchor}"' in markup
 
+    assert "What ARGUS adds" in markup
+    assert "The analyst decides what happens next" in markup
+    assert "ILLUSTRATIVE CASE · A-2048" not in markup
+    assert "Alert volume grows faster" not in markup
+
 
 def test_public_resource_and_legal_routes_render() -> None:
     routes = {

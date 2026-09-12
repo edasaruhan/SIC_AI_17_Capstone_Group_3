@@ -117,12 +117,8 @@ def test_streamlit_all_required_screens_render_from_saved_artifacts(
     assert 'class="argus-skip-link" href="#argus-main-content"' in portal_markup
     assert 'id="argus-main-content"' in portal_markup
     assert all(metric.label != "GraphSAGE queue alerts" for metric in app.metric)
-    assert [metric.label for metric in app.metric[:4]] == [
-        "Open cases",
-        "In review",
-        "Prior context",
-        "Analyst actions",
-    ]
+    for label in ("Open cases", "In review", "Prior context", "Analyst actions"):
+        assert label in portal_markup
 
     for page in ("Investigations", "Case Investigator", "Model Evidence"):
         app.sidebar.radio[0].set_value(page)
@@ -189,7 +185,8 @@ def test_clean_clone_uses_tracked_synthetic_demo(monkeypatch) -> None:
 
     assert not app.exception
     assert app.title[0].value == "Overview"
-    assert any("Illustrative synthetic demo" in warning.value for warning in app.warning)
+    overview = " ".join(str(item.value) for item in app.markdown)
+    assert "Illustrative synthetic demo" in overview
 
     app.sidebar.radio[0].set_value("Investigations")
     app.run(timeout=20)
@@ -201,8 +198,9 @@ def test_clean_clone_uses_tracked_synthetic_demo(monkeypatch) -> None:
     app.run(timeout=20)
     assert not app.exception
     assert app.title[0].value == "Case Investigator"
-    assert any("Illustrative demo score" in item.value for item in app.markdown)
-    assert any("Not a scientific model output" in item.value for item in app.caption)
+    case_copy = " ".join(str(item.value) for item in app.markdown)
+    assert "Demo priority signal" in case_copy
+    assert "Not a probability of wrongdoing" in case_copy
 
 
 def test_portal_guides_review_workflow_and_explains_metrics(monkeypatch) -> None:
@@ -227,6 +225,7 @@ def test_portal_guides_review_workflow_and_explains_metrics(monkeypatch) -> None
     assert 'aria-label="Investigation workflow"' in investigations
     assert "Choose the case that needs attention." in investigations
     assert "SELECTED CASE" in investigations
+    assert [control.value for control in app.multiselect] == [[], [], []]
 
     app.sidebar.radio[0].set_value("Case Investigator")
     app.run(timeout=20)
@@ -243,16 +242,16 @@ def test_portal_guides_review_workflow_and_explains_metrics(monkeypatch) -> None
     app.sidebar.radio[0].set_value("Model Evidence")
     app.run(timeout=20)
     model_copy = " ".join(str(item.value) for item in app.markdown)
-    metric_labels = [metric.label for metric in app.metric]
     assert "Performance in plain language" in model_copy
-    assert "Higher is better for rare-positive ranking" in model_copy
+    assert "Higher is better; compare models on the same data" in model_copy
     assert "Alert usefulness" in model_copy
-    assert metric_labels == [
+    for label in (
+        "Primary model",
         "Ranking quality",
-        "Overall separation",
-        "Positives found at capacity",
-        "Useful alerts at capacity",
-    ]
+        "Positive cases found",
+        "Useful reviewed alerts",
+    ):
+        assert label in model_copy
 
 
 def test_executive_metrics_do_not_mix_queue_and_validation_leader_models() -> None:
