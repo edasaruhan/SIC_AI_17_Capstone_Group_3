@@ -772,9 +772,7 @@ def _write_validation_predictions(
         )
     rows = len(source_values)
     if rows == 0 or len(label_values) != rows:
-        raise RefinementPipelineError(
-            "Validation identity and label lengths differ or are empty"
-        )
+        raise RefinementPipelineError("Validation identity and label lengths differ or are empty")
     if not np.issubdtype(source_values.dtype, np.integer) or (source_values < 0).any():
         raise RefinementPipelineError(
             "Validation source_row_number values must be non-negative integers"
@@ -795,20 +793,17 @@ def _write_validation_predictions(
         if raw_values.ndim != 1 or len(raw_values) != rows:
             raise RefinementPipelineError(f"Validation raw-score length differs for model {key}")
         if probability_values.ndim != 1 or len(probability_values) != rows:
-            raise RefinementPipelineError(
-                f"Validation probability length differs for model {key}"
-            )
+            raise RefinementPipelineError(f"Validation probability length differs for model {key}")
         if not np.issubdtype(raw_values.dtype, np.number) or not np.isfinite(raw_values).all():
             raise RefinementPipelineError(f"Validation raw scores must be finite for model {key}")
-        if not np.issubdtype(probability_values.dtype, np.number) or not np.isfinite(
-            probability_values
-        ).all():
+        if (
+            not np.issubdtype(probability_values.dtype, np.number)
+            or not np.isfinite(probability_values).all()
+        ):
             raise RefinementPipelineError(
                 f"Validation probabilities must be finite and bounded for model {key}"
             )
-        if (
-            (probability_values < 0) | (probability_values > 1)
-        ).any():
+        if ((probability_values < 0) | (probability_values > 1)).any():
             raise RefinementPipelineError(
                 f"Validation probabilities must be finite and bounded for model {key}"
             )

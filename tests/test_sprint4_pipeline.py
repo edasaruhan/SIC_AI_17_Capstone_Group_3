@@ -131,12 +131,8 @@ def test_pipeline_failure_after_preflight_preserves_published_run(
     }
     monkeypatch.setattr(sprint4_module, "load_config", lambda _path: config)
     monkeypatch.setattr(sprint4_module, "get_path", lambda _config, key: paths[key])
-    monkeypatch.setattr(
-        sprint4_module, "_verify_frozen_inputs", lambda **_kwargs: ({}, {}, {})
-    )
-    monkeypatch.setattr(
-        sprint4_module, "_verify_sprint3_reference", lambda *_args: ({}, {})
-    )
+    monkeypatch.setattr(sprint4_module, "_verify_frozen_inputs", lambda **_kwargs: ({}, {}, {}))
+    monkeypatch.setattr(sprint4_module, "_verify_sprint3_reference", lambda *_args: ({}, {}))
     monkeypatch.setattr(sprint4_module, "_source_snapshot", lambda _root: {})
 
     def fail_duckdb_configuration(*_args: object) -> None:

@@ -519,9 +519,7 @@ def _write_validation_predictions(
         raise Sprint4PipelineError("GraphSAGE validation labels must be binary")
     if not np.issubdtype(raw_scores.dtype, np.number) or not np.isfinite(raw_scores).all():
         raise Sprint4PipelineError("GraphSAGE validation raw scores must be finite")
-    if not np.issubdtype(probabilities.dtype, np.number) or not np.isfinite(
-        probabilities
-    ).all():
+    if not np.issubdtype(probabilities.dtype, np.number) or not np.isfinite(probabilities).all():
         raise Sprint4PipelineError("GraphSAGE validation probabilities must be finite")
     if ((probabilities < 0) | (probabilities > 1)).any():
         raise Sprint4PipelineError("GraphSAGE validation probabilities must be bounded")

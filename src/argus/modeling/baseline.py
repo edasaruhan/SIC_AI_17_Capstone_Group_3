@@ -398,9 +398,7 @@ def _write_validation_predictions(
         raise BaselinePipelineError("Validation labels must be binary")
     for model_name, scores in score_values.items():
         if scores.ndim != 1 or len(scores) != rows:
-            raise BaselinePipelineError(
-                f"Validation score length differs for model {model_name}"
-            )
+            raise BaselinePipelineError(f"Validation score length differs for model {model_name}")
         if not np.issubdtype(scores.dtype, np.number) or not np.isfinite(scores).all():
             raise BaselinePipelineError(
                 f"Validation scores must be finite probabilities for model {model_name}"

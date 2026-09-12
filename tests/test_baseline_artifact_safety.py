@@ -98,9 +98,7 @@ def test_frozen_input_verification_returns_auditable_provenance(tmp_path) -> Non
     )
 
     assert provenance["dataset"] == "synthetic-test"
-    assert provenance["frozen_inputs"]["features.parquet"]["sha256"] == sha256_file(
-        feature_table
-    )
+    assert provenance["frozen_inputs"]["features.parquet"]["sha256"] == sha256_file(feature_table)
     assert prevalence["test"]["rows"] == 1
     assert upstream["status"] == "PASS"
 
