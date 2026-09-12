@@ -226,6 +226,21 @@ sonuç değildir. `ARGUS_ARTIFACT_DIR` verilirse açıkça seçilen gerçek pake
 Demo vaka içeriğinin provenance sözleşmesi otomatik testlerle, lint ve en az `%77` coverage
 eşiği ise GitHub Actions kalite iş akışıyla korunur.
 
+## Streamlit Community Cloud deployment
+
+Depo, kökteki `app.py`, `.streamlit/config.toml`, `requirements.txt` ve izlenen sentetik demo
+artifact'iyle doğrudan Streamlit Community Cloud'a yayınlanabilir:
+
+1. `share.streamlit.io` üzerinde GitHub hesabını bağlayıp **Create app** seçin.
+2. Repository olarak `edasaruhan/SIC_AI_17_Capstone_Group_3`, branch olarak `main`, entrypoint
+   olarak `app.py` girin.
+3. **Advanced settings** altında Python `3.12` seçin.
+4. Secrets alanını boş bırakın. İzlenen sentetik demo, harici servis veya API anahtarı olmadan
+   çalışır ve açıkça etiketlenen prototip giriş formunu kullanır.
+
+Canlı uygulama yalnızca repoda izlenen sentetik demo paketini kullanır; yerel `artifacts/` ve ham
+IBM AML verileri deploy edilmez.
+
 Tam çalıştırma sırası [`docs/EXPERIMENT_PROTOCOL.md`](docs/EXPERIMENT_PROTOCOL.md)
 dosyasındadır.
 
