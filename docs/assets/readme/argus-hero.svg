@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="520" viewBox="0 0 1400 520" role="img" aria-labelledby="title desc">
+  <title id="title">ARGUS financial crime investigation intelligence</title>
+  <desc id="desc">A deep navy ARGUS banner showing a directed account network and the message See beyond the transaction.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#071c2c"/>
+      <stop offset="1" stop-color="#0d3040"/>
+    </linearGradient>
+    <linearGradient id="tealLine" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#65d1c7" stop-opacity="0.18"/>
+      <stop offset="0.55" stop-color="#65d1c7"/>
+      <stop offset="1" stop-color="#d7a250"/>
+    </linearGradient>
+    <pattern id="grid" width="44" height="44" patternUnits="userSpaceOnUse">
+      <path d="M44 0H0V44" fill="none" stroke="#d8e1e5" stroke-opacity="0.045"/>
+    </pattern>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#000000" flood-opacity="0.24"/>
+    </filter>
+    <marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
+      <path d="M0 0L9 4.5L0 9Z" fill="#88aaa9"/>
+    </marker>
+    <marker id="arrowAccent" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
+      <path d="M0 0L9 4.5L0 9Z" fill="#d7a250"/>
+    </marker>
+  </defs>
+
+  <rect width="1400" height="520" rx="28" fill="url(#background)"/>
+  <rect width="1400" height="520" rx="28" fill="url(#grid)"/>
+  <circle cx="1245" cy="88" r="180" fill="#147d76" opacity="0.07"/>
+  <circle cx="1120" cy="455" r="220" fill="#65d1c7" opacity="0.035"/>
+
+  <g font-family="Inter, Segoe UI, Arial, sans-serif">
+    <text x="74" y="86" fill="#7bd3cb" font-size="15" font-weight="700" letter-spacing="4">FINANCIAL CRIME INVESTIGATION INTELLIGENCE</text>
+    <rect x="74" y="113" width="76" height="5" rx="2.5" fill="#d7a250"/>
+    <text x="74" y="205" fill="#f7f8f5" font-size="78" font-weight="800" letter-spacing="9">ARGUS</text>
+    <text x="74" y="258" fill="#f7f8f5" font-size="30" font-weight="650">See beyond the transaction.</text>
+    <text x="74" y="302" fill="#b7cbd0" font-size="18">Şüpheli işlemlerden bağlantılı hesap ağlarına.</text>
+    <text x="74" y="333" fill="#b7cbd0" font-size="18">Model önceliği, gözlenen kanıt ve insan kararı tek inceleme akışında.</text>
+
+    <g transform="translate(74 382)">
+      <rect width="166" height="42" rx="21" fill="#123f4b" stroke="#2c6e72"/>
+      <circle cx="23" cy="21" r="5" fill="#65d1c7"/>
+      <text x="39" y="27" fill="#dcebec" font-size="14" font-weight="650">Human-in-the-loop</text>
+    </g>
+    <g transform="translate(254 382)">
+      <rect width="178" height="42" rx="21" fill="#123f4b" stroke="#2c6e72"/>
+      <circle cx="23" cy="21" r="5" fill="#65d1c7"/>
+      <text x="39" y="27" fill="#dcebec" font-size="14" font-weight="650">Frozen final protocol</text>
+    </g>
+    <g transform="translate(446 382)">
+      <rect width="170" height="42" rx="21" fill="#123f4b" stroke="#2c6e72"/>
+      <circle cx="23" cy="21" r="5" fill="#d7a250"/>
+      <text x="39" y="27" fill="#dcebec" font-size="14" font-weight="650">Network intelligence</text>
+    </g>
+  </g>
+
+  <g transform="translate(725 65)" filter="url(#shadow)">
+    <rect width="600" height="390" rx="24" fill="#0a2232" stroke="#2b5160"/>
+    <g font-family="Inter, Segoe UI, Arial, sans-serif">
+      <text x="34" y="48" fill="#f7f8f5" font-size="14" font-weight="750" letter-spacing="2">DIRECTED ACCOUNT CONTEXT</text>
+      <circle cx="504" cy="43" r="5" fill="#65d1c7"/>
+      <text x="518" y="49" fill="#91b8ba" font-size="12" font-weight="650">ANALYST REVIEW</text>
+      <line x1="34" y1="69" x2="566" y2="69" stroke="#244554"/>
+    </g>
+
+    <g fill="none" stroke="#88aaa9" stroke-width="2.4" marker-end="url(#arrow)">
+      <path d="M128 128C205 135 234 178 294 202"/>
+      <path d="M124 252C200 246 239 220 292 208"/>
+      <path d="M333 195C400 164 438 137 492 128"/>
+      <path d="M335 214C407 237 445 259 499 271"/>
+    </g>
+    <path d="M126 190C196 190 240 197 290 202" fill="none" stroke="url(#tealLine)" stroke-width="5" marker-end="url(#arrowAccent)"/>
+
+    <g>
+      <circle cx="104" cy="126" r="28" fill="#147d76" stroke="#dcebec" stroke-width="3"/>
+      <circle cx="100" cy="190" r="34" fill="#147d76" stroke="#dcebec" stroke-width="3"/>
+      <circle cx="103" cy="255" r="27" fill="#147d76" stroke="#dcebec" stroke-width="3"/>
+      <circle cx="316" cy="205" r="42" fill="#123149" stroke="#d7a250" stroke-width="4"/>
+      <circle cx="518" cy="124" r="30" fill="#147d76" stroke="#dcebec" stroke-width="3"/>
+      <circle cx="525" cy="276" r="30" fill="#147d76" stroke="#dcebec" stroke-width="3"/>
+    </g>
+
+    <g fill="#cfe0e2" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="12" font-weight="650" text-anchor="middle">
+      <text x="104" y="91">ACCT-6630</text>
+      <text x="100" y="239">ACCT-1047</text>
+      <text x="103" y="299">ACCT-5821</text>
+      <text x="316" y="267" fill="#f0c879">FOCAL CASE</text>
+      <text x="518" y="83">ACCT-7714</text>
+      <text x="525" y="322">ACCT-3382</text>
+    </g>
+
+    <g font-family="Inter, Segoe UI, Arial, sans-serif">
+      <rect x="34" y="337" width="532" height="1" fill="#244554"/>
+      <text x="34" y="366" fill="#7bd3cb" font-size="12" font-weight="750" letter-spacing="2">TRANSACTION</text>
+      <text x="155" y="366" fill="#6f8f98" font-size="16">→</text>
+      <text x="184" y="366" fill="#7bd3cb" font-size="12" font-weight="750" letter-spacing="2">CONTEXT</text>
+      <text x="284" y="366" fill="#6f8f98" font-size="16">→</text>
+      <text x="313" y="366" fill="#7bd3cb" font-size="12" font-weight="750" letter-spacing="2">PRIORITY</text>
+      <text x="414" y="366" fill="#6f8f98" font-size="16">→</text>
+      <text x="443" y="366" fill="#f0c879" font-size="12" font-weight="750" letter-spacing="2">HUMAN DECISION</text>
+    </g>
+  </g>
+</svg>

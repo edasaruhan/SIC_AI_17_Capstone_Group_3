@@ -1,28 +1,77 @@
 # ARGUS AI
 
-[![Quality](https://github.com/edasaruhan/SIC_AI_17_Capstone_Group_3/actions/workflows/quality.yml/badge.svg?branch=main)](https://github.com/edasaruhan/SIC_AI_17_Capstone_Group_3/actions/workflows/quality.yml)
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-Streamlit-FF4B4B?logo=streamlit&logoColor=white)](https://sicai17capstonegroup3-azala6r97tsxkq7fu2loga.streamlit.app/?view=home)
-[![Python](https://img.shields.io/badge/Python-3.11--3.13-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-0F766E.svg)](LICENSE)
+<p align="center">
+  <img src="docs/assets/readme/argus-hero.svg" width="100%" alt="ARGUS — See beyond the transaction. Yönlü hesap ağı üzerinden finansal suç inceleme zekâsı.">
+</p>
 
-**Graph-Based Financial Crime & Account Network Intelligence**
+<p align="center">
+  <a href="https://sicai17capstonegroup3-azala6r97tsxkq7fu2loga.streamlit.app/?view=home"><img src="https://img.shields.io/badge/Live_Demo-Open_ARGUS-147D76?style=for-the-badge&logo=streamlit&logoColor=white" alt="ARGUS canlı demo"></a>
+  <a href="https://github.com/edasaruhan/SIC_AI_17_Capstone_Group_3/actions/workflows/quality.yml"><img src="https://img.shields.io/github/actions/workflow/status/edasaruhan/SIC_AI_17_Capstone_Group_3/quality.yml?branch=main&style=for-the-badge&label=Quality" alt="Quality workflow"></a>
+  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.11--3.13-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.11–3.13"></a>
+  <a href="https://streamlit.io/"><img src="https://img.shields.io/badge/Streamlit-Analyst_Workspace-0F6B66?style=for-the-badge&logo=streamlit&logoColor=white" alt="Streamlit analyst workspace"></a>
+</p>
 
-> Şüpheli işlemlerden şüpheli ağlara.
+<p align="center">
+  <a href="docs/MODEL_CARD.md"><img src="https://img.shields.io/badge/Primary_Model-Graph--enhanced_LightGBM-B7791F?style=for-the-badge" alt="Primary model: Graph-enhanced LightGBM"></a>
+  <a href="https://github.com/edasaruhan/SIC_AI_17_Capstone_Group_3/tree/v1.0-scientific-final"><img src="https://img.shields.io/badge/Scientific_Final-v1.0-123149?style=for-the-badge" alt="Scientific final v1.0"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-0F766E?style=for-the-badge" alt="MIT License"></a>
+</p>
 
-ARGUS, şüpheli finansal işlemleri işlem geçmişi ve yönlü hesap ağı sinyalleriyle
-sıralayan bir karar destek prototipidir. Her vaka; gözlenen işlemler, ağ yapısı ve
-model katkılarıyla birlikte banka finansal suç analistine sunulur.
+<p align="center">
+  <strong>Graph-Based Financial Crime &amp; Account Network Intelligence</strong><br>
+  <sub>Samsung Innovation Campus · Pazarlamada Yapay Zekâ · Capstone Projesi · Grup 3</sub>
+</p>
 
-**Samsung Innovation Campus · Pazarlamada Yapay Zekâ · Capstone Projesi · Grup 3**
+<p align="center">
+  <a href="https://sicai17capstonegroup3-azala6r97tsxkq7fu2loga.streamlit.app/?view=home">🚀 Canlı Demo</a> ·
+  <a href="#ürün-yolculuğu">🧭 Ürün Yolculuğu</a> ·
+  <a href="#final-sonuçlar">📊 Final Sonuçlar</a> ·
+  <a href="docs/MODEL_CARD.md">🧠 Model Kartı</a> ·
+  <a href="docs/EXPERIMENT_PROTOCOL.md">🧪 Deney Protokolü</a> ·
+  <a href="#hızlı-başlangıç">⚙️ Kurulum</a>
+</p>
 
-[Canlı demoyu aç](https://sicai17capstonegroup3-azala6r97tsxkq7fu2loga.streamlit.app/?view=home) ·
-[Model kartı](docs/MODEL_CARD.md) ·
-[Deney protokolü](docs/EXPERIMENT_PROTOCOL.md) ·
-[Sorumlu kullanım](#sınırlılıklar-ve-sorumlu-kullanım)
+## Yönetici özeti
+
+ARGUS, yüksek hacimli AML alarm kuyruklarında hangi işlemlerin önce incelenmesi gerektiğini
+belirlemeye yardımcı olan bir finansal suç karar destek prototipidir. İşlem geçmişini, zamansal
+davranışı ve yönlü hesap ağı sinyallerini aynı vaka bağlamında birleştirir; gözlenen kayıtları
+model açıklamalarından ayrı sunar ve nihai kararı analiste bırakır.
+
+Birincil sıralama modeli **Graph-enhanced LightGBM**'dir. **GraphSAGE** yalnızca araştırma
+karşılaştırıcısıdır. Bilimsel sonuçlar kronolojik ve leakage-safe protokol altında dondurulmuş,
+final test yalnızca tek seferlik değerlendirmede açılmıştır.
+
+> [!IMPORTANT]
+> ARGUS bir müşteriyi suçlu ilan etmez, hesabı otomatik olarak bloke etmez ve yaptırım kararı
+> vermez. Model skoru yalnızca inceleme önceliğidir; her vaka kaynak kayıtlarla birlikte uzman
+> analist tarafından değerlendirilmelidir.
+
+## Bir bakışta
+
+| **5.078.345** | **518.581** | **0,690059** | **%98,0** |
+| :---: | :---: | :---: | :---: |
+| Sentetik HI-Small işlemi | Hesap kaydı | Final test PR-AUC | Final test Precision@100 |
+
+<p align="center"><sub>Dondurulmuş Graph-enhanced LightGBM değerlendirmesi · Final test model seçimi veya tuning için kullanılmadı.</sub></p>
+
+## Ürün yolculuğu
+
+| `01` Problemi görün | `02` Bağlamı keşfedin | `03` Vakayı inceleyin | `04` İnsan kararı verin |
+| --- | --- | --- | --- |
+| AML alarm yükünü ve önceliklendirme problemini anlayın. | Sentetik Case Challenge ve kapasite hesaplayıcısını deneyin. | Investigation Queue, işlem geçmişi, hesap ağı ve model kanıtını açın. | Not ekleyin; escalate, false-positive veya close kararını oturum içinde kaydedin. |
+
+> [!TIP]
+> En kısa ürün turu için önce [canlı Case Challenge'ı](https://sicai17capstonegroup3-azala6r97tsxkq7fu2loga.streamlit.app/?view=home#case-challenge)
+> deneyin, ardından `Open Demo` ile Analyst Workspace'e geçin.
 
 ## İçindekiler
 
+- [Yönetici özeti](#yönetici-özeti)
+- [Bir bakışta](#bir-bakışta)
+- [Ürün yolculuğu](#ürün-yolculuğu)
 - [Canlı demo](#canlı-demo)
+- [Neden ARGUS?](#neden-argus)
 - [Problem ve hedef](#problem-ve-hedef)
 - [ARGUS nasıl çalışır?](#argus-nasıl-çalışır)
 - [Veri ve yöntem](#veri)
@@ -58,13 +107,15 @@ model katkılarıyla birlikte banka finansal suç analistine sunulur.
 > kişisel veya kurumsal parolalar kullanmayın. Canlı arayüzdeki walkthrough vakaları
 > sentetiktir; aşağıdaki dondurulmuş bilimsel sonuçların yeniden üretimi değildir.
 
-## Öne çıkanlar
+## Neden ARGUS?
 
-- Zamana duyarlı ve leakage-safe özellik üretimi
-- Yönlü hesap ağı ve işlem geçmişi bağlamı
-- Birincil Graph-enhanced LightGBM modeli ve araştırma karşılaştırıcısı GraphSAGE
-- Model kanıtını gözlenen kayıtlardan ayıran insan denetimli inceleme akışı
-- Tekrarlanabilir deney sözleşmesi, dondurulmuş artifact doğrulaması ve otomatik kalite kapıları
+| Ağ bağlamı | Bilimsel disiplin | İnsan denetimi |
+| --- | --- | --- |
+| Tekil transferin ötesinde gönderici, alıcı, geçmiş ve yönlü bağlantıları aynı vakada gösterir. | Train-fit/validation-test-transform disiplini, kronolojik split, frozen artifact doğrulaması ve otomatik kalite kapıları kullanır. | Gözlenen kanıtı model desteğinden ayırır; karar ve gerekçe analiste aittir. |
+
+| Operasyonel görünüm | Açıklanabilirlik | Araştırma karşılaştırması |
+| --- | --- | --- |
+| Önceliklendirilmiş kuyruk, filtreleme, vaka özeti ve oturuma özel aksiyonlar sunar. | TreeSHAP, kayıt-temelli ağ kanıtları ve model provenance bilgisini görünür tutar. | Transaction LightGBM ve GraphSAGE sonuçlarını birincil graph-enhanced modelle aynı protokol bağlamında raporlar. |
 
 ## Problem ve hedef
 
