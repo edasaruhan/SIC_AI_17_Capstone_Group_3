@@ -1,34 +1,37 @@
 # ARGUS AI
 
 <p align="center">
-  <img src="docs/assets/readme/argus-hero.svg" width="100%" alt="ARGUS — See beyond the transaction. Yönlü hesap ağı üzerinden finansal suç inceleme zekâsı.">
+  <img src="docs/marketing/assets/argus-brand-hero-mountain.png" width="760" alt="ARGUS — İşlemin ötesini görün. Dağlar üzerine yerleştirilmiş bağlantılı ağları gösteren marka konsepti.">
 </p>
 
 <p align="center">
   <a href="https://sicai17capstonegroup3-azala6r97tsxkq7fu2loga.streamlit.app/?view=home"><img src="https://img.shields.io/badge/Live_Demo-Open_ARGUS-147D76?style=for-the-badge&logo=streamlit&logoColor=white" alt="ARGUS canlı demo"></a>
   <a href="https://github.com/edasaruhan/SIC_AI_17_Capstone_Group_3/actions/workflows/quality.yml"><img src="https://img.shields.io/github/actions/workflow/status/edasaruhan/SIC_AI_17_Capstone_Group_3/quality.yml?branch=main&style=for-the-badge&label=Quality" alt="Quality workflow"></a>
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.11--3.13-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.11–3.13"></a>
-  <a href="https://streamlit.io/"><img src="https://img.shields.io/badge/Streamlit-Analyst_Workspace-0F6B66?style=for-the-badge&logo=streamlit&logoColor=white" alt="Streamlit analyst workspace"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-0F766E?style=for-the-badge" alt="MIT License"></a>
 </p>
 
 <p align="center">
   <a href="docs/MODEL_CARD.md"><img src="https://img.shields.io/badge/Primary_Model-Graph--enhanced_LightGBM-B7791F?style=for-the-badge" alt="Primary model: Graph-enhanced LightGBM"></a>
   <a href="https://github.com/edasaruhan/SIC_AI_17_Capstone_Group_3/tree/v1.0-scientific-final"><img src="https://img.shields.io/badge/Scientific_Final-v1.0-123149?style=for-the-badge" alt="Scientific final v1.0"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-0F766E?style=for-the-badge" alt="MIT License"></a>
 </p>
 
 <p align="center">
   <strong>Graph-Based Financial Crime &amp; Account Network Intelligence</strong><br>
+  <em>Şüpheli işlemlerden şüpheli ağlara.</em><br>
   <sub>Samsung Innovation Campus · Pazarlamada Yapay Zekâ · Capstone Projesi · Grup 3</sub>
 </p>
 
 <p align="center">
-  <a href="https://sicai17capstonegroup3-azala6r97tsxkq7fu2loga.streamlit.app/?view=home">🚀 Canlı Demo</a> ·
-  <a href="#ürün-yolculuğu">🧭 Ürün Yolculuğu</a> ·
-  <a href="#final-sonuçlar">📊 Final Sonuçlar</a> ·
-  <a href="docs/MODEL_CARD.md">🧠 Model Kartı</a> ·
-  <a href="docs/EXPERIMENT_PROTOCOL.md">🧪 Deney Protokolü</a> ·
-  <a href="#hızlı-başlangıç">⚙️ Kurulum</a>
+  <a href="https://sicai17capstonegroup3-azala6r97tsxkq7fu2loga.streamlit.app/?view=home">Canlı Demo</a> ·
+  <a href="#problem-ve-hedef">Problem</a> ·
+  <a href="#argus-nasıl-çalışır">Nasıl Çalışır?</a> ·
+  <a href="#final-sonuçlar">Bilimsel Sonuçlar</a> ·
+  <a href="#analist-ürünü">Analist Ürünü</a> ·
+  <a href="#argus-pazarlama-stratejisi">Pazarlama Stratejisi</a> ·
+  <a href="#mimari">Mimari</a> ·
+  <a href="#dokümantasyon">Dokümantasyon</a> ·
+  <a href="#hızlı-başlangıç">Kurulum</a>
 </p>
 
 ## Yönetici özeti
@@ -78,9 +81,11 @@ final test yalnızca tek seferlik değerlendirmede açılmıştır.
 - [Final sonuçlar](#final-sonuçlar)
 - [Analist ürünü](#analist-ürünü)
 - [Public B2B deneyimi](#public-b2b-deneyimi)
+- [ARGUS Pazarlama Stratejisi](#argus-pazarlama-stratejisi)
 - [Mimari](#mimari)
 - [Kurulum ve kalite kontrolleri](#hızlı-başlangıç)
 - [Canlı yayın](#canlı-yayın-ve-yeniden-dağıtım)
+- [Dokümantasyon](#dokümantasyon)
 - [Sınırlılıklar ve sorumlu kullanım](#sınırlılıklar-ve-sorumlu-kullanım)
 
 ## Canlı demo
@@ -274,6 +279,96 @@ veri tabanı entegrasyonu yoktur, istek gönderilmez ve form verisi proje artifa
 Konumlandırma, hedef kitle, pazarlama hunisi, içerik planı ve claim/provenance sınırları için
 [`docs/marketing/README.md`](docs/marketing/README.md) dosyasına bakın.
 
+## ARGUS Pazarlama Stratejisi
+
+ARGUS'un pazarlama stratejisi; banka ve fintech dünyasındaki AML, Fraud, Compliance ve
+Financial Crime karar vericilerinde görünürlük oluşturmak, uzmanlık ve güven geliştirmek ve
+ilgiyi ürün deneyimi, demo ve kontrollü pilot değerlendirmesine taşımak üzere tasarlanmıştır.
+Tek bir kampanya yerine, birbirini tamamlayan temas noktalarından oluşan önerilen bir B2B
+müşteri yolculuğudur.
+
+> [!NOTE]
+> Bu bölüm uygulanmış kampanya sonuçlarını değil, ARGUS için tasarlanan pazarlama konseptini
+> gösterir. Görsellerdeki kanal sayıları, kişiler, etkinlikler, tarihler, arayüz değerleri ve QR
+> kodları; gerçek müşteri, kampanya performansı, üretim kurulumu veya bilimsel sonuç kanıtı değildir.
+
+### Strateji omurgası
+
+<p align="center">
+  <img src="docs/marketing/portfolio/portfolio-02-strategy-backbone.png" alt="ARGUS için tasarlanan altı aşamalı B2B pazarlama stratejisinin konsept portfolyo sayfası" width="950">
+</p>
+
+| Aşama | Önerilen rol |
+| --- | --- |
+| **01 · Farkındalık** | LinkedIn'de problem odaklı içeriklerle ilk temas kurmak |
+| **02 · İçerik ve Güven** | ARGUS Talks ile uzmanlık ve düşünce liderliği geliştirmek |
+| **03 · Webinar** | Belirli sektör problemlerini canlı ve daha derin bir etkileşimde ele almak |
+| **04 · B2B Etkinlik** | Dijital görünürlüğü yüz yüze ürün anlatımıyla birleştirmek |
+| **05 · Web Sitesi ve Ürün Deneyimi** | Case Challenge ve kapasite hesaplayıcısıyla yaklaşımı deneyimletmek |
+| **06 · Demo ve Pilot** | İlgiyi kontrollü değerlendirme ve pilot görüşmesine taşımak |
+
+### 01 — Farkındalık: LinkedIn
+
+<p align="center">
+  <img src="docs/marketing/portfolio/portfolio-03-linkedin-awareness.png" alt="ARGUS LinkedIn farkındalık stratejisi için hazırlanmış konsept portfolyo sayfası" width="950">
+</p>
+
+LinkedIn, önerilen stratejinin ilk düzenli B2B temas noktasıdır. İçerik sistemi; **problem**
+(alarm yükü ve önceliklendirme), **eğitim** (ağ bağlamı ve insan denetimli yapay zekâ) ve
+**dönüşüm** (ürün demosu ve kontrollü pilot ilgisi) katmanlarından oluşur. Görsellerdeki takipçi
+ve etkileşim sayıları yalnızca tasarım mockup'ıdır; gerçekleşmiş kanal performansı değildir.
+
+### 02 — İçerik ve Güven: ARGUS Talks
+
+<p align="center">
+  <img src="docs/marketing/portfolio/portfolio-04-argus-talks-webinar.png" alt="Planlanan ARGUS Talks ve webinar içerik serisinin konsept portfolyo sayfası" width="950">
+</p>
+
+**ARGUS Talks**, finansal suç, AML, Fraud, Compliance, ağ zekâsı ve sorumlu yapay zekâ
+çevresinde kurgulanan bir thought-leadership içerik serisidir. Uzun formatlı içeriklerin
+YouTube'da, seçili kısa kesitlerin LinkedIn'de değerlendirilmesi; webinarların ise daha yüksek
+etkileşimli bir katman oluşturması önerilir. Görseldeki kanal istatistikleri, konuklar ve webinar
+duyurusu konsepttir; gerçekleşmiş yayın veya etkinlik iddiası taşımaz.
+
+### 03 — B2B Etkinlikleri
+
+<p align="center">
+  <img src="docs/marketing/portfolio/portfolio-05-b2b-events.png" alt="ARGUS B2B etkinlik deneyimi için hazırlanmış konsept portfolyo sayfası" width="950">
+</p>
+
+Önerilen fiziksel deneyim; sade bir standı, ürün ekranlarını, kısa ürün anlatımını, broşür veya
+ürün föyünü ve web sitesi, demo ya da pilot sayfasına yönlendiren QR temaslarını bir araya getirir.
+Amaç, dijital farkındalığı bağımsız bir etkinlikte bırakmadan yeniden ölçülebilir dijital yolculuğa
+bağlamaktır. Bu çalışmalar gerçek bir fuar katılımı veya toplanmış müşteri adayı kanıtı değildir.
+
+### 04 — Web Sitesi, Demo ve Pilot
+
+<p align="center">
+  <img src="docs/marketing/portfolio/portfolio-06-website-demo-pilot.png" alt="ARGUS web sitesi, sentetik Case Challenge, demo ve kontrollü pilot yolculuğunun konsept portfolyo sayfası" width="950">
+</p>
+
+Önerilen dönüşüm yolu **Case Challenge → Capacity Calculator → Product Demo → Controlled
+Pilot** şeklindedir. Case Challenge sentetik ve açıklayıcıdır. Capacity Calculator yalnızca
+kullanıcı girdileriyle iş yükünü görselleştirir; ARGUS'un sağlayacağı verimlilik artışını tahmin
+etmez. Demo, analist iş akışını gösterir; pilot ise üretim veya performans garantisi değil,
+yönetişim altında yürütülecek kontrollü bir değerlendirme çerçevesidir.
+
+### Pazarlama teslimleri
+
+| Pazarlama teslimi | Dosya |
+| --- | --- |
+| Pazarlama Stratejisi Raporu | [PDF](docs/marketing/ARGUS_Marketing_Strategy_Report.pdf) |
+| Pazarlama Stratejisi Portfolyosu | [PDF](docs/marketing/ARGUS_Marketing_Strategy_Portfolio.pdf) |
+| Marketing Documentation | [README](docs/marketing/README.md) |
+
+<p align="center">
+  <a href="docs/marketing/ARGUS_Marketing_Strategy_Portfolio.pdf">
+    <img src="docs/marketing/portfolio/portfolio-01-cover.png" alt="ARGUS için tasarlanan B2B pazarlama stratejisinin görsel portfolyo kapağı" width="800">
+  </a>
+</p>
+
+<p align="center"><sub>ARGUS için tasarlanan çok kanallı B2B pazarlama stratejisinin görsel portfolyosu.</sub></p>
+
 ## Mimari
 
 ```mermaid
@@ -413,6 +508,20 @@ IBM AML verileri deploy edilmez.
 
 Tam çalıştırma sırası [`docs/EXPERIMENT_PROTOCOL.md`](docs/EXPERIMENT_PROTOCOL.md)
 dosyasındadır.
+
+## Dokümantasyon
+
+| Belge | İçerik |
+| --- | --- |
+| [Model Card](docs/MODEL_CARD.md) | Model performansı, davranışı, kullanım sınırları ve final model rolü |
+| [Experiment Protocol](docs/EXPERIMENT_PROTOCOL.md) | Kronolojik deney, doğrulama ve final test protokolü |
+| [Project Spec](docs/PROJECT_SPEC.md) | Proje kapsamı ve teknik sistem tanımı |
+| [Data Dictionary](docs/DATA_DICTIONARY.md) | Veri alanları ve türetilen özelliklerin sözlüğü |
+| [Decision Log](docs/DECISIONS.md) | Önemli teknik ve bilimsel kararların kaydı |
+| [Marketing Strategy Report](docs/marketing/ARGUS_Marketing_Strategy_Report.pdf) | Önerilen B2B pazarlama stratejisinin ayrıntılı raporu |
+| [Marketing Strategy Portfolio](docs/marketing/ARGUS_Marketing_Strategy_Portfolio.pdf) | Tasarlanan pazarlama stratejisinin konsept görsel portfolyosu |
+| [Marketing README](docs/marketing/README.md) | Konumlandırma, pazarlama hunisi ve claim/provenance sınırları |
+| [Coursework](reports/coursework/README.md) | Samsung Innovation Campus ders teslimleri |
 
 ## Ders teslimleri
 

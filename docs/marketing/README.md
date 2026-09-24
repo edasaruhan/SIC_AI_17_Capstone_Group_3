@@ -5,6 +5,28 @@ kanıt sınırlarını tanımlar. Bilimsel sonuçların kaynağı değildir; met
 [`MODEL_CARD.md`](../MODEL_CARD.md) ile [`reports/generated/`](../../reports/generated/)
 altındaki dondurulmuş raporlar esas alınır.
 
+## Marketing Deliverables
+
+- [ARGUS Marketing Strategy Report](ARGUS_Marketing_Strategy_Report.pdf)
+- [ARGUS Marketing Strategy Portfolio](ARGUS_Marketing_Strategy_Portfolio.pdf)
+- [Root Project README](../../README.md)
+
+<p align="center">
+  <a href="ARGUS_Marketing_Strategy_Portfolio.pdf">
+    <img src="portfolio/portfolio-01-cover.png" alt="ARGUS Marketing Strategy Portfolio konsept kapağı" width="820">
+  </a>
+</p>
+
+<p align="center">
+  <img src="portfolio/portfolio-02-strategy-backbone.png" alt="ARGUS için tasarlanan altı aşamalı B2B pazarlama stratejisi" width="920">
+</p>
+
+> [!NOTE]
+> Rapor ve portfolyo, ARGUS için **tasarlanmış/önerilen** B2B pazarlama stratejisini sunar.
+> Konsept görseller; gerçek müşteri, kanal performansı, etkinlik, üretim kurulumu veya bilimsel
+> sonuç kanıtı değildir. Görsellerdeki örnek sayılar ve senaryolar doğrulanmış proje metriği
+> olarak kullanılmaz.
+
 ## Konumlandırma
 
 **Kategori:** Graph-Based Financial Crime & Account Network Intelligence  
@@ -108,6 +130,8 @@ sunulmamalıdır. Gerçek uzman, etkinlik, video, webinar, müşteri veya vaka �
 | Public Case Challenge | Pazarlama amaçlı etkileşimli örnek | Sentetik, açıklayıcı ve gerçek soruşturma olmadığı belirtilir |
 | Kapasite hesaplayıcısı | Kullanıcı girdilerine dayalı iş yükü hesabı | ARGUS etkisi veya üretkenlik kazanımı olarak yorumlanmaz |
 | Pilot formu | Alan doğrulama ve başarı durumu | Oturum bazlıdır; CRM, e-posta ve kalıcı kayıt yoktur |
+| Pazarlama stratejisi raporu ve portfolyosu | Önerilen B2B yolculuğunu ve yaratıcı uygulamaları göstermek | Gerçekleşmiş kampanya, müşteri, kanal performansı, etkinlik veya üretim kanıtı değildir |
+| Konsept görsel varlıkları | Marka, içerik, webinar ve etkinlik temaslarını örneklemek | Mockup içindeki sayı, tarih, kişi, QR kodu ve arayüz değeri doğrulanmış proje sonucu sayılmaz |
 
 Güvenle kullanılabilecek ürün ifadeleri şunlardır:
 
