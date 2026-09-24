@@ -45,11 +45,6 @@ Birincil sıralama modeli **Graph-enhanced LightGBM**'dir. **GraphSAGE** yalnız
 karşılaştırıcısıdır. Bilimsel sonuçlar kronolojik ve leakage-safe protokol altında dondurulmuş,
 final test yalnızca tek seferlik değerlendirmede açılmıştır.
 
-> [!IMPORTANT]
-> ARGUS bir müşteriyi suçlu ilan etmez, hesabı otomatik olarak bloke etmez ve yaptırım kararı
-> vermez. Model skoru yalnızca inceleme önceliğidir; her vaka kaynak kayıtlarla birlikte uzman
-> analist tarafından değerlendirilmelidir.
-
 ## Bir bakışta
 
 | **5.078.345** | **518.581** | **0,690059** | **%98,0** |
@@ -426,11 +421,6 @@ Financial Crime karar vericilerinde görünürlük oluşturmak, uzmanlık ve gü
 ilgiyi ürün deneyimi, demo ve kontrollü pilot değerlendirmesine taşımak üzere tasarlanmıştır.
 Tek bir kampanya yerine, birbirini tamamlayan temas noktalarından oluşan önerilen bir B2B
 müşteri yolculuğudur.
-
-> [!NOTE]
-> Bu bölüm uygulanmış kampanya sonuçlarını değil, ARGUS için tasarlanan pazarlama konseptini
-> gösterir. Görsellerdeki kanal sayıları, kişiler, etkinlikler, tarihler, arayüz değerleri ve QR
-> kodları; gerçek müşteri, kampanya performansı, üretim kurulumu veya bilimsel sonuç kanıtı değildir.
 
 ### Strateji omurgası
 
