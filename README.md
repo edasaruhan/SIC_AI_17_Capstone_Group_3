@@ -81,10 +81,10 @@ final test yalnızca tek seferlik değerlendirmede açılmıştır.
 - [Final sonuçlar](#final-sonuçlar)
 - [Analist ürünü](#analist-ürünü)
 - [Public B2B deneyimi](#public-b2b-deneyimi)
-- [ARGUS Pazarlama Stratejisi](#argus-pazarlama-stratejisi)
 - [Mimari](#mimari)
 - [Kurulum ve kalite kontrolleri](#hızlı-başlangıç)
 - [Canlı yayın](#canlı-yayın-ve-yeniden-dağıtım)
+- [ARGUS Pazarlama Stratejisi](#argus-pazarlama-stratejisi)
 - [Dokümantasyon](#dokümantasyon)
 - [Sınırlılıklar ve sorumlu kullanım](#sınırlılıklar-ve-sorumlu-kullanım)
 
@@ -279,96 +279,6 @@ veri tabanı entegrasyonu yoktur, istek gönderilmez ve form verisi proje artifa
 Konumlandırma, hedef kitle, pazarlama hunisi, içerik planı ve claim/provenance sınırları için
 [`docs/marketing/README.md`](docs/marketing/README.md) dosyasına bakın.
 
-## ARGUS Pazarlama Stratejisi
-
-ARGUS'un pazarlama stratejisi; banka ve fintech dünyasındaki AML, Fraud, Compliance ve
-Financial Crime karar vericilerinde görünürlük oluşturmak, uzmanlık ve güven geliştirmek ve
-ilgiyi ürün deneyimi, demo ve kontrollü pilot değerlendirmesine taşımak üzere tasarlanmıştır.
-Tek bir kampanya yerine, birbirini tamamlayan temas noktalarından oluşan önerilen bir B2B
-müşteri yolculuğudur.
-
-> [!NOTE]
-> Bu bölüm uygulanmış kampanya sonuçlarını değil, ARGUS için tasarlanan pazarlama konseptini
-> gösterir. Görsellerdeki kanal sayıları, kişiler, etkinlikler, tarihler, arayüz değerleri ve QR
-> kodları; gerçek müşteri, kampanya performansı, üretim kurulumu veya bilimsel sonuç kanıtı değildir.
-
-### Strateji omurgası
-
-<p align="center">
-  <img src="docs/marketing/portfolio/portfolio-02-strategy-backbone.png" alt="ARGUS için tasarlanan altı aşamalı B2B pazarlama stratejisinin konsept portfolyo sayfası" width="950">
-</p>
-
-| Aşama | Önerilen rol |
-| --- | --- |
-| **01 · Farkındalık** | LinkedIn'de problem odaklı içeriklerle ilk temas kurmak |
-| **02 · İçerik ve Güven** | ARGUS Talks ile uzmanlık ve düşünce liderliği geliştirmek |
-| **03 · Webinar** | Belirli sektör problemlerini canlı ve daha derin bir etkileşimde ele almak |
-| **04 · B2B Etkinlik** | Dijital görünürlüğü yüz yüze ürün anlatımıyla birleştirmek |
-| **05 · Web Sitesi ve Ürün Deneyimi** | Case Challenge ve kapasite hesaplayıcısıyla yaklaşımı deneyimletmek |
-| **06 · Demo ve Pilot** | İlgiyi kontrollü değerlendirme ve pilot görüşmesine taşımak |
-
-### 01 — Farkındalık: LinkedIn
-
-<p align="center">
-  <img src="docs/marketing/portfolio/portfolio-03-linkedin-awareness.png" alt="ARGUS LinkedIn farkındalık stratejisi için hazırlanmış konsept portfolyo sayfası" width="950">
-</p>
-
-LinkedIn, önerilen stratejinin ilk düzenli B2B temas noktasıdır. İçerik sistemi; **problem**
-(alarm yükü ve önceliklendirme), **eğitim** (ağ bağlamı ve insan denetimli yapay zekâ) ve
-**dönüşüm** (ürün demosu ve kontrollü pilot ilgisi) katmanlarından oluşur. Görsellerdeki takipçi
-ve etkileşim sayıları yalnızca tasarım mockup'ıdır; gerçekleşmiş kanal performansı değildir.
-
-### 02 — İçerik ve Güven: ARGUS Talks
-
-<p align="center">
-  <img src="docs/marketing/portfolio/portfolio-04-argus-talks-webinar.png" alt="Planlanan ARGUS Talks ve webinar içerik serisinin konsept portfolyo sayfası" width="950">
-</p>
-
-**ARGUS Talks**, finansal suç, AML, Fraud, Compliance, ağ zekâsı ve sorumlu yapay zekâ
-çevresinde kurgulanan bir thought-leadership içerik serisidir. Uzun formatlı içeriklerin
-YouTube'da, seçili kısa kesitlerin LinkedIn'de değerlendirilmesi; webinarların ise daha yüksek
-etkileşimli bir katman oluşturması önerilir. Görseldeki kanal istatistikleri, konuklar ve webinar
-duyurusu konsepttir; gerçekleşmiş yayın veya etkinlik iddiası taşımaz.
-
-### 03 — B2B Etkinlikleri
-
-<p align="center">
-  <img src="docs/marketing/portfolio/portfolio-05-b2b-events.png" alt="ARGUS B2B etkinlik deneyimi için hazırlanmış konsept portfolyo sayfası" width="950">
-</p>
-
-Önerilen fiziksel deneyim; sade bir standı, ürün ekranlarını, kısa ürün anlatımını, broşür veya
-ürün föyünü ve web sitesi, demo ya da pilot sayfasına yönlendiren QR temaslarını bir araya getirir.
-Amaç, dijital farkındalığı bağımsız bir etkinlikte bırakmadan yeniden ölçülebilir dijital yolculuğa
-bağlamaktır. Bu çalışmalar gerçek bir fuar katılımı veya toplanmış müşteri adayı kanıtı değildir.
-
-### 04 — Web Sitesi, Demo ve Pilot
-
-<p align="center">
-  <img src="docs/marketing/portfolio/portfolio-06-website-demo-pilot.png" alt="ARGUS web sitesi, sentetik Case Challenge, demo ve kontrollü pilot yolculuğunun konsept portfolyo sayfası" width="950">
-</p>
-
-Önerilen dönüşüm yolu **Case Challenge → Capacity Calculator → Product Demo → Controlled
-Pilot** şeklindedir. Case Challenge sentetik ve açıklayıcıdır. Capacity Calculator yalnızca
-kullanıcı girdileriyle iş yükünü görselleştirir; ARGUS'un sağlayacağı verimlilik artışını tahmin
-etmez. Demo, analist iş akışını gösterir; pilot ise üretim veya performans garantisi değil,
-yönetişim altında yürütülecek kontrollü bir değerlendirme çerçevesidir.
-
-### Pazarlama teslimleri
-
-| Pazarlama teslimi | Dosya |
-| --- | --- |
-| Pazarlama Stratejisi Raporu | [PDF](docs/marketing/ARGUS_Marketing_Strategy_Report.pdf) |
-| Pazarlama Stratejisi Portfolyosu | [PDF](docs/marketing/ARGUS_Marketing_Strategy_Portfolio.pdf) |
-| Marketing Documentation | [README](docs/marketing/README.md) |
-
-<p align="center">
-  <a href="docs/marketing/ARGUS_Marketing_Strategy_Portfolio.pdf">
-    <img src="docs/marketing/portfolio/portfolio-01-cover.png" alt="ARGUS için tasarlanan B2B pazarlama stratejisinin görsel portfolyo kapağı" width="800">
-  </a>
-</p>
-
-<p align="center"><sub>ARGUS için tasarlanan çok kanallı B2B pazarlama stratejisinin görsel portfolyosu.</sub></p>
-
 ## Mimari
 
 ```mermaid
@@ -508,6 +418,96 @@ IBM AML verileri deploy edilmez.
 
 Tam çalıştırma sırası [`docs/EXPERIMENT_PROTOCOL.md`](docs/EXPERIMENT_PROTOCOL.md)
 dosyasındadır.
+
+## ARGUS Pazarlama Stratejisi
+
+ARGUS'un pazarlama stratejisi; banka ve fintech dünyasındaki AML, Fraud, Compliance ve
+Financial Crime karar vericilerinde görünürlük oluşturmak, uzmanlık ve güven geliştirmek ve
+ilgiyi ürün deneyimi, demo ve kontrollü pilot değerlendirmesine taşımak üzere tasarlanmıştır.
+Tek bir kampanya yerine, birbirini tamamlayan temas noktalarından oluşan önerilen bir B2B
+müşteri yolculuğudur.
+
+> [!NOTE]
+> Bu bölüm uygulanmış kampanya sonuçlarını değil, ARGUS için tasarlanan pazarlama konseptini
+> gösterir. Görsellerdeki kanal sayıları, kişiler, etkinlikler, tarihler, arayüz değerleri ve QR
+> kodları; gerçek müşteri, kampanya performansı, üretim kurulumu veya bilimsel sonuç kanıtı değildir.
+
+### Strateji omurgası
+
+<p align="center">
+  <img src="docs/marketing/portfolio/portfolio-02-strategy-backbone.png" alt="ARGUS için tasarlanan altı aşamalı B2B pazarlama stratejisinin konsept portfolyo sayfası" width="950">
+</p>
+
+| Aşama | Önerilen rol |
+| --- | --- |
+| **01 · Farkındalık** | LinkedIn'de problem odaklı içeriklerle ilk temas kurmak |
+| **02 · İçerik ve Güven** | ARGUS Talks ile uzmanlık ve düşünce liderliği geliştirmek |
+| **03 · Webinar** | Belirli sektör problemlerini canlı ve daha derin bir etkileşimde ele almak |
+| **04 · B2B Etkinlik** | Dijital görünürlüğü yüz yüze ürün anlatımıyla birleştirmek |
+| **05 · Web Sitesi ve Ürün Deneyimi** | Case Challenge ve kapasite hesaplayıcısıyla yaklaşımı deneyimletmek |
+| **06 · Demo ve Pilot** | İlgiyi kontrollü değerlendirme ve pilot görüşmesine taşımak |
+
+### 01 — Farkındalık: LinkedIn
+
+<p align="center">
+  <img src="docs/marketing/portfolio/portfolio-03-linkedin-awareness.png" alt="ARGUS LinkedIn farkındalık stratejisi için hazırlanmış konsept portfolyo sayfası" width="950">
+</p>
+
+LinkedIn, önerilen stratejinin ilk düzenli B2B temas noktasıdır. İçerik sistemi; **problem**
+(alarm yükü ve önceliklendirme), **eğitim** (ağ bağlamı ve insan denetimli yapay zekâ) ve
+**dönüşüm** (ürün demosu ve kontrollü pilot ilgisi) katmanlarından oluşur. Görsellerdeki takipçi
+ve etkileşim sayıları yalnızca tasarım mockup'ıdır; gerçekleşmiş kanal performansı değildir.
+
+### 02 — İçerik ve Güven: ARGUS Talks
+
+<p align="center">
+  <img src="docs/marketing/portfolio/portfolio-04-argus-talks-webinar.png" alt="Planlanan ARGUS Talks ve webinar içerik serisinin konsept portfolyo sayfası" width="950">
+</p>
+
+**ARGUS Talks**, finansal suç, AML, Fraud, Compliance, ağ zekâsı ve sorumlu yapay zekâ
+çevresinde kurgulanan bir thought-leadership içerik serisidir. Uzun formatlı içeriklerin
+YouTube'da, seçili kısa kesitlerin LinkedIn'de değerlendirilmesi; webinarların ise daha yüksek
+etkileşimli bir katman oluşturması önerilir. Görseldeki kanal istatistikleri, konuklar ve webinar
+duyurusu konsepttir; gerçekleşmiş yayın veya etkinlik iddiası taşımaz.
+
+### 03 — B2B Etkinlikleri
+
+<p align="center">
+  <img src="docs/marketing/portfolio/portfolio-05-b2b-events.png" alt="ARGUS B2B etkinlik deneyimi için hazırlanmış konsept portfolyo sayfası" width="950">
+</p>
+
+Önerilen fiziksel deneyim; sade bir standı, ürün ekranlarını, kısa ürün anlatımını, broşür veya
+ürün föyünü ve web sitesi, demo ya da pilot sayfasına yönlendiren QR temaslarını bir araya getirir.
+Amaç, dijital farkındalığı bağımsız bir etkinlikte bırakmadan yeniden ölçülebilir dijital yolculuğa
+bağlamaktır. Bu çalışmalar gerçek bir fuar katılımı veya toplanmış müşteri adayı kanıtı değildir.
+
+### 04 — Web Sitesi, Demo ve Pilot
+
+<p align="center">
+  <img src="docs/marketing/portfolio/portfolio-06-website-demo-pilot.png" alt="ARGUS web sitesi, sentetik Case Challenge, demo ve kontrollü pilot yolculuğunun konsept portfolyo sayfası" width="950">
+</p>
+
+Önerilen dönüşüm yolu **Case Challenge → Capacity Calculator → Product Demo → Controlled
+Pilot** şeklindedir. Case Challenge sentetik ve açıklayıcıdır. Capacity Calculator yalnızca
+kullanıcı girdileriyle iş yükünü görselleştirir; ARGUS'un sağlayacağı verimlilik artışını tahmin
+etmez. Demo, analist iş akışını gösterir; pilot ise üretim veya performans garantisi değil,
+yönetişim altında yürütülecek kontrollü bir değerlendirme çerçevesidir.
+
+### Pazarlama teslimleri
+
+| Pazarlama teslimi | Dosya |
+| --- | --- |
+| Pazarlama Stratejisi Raporu | [PDF](docs/marketing/ARGUS_Marketing_Strategy_Report.pdf) |
+| Pazarlama Stratejisi Portfolyosu | [PDF](docs/marketing/ARGUS_Marketing_Strategy_Portfolio.pdf) |
+| Marketing Documentation | [README](docs/marketing/README.md) |
+
+<p align="center">
+  <a href="docs/marketing/ARGUS_Marketing_Strategy_Portfolio.pdf">
+    <img src="docs/marketing/portfolio/portfolio-01-cover.png" alt="ARGUS için tasarlanan B2B pazarlama stratejisinin görsel portfolyo kapağı" width="800">
+  </a>
+</p>
+
+<p align="center"><sub>ARGUS için tasarlanan çok kanallı B2B pazarlama stratejisinin görsel portfolyosu.</sub></p>
 
 ## Dokümantasyon
 
